@@ -512,12 +512,12 @@ export function TranscricaoDetalhesPage() {
                   <Card className="p-5 flex flex-col">
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center flex-shrink-0">
-                          <MailOpen className="h-4 w-4 text-[#182848]" />
+                        <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: '#fffde7' }}>
+                          <MailOpen className="h-4 w-4" style={{ color: '#2D5A27' }} />
                         </div>
                         <div>
                           <h3 className="font-semibold text-primary text-sm">Agente 4</h3>
-                          <span className="inline-block mt-0.5 rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-[#182848]">
+                          <span className="inline-block mt-0.5 rounded-full px-2 py-0.5 text-xs font-medium" style={{ background: '#fffde7', color: '#2D5A27', border: '1px solid #ffe082' }}>
                             Resumo para E-mail
                           </span>
                         </div>
@@ -532,48 +532,54 @@ export function TranscricaoDetalhesPage() {
                     </div>
 
                     {/* Preview compacto */}
-                    <div className="rounded-xl overflow-hidden border border-neutral-light flex-1">
-                      <div className="bg-[#182848] px-4 py-3 text-center">
-                        <p className="text-white font-semibold text-sm truncate">{meetingTitle}</p>
+                    <div className="rounded-xl overflow-hidden border border-neutral-light flex-1" style={{ fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif" }}>
+                      {/* Header branco + borda amarela */}
+                      <div className="bg-white px-4 py-3 text-center" style={{ borderBottom: '4px solid #FFD700' }}>
+                        <img src="/lemon.meet.png" alt="Lemon.meet" style={{ maxWidth: 50, height: 'auto', marginBottom: 6, display: 'inline-block' }} />
+                        <p className="font-semibold text-sm truncate" style={{ color: '#2D5A27' }}>{meetingTitle}</p>
                         {transcricao.email_lead && (
-                          <p className="text-white/60 text-xs mt-0.5 truncate">{transcricao.email_lead}</p>
+                          <p className="text-xs mt-0.5 truncate" style={{ color: '#666' }}>{transcricao.email_lead}</p>
                         )}
                       </div>
                       {scoreNum !== null && (
-                        <div className="bg-[#1e3a6e] px-4 py-3 text-center">
-                          <span className="block text-[9px] uppercase tracking-wider text-white/60 mb-1">Meet Score</span>
-                          <span className="block text-3xl font-extrabold text-[#FF914D] leading-none">{scoreNum}/10</span>
-                          <div className="mx-auto mt-2 w-32 h-2 rounded-full bg-white/20 overflow-hidden">
-                            <div className="h-full rounded-full bg-[#FF914D]" style={{ width: `${scoreNum * 10}%` }} />
+                        <div className="px-4 py-3 text-center" style={{ backgroundColor: '#fcfdf3', borderBottom: '1px solid #eee' }}>
+                          <span className="block mb-2" style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: 2, color: '#2D5A27', opacity: 0.9 }}>Diagnóstico Meet Score</span>
+                          <div className="mx-auto mb-2" style={{ width: 60, height: 60, background: '#fff', border: '3px solid #FFD700', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <span style={{ fontSize: 26, fontWeight: 800, color: '#FFD700', lineHeight: 1 }}>
+                              {scoreNum}<span style={{ fontSize: 10, color: '#2D5A27', fontWeight: 'normal', verticalAlign: 'super' }}>/10</span>
+                            </span>
+                          </div>
+                          <div className="mx-auto" style={{ background: 'rgba(0,0,0,0.08)', height: 7, borderRadius: 4, width: '70%', overflow: 'hidden' }}>
+                            <div style={{ background: '#FFD700', height: '100%', borderRadius: 4, width: `${scoreNum * 10}%` }} />
                           </div>
                         </div>
                       )}
                       {resumo && (
                         <div className="bg-white px-4 py-3">
-                          <p className="text-[10px] font-bold uppercase tracking-wider text-[#182848] border-l-4 border-[#FF914D] pl-2 mb-1.5">Resumo Executivo</p>
-                          <p className="text-xs text-secondary whitespace-pre-line">{resumo}</p>
+                          <p className="font-bold uppercase mb-1.5" style={{ color: '#2D5A27', borderLeft: '3px solid #4CAF50', paddingLeft: 8, fontSize: 10 }}>Resumo Executivo</p>
+                          <p className="text-xs whitespace-pre-line" style={{ color: '#444' }}>{resumo}</p>
                         </div>
                       )}
                       {decisoes.length > 0 && (
-                        <div className="bg-white px-4 py-3 border-t border-neutral-light">
-                          <p className="text-[10px] font-bold uppercase tracking-wider text-[#182848] border-l-4 border-[#FF914D] pl-2 mb-1.5">Principais Decisões</p>
-                          <ul className="space-y-1">
+                        <div className="px-4 py-3" style={{ borderTop: '1px solid #eee', background: '#fff' }}>
+                          <p className="font-bold uppercase mb-1.5" style={{ color: '#2D5A27', borderLeft: '3px solid #4CAF50', paddingLeft: 8, fontSize: 10 }}>Principais Decisões</p>
+                          <ul className="pl-4 space-y-1">
                             {decisoes.map((d, i) => (
-                              <li key={i} className="flex gap-1.5 text-xs text-secondary"><span className="text-[#FF914D] font-bold flex-shrink-0">•</span>{d}</li>
+                              <li key={i} className="text-xs" style={{ color: '#444' }}>{d}</li>
                             ))}
                           </ul>
                         </div>
                       )}
                       {analiseVendedor && (
-                        <div className="bg-blue-50/50 px-4 py-3 border-t border-neutral-light">
-                          <p className="text-[10px] font-bold uppercase tracking-wider text-[#182848] border-l-4 border-[#FF914D] pl-2 mb-1.5">Análise de Saúde do Deal</p>
-                          <p className="text-xs text-secondary whitespace-pre-line">{analiseVendedor}</p>
+                        <div className="px-4 py-3" style={{ borderTop: '1px solid #eee', background: '#fafafa', borderLeft: '3px solid #2D5A27' }}>
+                          <p className="font-bold uppercase mb-1.5" style={{ color: '#2D5A27', borderLeft: '3px solid #4CAF50', paddingLeft: 8, fontSize: 10 }}>Análise de Saúde do Deal</p>
+                          <p className="text-xs whitespace-pre-line" style={{ color: '#444' }}>{analiseVendedor}</p>
                         </div>
                       )}
                       {proximosPassos && (
-                        <div className="bg-yellow-50 px-4 py-3 border-t border-yellow-200">
-                          <p className="text-[10px] font-bold uppercase tracking-wider text-[#182848] border-l-4 border-[#FF914D] pl-2 mb-1.5">Ações Imediatas</p>
-                          <p className="text-xs text-secondary whitespace-pre-line">{proximosPassos}</p>
+                        <div className="px-4 py-3" style={{ borderTop: '1px solid #c8e6c9', background: '#e8f5e9' }}>
+                          <p className="font-bold uppercase mb-1.5" style={{ color: '#2D5A27', borderLeft: '3px solid #4CAF50', paddingLeft: 8, fontSize: 10 }}>Ações Imediatas</p>
+                          <p className="text-xs whitespace-pre-line font-medium" style={{ color: '#1b5e20' }}>{proximosPassos}</p>
                         </div>
                       )}
                       {!json && (
