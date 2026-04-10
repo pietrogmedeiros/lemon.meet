@@ -4,10 +4,10 @@ FROM node:20-bookworm-slim AS builder
 WORKDIR /app
 
 # Install pnpm
-RUN npm install -g pnpm@8
+RUN npm install -g pnpm@10
 
 # Copy workspace configuration
-COPY pnpm-workspace.yaml package.json pnpm-lock.yaml* ./
+COPY pnpm-workspace.yaml package.json pnpm-lock.yaml* tsconfig.json ./
 
 # Copy package.json files
 COPY server/package.json ./server/
@@ -69,13 +69,14 @@ ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
 WORKDIR /app
 
 # Install pnpm
-RUN npm install -g pnpm@8
+RUN npm install -g pnpm@10
 
 # Copy workspace configuration
-COPY pnpm-workspace.yaml package.json ./
+COPY pnpm-workspace.yaml package.json pnpm-lock.yaml* ./
 
 # Copy server package.json
 COPY server/package.json ./server/
+COPY web/package.json ./web/
 
 # Install production dependencies only
 RUN pnpm install --frozen-lockfile --prod --filter @vibe-ai/server

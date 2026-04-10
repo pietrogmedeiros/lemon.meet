@@ -1,8 +1,4 @@
 <div align="center">
-  <img src="https://raw.githubusercontent.com/pietrogmedeiros/lemon.meet/main/web/public/lemon.meet.png" alt="Lemon.meet" width="280" />
-  
-  <br/>
-  <br/>
 
   [![React](https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react)](https://react.dev)
   [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=flat-square&logo=typescript)](https://www.typescriptlang.org)
@@ -13,30 +9,6 @@
   <p><strong>Plataforma inteligente de análise de reuniões do Google Meet</strong><br/>
   Transcrições automáticas, diagnóstico de qualidade e insights acionáveis gerados por IA.</p>
 </div>
-
----
-
-## 📸 Screenshots
-
-### Login
-![Login Page](docs/screenshots/login.png)
-
-### Dashboard — Visão Geral das Reuniões
-![Dashboard](docs/screenshots/dashboard.png)
-
-### Reuniões — Grade de Cards com Meet Score
-![Meetings](docs/screenshots/meetings.png)
-
-### Detalhes da Reunião — Análise dos Agentes de IA
-![Meeting Details](docs/screenshots/meeting-details.png)
-
-### E-mail de Diagnóstico — Agente 4
-![Email Preview](docs/screenshots/email-preview.png)
-
-### Insights — Qualidade e Métricas em Tempo Real
-![Insights](docs/screenshots/insights.png)
-
-> **Adicione os screenshots** na pasta `docs/screenshots/` para exibi-los aqui.
 
 ---
 
@@ -241,4 +213,4 @@ MIT © [Pietro Medeiros](https://github.com/pietrogmedeiros)
 
 ---
 
-Desenvolvido com ❤️ por [Seu Nome]
+Desenvolvido com ❤️ por [Pietro Medeiros](https://github.com/pietrogmedeiros)

@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   server:
     build:
@@ -39,10 +37,29 @@ services:
       retries: 3
       start_period: 40s
 
+  web:
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+      args:
+        - VITE_SUPABASE_URL=${SUPABASE_URL}
+        - VITE_SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+        - VITE_API_URL=http://localhost:3000
+    container_name: vibe-ai-web
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      - server
+    networks:
+      - vibe-ai-network
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
 networks:
   vibe-ai-network:
     driver: bridge
-
-volumes:
-  puppeteer-cache:
-    driver: local

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { MainLayout } from '@/components/layout';
-import { Card, Button, Badge } from '@/components/ui';
+import { Card, Badge } from '@/components/ui';
 import { FileText, Clock, Calendar, TrendingUp, User, Mail } from 'lucide-react';
 import { formatDate, formatTime } from '@/lib';
 
