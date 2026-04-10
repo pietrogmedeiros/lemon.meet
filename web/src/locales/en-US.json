@@ -1,0 +1,123 @@
+{
+  "app": {
+    "name": "Lemon.meet",
+    "tagline": "Intelligent transcription for Google Meet meetings"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "meetings": "Meetings",
+    "insights": "Insights",
+    "settings": "Settings",
+    "logout": "Logout"
+  },
+  "topbar": {
+    "meetLinkPlaceholder": "Paste the Google Meet link (e.g., https://meet.google.com/abc-defg-hij)",
+    "joinButton": "Join",
+    "invalidUrl": "Invalid URL. Use format: https://meet.google.com/abc-defg-hij",
+    "language": "Language",
+    "theme": {
+      "light": "Light mode",
+      "dark": "Dark mode"
+    }
+  },
+  "dashboard": {
+    "title": "Your Meetings",
+    "subtitle": "Track all your transcribed meetings and generated insights",
+    "stats": {
+      "totalMeetings": "Total Meetings",
+      "hoursTranscribed": "Hours Transcribed",
+      "thisMonth": "This Month"
+    },
+    "viewInsights": "View Insights",
+    "viewLive": "View Live",
+    "emptyState": {
+      "title": "No meetings yet",
+      "subtitle": "Paste a Google Meet link to get started"
+    }
+  },
+  "meeting": {
+    "status": {
+      "recording": "Recording",
+      "processing": "Processing",
+      "completed": "Completed",
+      "failed": "Failed"    },
+    "activeTitle": "Meeting in Progress",
+    "stopRecording": "Stop Recording",
+    "stopping": "Stopping...",
+    "connected": "Connected to server",
+    "disconnected": "Disconnected",
+    "startedAt": "Started at",
+    "transcriptChunks": "Segments",
+    "segments": "segments",
+    "wordCount": "Words",
+    "words": "words",
+    "audioStatus": "Audio Status",
+    "recording": "Recording",
+    "transcribing": "Transcribing",
+    "liveTranscript": "Live Transcript",
+    "waitingForTranscript": "Waiting for transcription...",
+    "transcriptHint": "Transcription will appear in real-time as people speak",
+    "error": {
+      "stopFailed": "Error stopping recording. Please try again."    }
+  },
+  "insights": {
+    "title": "Meeting Insights",
+    "notGenerated": "Insights not generated yet",
+    "notGeneratedHint": "Click the button below to generate intelligent insights from this meeting using AI",
+    "generate": "Generate Insights",
+    "generating": "Generating...",
+    "noTranscript": "Transcript not available",
+    "metrics": "Metrics",
+    "sentiment": "Sentiment",
+    "sentiments": {
+      "positive": "Positive",
+      "neutral": "Neutral",
+      "negative": "Negative"
+    },
+    "commercialQuality": "Commercial Quality",
+    "closingProbability": "Closing Probability",
+    "meetingInfo": "Meeting Info",
+    "date": "Date",
+    "time": "Time",
+    "words": "Words",
+    "executiveContext": "Executive Summary",
+    "keyTopics": "Key Topics",
+    "actionItems": "Action Items",
+    "followUp": "Follow-up",
+    "fullTranscript": "Full Transcript",
+    "error": {
+      "generationFailed": "Error generating insights. Please try again."
+    }
+  },
+  "auth": {
+    "login": {
+      "title": "Welcome to Vibe AI",
+      "subtitle": "Sign in with your Google account to get started",
+      "button": "Sign in with Google",
+      "loading": "Signing in..."
+    },
+    "logout": {
+      "button": "Logout",
+      "confirm": "Are you sure you want to logout?"
+    }
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "save": "Save",
+    "delete": "Delete",
+    "edit": "Edit",
+    "back": "Back",
+    "next": "Next",
+    "close": "Close",
+    "active": "Active",
+    "inactive": "Inactive",
+    "waiting": "Waiting"
+  },
+  "date": {
+    "format": "MM-DD-YYYY"
+  }
+}

@@ -1,0 +1,5 @@
+export { LoginPage } from './LoginPage'
+export { DashboardPage } from './DashboardPage'
+export { MeetingsPage } from './MeetingsPage'
+export { TranscricaoDetalhesPage } from './TranscricaoDetalhesPage'
+export { InsightsPage } from './InsightsPage'

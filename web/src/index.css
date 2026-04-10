@@ -1,0 +1,59 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-neutral-light dark:border-gray-700;
+  }
+
+  body {
+    @apply bg-background dark:bg-gray-900 text-primary dark:text-gray-100 font-sans antialiased;
+    font-feature-settings: 'cv11', 'ss01';
+    font-variation-settings: 'opsz' auto;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  button {
+    @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2;
+  }
+}
+
+@layer components {
+  /* Cards */
+  .card {
+    @apply bg-white border border-neutral-light rounded-lg shadow-sm;
+  }
+
+  /* Inputs */
+  .input {
+    @apply w-full px-4 py-2 rounded-md;
+    @apply border border-neutral-light;
+    @apply focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent;
+    @apply text-neutral-dark;
+  }
+}
+
+@layer utilities {
+  /* Typography utilities */
+  .text-headline-1 {
+    @apply text-2xl font-bold leading-8;
+  }
+  
+  .text-headline-2 {
+    @apply text-lg font-semibold leading-6;
+  }
+  
+  .text-body-large {
+    @apply text-base leading-6;
+  }
+  
+  .text-body-small {
+    @apply text-xs leading-4;
+  }
+}

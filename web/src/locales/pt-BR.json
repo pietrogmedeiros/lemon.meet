@@ -1,0 +1,125 @@
+{
+  "app": {
+    "name": "Lemon.meet",
+    "tagline": "Transcrição inteligente de reuniões do Google Meet"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "meetings": "Reuniões",
+    "insights": "Insights",
+    "settings": "Configurações",
+    "logout": "Sair"
+  },
+  "topbar": {
+    "meetLinkPlaceholder": "Cole o link do Google Meet (ex: https://meet.google.com/abc-defg-hij)",
+    "joinButton": "Entrar",
+    "invalidUrl": "URL inválida. Use o formato: https://meet.google.com/abc-defg-hij",
+    "language": "Idioma",
+    "theme": {
+      "light": "Modo claro",
+      "dark": "Modo escuro"
+    }
+  },
+  "dashboard": {
+    "title": "Suas Reuniões",
+    "subtitle": "Acompanhe todas as suas reuniões transcritas e insights gerados",
+    "stats": {
+      "totalMeetings": "Total de Reuniões",
+      "hoursTranscribed": "Horas Transcritas",
+      "thisMonth": "Este Mês"
+    },
+    "viewInsights": "Ver Insights",
+    "viewLive": "Ver Ao Vivo",
+    "emptyState": {
+      "title": "Nenhuma reunião ainda",
+      "subtitle": "Cole o link de uma reunião do Google Meet para começar"
+    }
+  },
+  "meeting": {
+    "status": {
+      "recording": "Gravando",
+      "processing": "Processando",
+      "completed": "Finalizada",
+      "failed": "Erro"
+    },
+    "activeTitle": "Reunião em Andamento",
+    "stopRecording": "Parar Gravação",
+    "stopping": "Parando...",
+    "connected": "Conectado ao servidor",
+    "disconnected": "Desconectado",
+    "startedAt": "Iniciada às",
+    "transcriptChunks": "Segmentos",
+    "segments": "segmentos",
+    "wordCount": "Palavras",
+    "words": "palavras",
+    "audioStatus": "Status do Áudio",
+    "recording": "Gravação",
+    "transcribing": "Transcrição",
+    "liveTranscript": "Transcrição ao Vivo",
+    "waitingForTranscript": "Aguardando transcrição...",
+    "transcriptHint": "A transcrição aparecerá em tempo real conforme as pessoas falam",
+    "error": {
+      "stopFailed": "Erro ao parar a gravação. Tente novamente."
+    }
+  },
+  "insights": {
+    "title": "Insights da Reunião",
+    "notGenerated": "Insights ainda não gerados",
+    "notGeneratedHint": "Clique no botão abaixo para gerar insights inteligentes desta reunião usando IA",
+    "generate": "Gerar Insights",
+    "generating": "Gerando...",
+    "noTranscript": "Transcrição não disponível",
+    "metrics": "Métricas",
+    "sentiment": "Sentimento",
+    "sentiments": {
+      "positive": "Positivo",
+      "neutral": "Neutro",
+      "negative": "Negativo"
+    },
+    "commercialQuality": "Qualidade Comercial",
+    "closingProbability": "Probabilidade de Fechamento",
+    "meetingInfo": "Informações da Reunião",
+    "date": "Data",
+    "time": "Horário",
+    "words": "Palavras",
+    "executiveContext": "Contexto Executivo",
+    "keyTopics": "Tópicos-Chave",
+    "actionItems": "Itens de Ação",
+    "followUp": "Próximos Passos",
+    "fullTranscript": "Transcrição Completa",
+    "error": {
+      "generationFailed": "Erro ao gerar insights. Tente novamente."
+    }
+  },
+  "auth": {
+    "login": {
+      "title": "Bem-Vindo ao Lemon 😉",
+      "subtitle": "Entre com sua conta Google para começar",
+      "button": "Entrar com Google",
+      "loading": "Entrando..."
+    },
+    "logout": {
+      "button": "Sair",
+      "confirm": "Tem certeza que deseja sair?"
+    }
+  },
+  "common": {
+    "loading": "Carregando...",
+    "error": "Erro",
+    "success": "Sucesso",
+    "cancel": "Cancelar",
+    "confirm": "Confirmar",
+    "save": "Salvar",
+    "delete": "Excluir",
+    "edit": "Editar",
+    "back": "Voltar",
+    "next": "Próximo",
+    "close": "Fechar",
+    "active": "Ativo",
+    "inactive": "Inativo",
+    "waiting": "Aguardando"
+  },
+  "date": {
+    "format": "DD-MM-AAAA"
+  }
+}

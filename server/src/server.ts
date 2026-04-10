@@ -1,0 +1,105 @@
+import express, { type Express } from 'express'
+import { createServer } from 'http'
+import cors from 'cors'
+import helmet from 'helmet'
+import morgan from 'morgan'
+import rateLimit from 'express-rate-limit'
+import dotenv from 'dotenv'
+import transcricoesRouter from './routes/transcricoes.routes.js'
+
+// Load environment variables
+dotenv.config()
+
+const app: Express = express()
+const httpServer = createServer(app)
+const PORT = process.env.PORT || 3000
+
+// Middleware
+app.use(helmet())
+app.use(cors({
+  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  credentials: true,
+}))
+app.use(morgan('dev'))
+app.use(express.json())
+app.use(express.urlencoded({ extended: true }))
+
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 100, // 100 requests per minute per IP
+  message: 'Too many requests from this IP, please try again later',
+})
+app.use('/api', limiter)
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+  })
+})
+
+// API Routes
+app.use('/api/transcricoes', transcricoesRouter)
+
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({ error: 'Route not found' })
+})
+
+// Error handler
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error('[Server Error]', err)
+  res.status(err.status || 500).json({
+    error: err.message || 'Internal server error',
+  })
+})
+
+// Start server
+httpServer.listen(PORT, () => {
+  console.log(`
+╔══════════════════════════════════════════════════════════╗
+║                                                          ║
+║                 🎙️  VIBE AI SERVER 🎙️                  ║
+║                                                          ║
+║  Status: Online ✅                                        ║
+║  Port: ${PORT}                                        ║
+║  Environment: ${process.env.NODE_ENV || 'development'}                              ║
+║                                                          ║
+║  API Transcrições: /api/transcricoes                     ║
+║  Health Check: /health                                   ║
+║                                                          ║
+╚══════════════════════════════════════════════════════════╝
+  `)
+})
+
+// Graceful shutdown
+const shutdown = async () => {
+  console.log('Shutdown initiated...')
+  
+  // Fecha servidor HTTP
+  httpServer.close(() => {
+    console.log('Server closed')
+    process.exit(0)
+  })
+  
+  // Força saída após 10 segundos
+  setTimeout(() => {
+    console.error('Forced shutdown after timeout')
+    process.exit(1)
+  }, 10000)
+}
+
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received, shutting down gracefully...')
+  shutdown()
+})
+
+process.on('SIGINT', () => {
+  console.log('SIGINT received, shutting down gracefully...')
+  shutdown()
+})
+
+export { app, httpServer }

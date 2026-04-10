@@ -1,0 +1,22 @@
+{
+  "name": "vibe-ai",
+  "version": "1.0.0",
+  "private": true,
+  "description": "SaaS que entra em reuniões do Google Meet, transcreve e gera insights inteligentes",
+  "scripts": {
+    "dev": "pnpm --parallel --filter web --filter server dev",
+    "dev:web": "pnpm --filter web dev",
+    "dev:server": "pnpm --filter server dev",
+    "build": "pnpm --filter web build && pnpm --filter server build",
+    "test": "pnpm --recursive test",
+    "lint": "pnpm --recursive lint",
+    "clean": "pnpm --recursive exec rm -rf dist node_modules"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5"
+  }
+}

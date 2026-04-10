@@ -1,0 +1,123 @@
+{
+  "app": {
+    "name": "Lemon.meet",
+    "tagline": "Transcripción inteligente de reuniones de Google Meet"
+  },
+  "nav": {
+    "dashboard": "Panel",
+    "meetings": "Reuniones",
+    "insights": "Insights",
+    "settings": "Configuración",
+    "logout": "Salir"
+  },
+  "topbar": {
+    "meetLinkPlaceholder": "Pega el enlace de Google Meet (ej: https://meet.google.com/abc-defg-hij)",
+    "joinButton": "Entrar",
+    "invalidUrl": "URL inválida. Use el formato: https://meet.google.com/abc-defg-hij",
+    "language": "Idioma",
+    "theme": {
+      "light": "Modo claro",
+      "dark": "Modo oscuro"
+    }
+  },
+  "dashboard": {
+    "title": "Tus Reuniones",
+    "subtitle": "Sigue todas tus reuniones transcritas e insights generados",
+    "stats": {
+      "totalMeetings": "Total de Reuniones",
+      "hoursTranscribed": "Horas Transcritas",
+      "thisMonth": "Este Mes"
+    },
+    "viewInsights": "Ver Insights",    "viewLive": "Ver en Vivo",    "emptyState": {
+      "title": "Sin reuniones todavía",
+      "subtitle": "Pega un enlace de Google Meet para comenzar"
+    }
+  },
+  "meeting": {
+    "status": {
+      "recording": "Grabando",
+      "processing": "Procesando",
+      "completed": "Finalizada",
+      "failed": "Error"
+    },
+    "activeTitle": "Reunión en Curso",
+    "stopRecording": "Detener Grabación",
+    "stopping": "Deteniendo...",
+    "connected": "Conectado al servidor",
+    "disconnected": "Desconectado",
+    "startedAt": "Iniciada a las",
+    "transcriptChunks": "Segmentos",
+    "segments": "segmentos",
+    "wordCount": "Palabras",
+    "words": "palabras",
+    "audioStatus": "Estado del Audio",
+    "recording": "Grabación",
+    "transcribing": "Transcripción",
+    "liveTranscript": "Transcripción en Vivo",
+    "waitingForTranscript": "Esperando transcripción...",
+    "transcriptHint": "La transcripción aparecerá en tiempo real mientras las personas hablan",
+    "error": {
+      "stopFailed": "Error al detener la grabación. Inténtalo de nuevo."
+    }
+  },
+  "insights": {
+    "title": "Insights de la Reunión",
+    "notGenerated": "Insights aún no generados",
+    "notGeneratedHint": "Haz clic en el botón abajo para generar insights inteligentes de esta reunión usando IA",
+    "generate": "Generar Insights",
+    "generating": "Generando...",
+    "noTranscript": "Transcripción no disponible",
+    "metrics": "Métricas",
+    "sentiment": "Sentimiento",
+    "sentiments": {
+      "positive": "Positivo",
+      "neutral": "Neutral",
+      "negative": "Negativo"
+    },
+    "commercialQuality": "Calidad Comercial",
+    "closingProbability": "Probabilidad de Cierre",
+    "meetingInfo": "Info de la Reunión",
+    "date": "Fecha",
+    "time": "Hora",
+    "words": "Palabras",
+    "executiveContext": "Resumen Ejecutivo",
+    "keyTopics": "Tópicos Clave",
+    "actionItems": "Items de Acción",
+    "followUp": "Seguimiento",
+    "fullTranscript": "Transcripción Completa",
+    "error": {
+      "generationFailed": "Error al generar insights. Inténtalo de nuevo."
+    }
+  },
+  "auth": {
+    "login": {
+      "title": "Bienvenido a Vibe AI",
+      "subtitle": "Inicia sesión con tu cuenta de Google para comenzar",
+      "button": "Iniciar sesión con Google",
+      "loading": "Iniciando sesión..."
+    },
+    "logout": {
+      "button": "Salir",
+      "confirm": "¿Estás seguro de que quieres salir?"
+    }
+  },
+  "common": {
+    "loading": "Cargando...",
+    "error": "Error",
+    "success": "Éxito",
+    "cancel": "Cancelar",
+    "confirm": "Confirmar",
+    "save": "Guardar",
+    "delete": "Eliminar",
+    "edit": "Editar",
+    "back": "Volver",
+    "next": "Siguiente",
+    "close": "Cerrar",
+    "active": "Activo",
+    "inactive": "Inactivo",
+    "waiting": "Esperando"
+  },
+  "date": {
+    "format": "DD-MM-AAAA"
+  }
+}

@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  server:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    container_name: vibe-ai-server
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:5173}
+      - SOCKET_IO_CORS_ORIGIN=${SOCKET_IO_CORS_ORIGIN:-http://localhost:5173}
+      - PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+      - PUPPETEER_HEADLESS=true
+      - MAX_CONCURRENT_MEETINGS=${MAX_CONCURRENT_MEETINGS:-5}
+      - MEETING_TIMEOUT_MS=${MEETING_TIMEOUT_MS:-7200000}
+    volumes:
+      - /dev/shm:/dev/shm
+    shm_size: 2gb
+    mem_limit: 2g
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    networks:
+      - vibe-ai-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  vibe-ai-network:
+    driver: bridge
+
+volumes:
+  puppeteer-cache:
+    driver: local
