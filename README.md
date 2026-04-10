@@ -1,163 +1,236 @@
-# 🎙️ Vibe AI
+<div align="center">
+  <img src="https://raw.githubusercontent.com/pietrogmedeiros/lemon.meet/main/web/public/lemon.meet.png" alt="Lemon.meet" width="280" />
+  
+  <br/>
+  <br/>
 
-> **SaaS de transcrição e insights inteligentes para reuniões do Google Meet**
+  [![React](https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react)](https://react.dev)
+  [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=flat-square&logo=typescript)](https://www.typescriptlang.org)
+  [![Supabase](https://img.shields.io/badge/Supabase-Auth%20%2B%20DB-3ECF8E?style=flat-square&logo=supabase)](https://supabase.com)
+  [![Tailwind CSS](https://img.shields.io/badge/Tailwind-CSS-38BDF8?style=flat-square&logo=tailwindcss)](https://tailwindcss.com)
+  [![OpenAI](https://img.shields.io/badge/OpenAI-GPT--4o-412991?style=flat-square&logo=openai)](https://openai.com)
 
-Vibe AI é uma plataforma que automatiza a participação em reuniões do Google Meet através de um bot inteligente, realiza transcrição em tempo real usando Whisper API e gera insights acionáveis com GPT-4o.
+  <p><strong>Plataforma inteligente de análise de reuniões do Google Meet</strong><br/>
+  Transcrições automáticas, diagnóstico de qualidade e insights acionáveis gerados por IA.</p>
+</div>
+
+---
+
+## 📸 Screenshots
+
+### Login
+![Login Page](docs/screenshots/login.png)
+
+### Dashboard — Visão Geral das Reuniões
+![Dashboard](docs/screenshots/dashboard.png)
+
+### Reuniões — Grade de Cards com Meet Score
+![Meetings](docs/screenshots/meetings.png)
+
+### Detalhes da Reunião — Análise dos Agentes de IA
+![Meeting Details](docs/screenshots/meeting-details.png)
+
+### E-mail de Diagnóstico — Agente 4
+![Email Preview](docs/screenshots/email-preview.png)
+
+### Insights — Qualidade e Métricas em Tempo Real
+![Insights](docs/screenshots/insights.png)
+
+> **Adicione os screenshots** na pasta `docs/screenshots/` para exibi-los aqui.
+
+---
 
 ## ✨ Funcionalidades
 
-- 🤖 **Bot Automatizado**: Entra automaticamente em reuniões do Google Meet
-- 🎤 **Transcrição em Tempo Real**: Transcrição precisa usando OpenAI Whisper API
-- 📊 **Insights Inteligentes**: Análise de sentimento, qualidade comercial e contexto executivo
-- 🔄 **WebSocket Real-Time**: Visualização de transcrição ao vivo durante a reunião
-- 🌍 **Multilíngue**: Suporte para PT-BR, EN-US e ES
-- 🌓 **Dark/Light Mode**: Interface adaptável com design moderno
-- 🔐 **Autenticação Google**: Login seguro via OAuth do Google
-- 📈 **Dashboard Intuitivo**: Gerenciamento fácil de todas as reuniões
+| Recurso | Descrição |
+|---|---|
+| 🔐 **Google OAuth** | Login seguro com conta Google via Supabase Auth |
+| 📋 **Dashboard** | Visão geral de todas as reuniões com status e Meet Score |
+| 🗂️ **Reuniões** | Grade de cards com filtro por status e score de qualidade |
+| 🤖 **Agente 1** | Estrutura da reunião: participantes, empresas e pontos-chave |
+| 📝 **Agente 2** | Resumo executivo completo em Markdown |
+| 📊 **Agente 3** | Avaliação detalhada da reunião com Meet Score (0–10) |
+| 📧 **Agente 4** | Diagnóstico formatado para e-mail com score visual e ações imediatas |
+| 📈 **Insights** | Análise agregada: ranking de qualidade, empresas, responsáveis e tendências |
+| 🌍 **Multilíngue** | Interface em PT-BR, EN-US e ES |
+
+---
+
+## 🤖 Agentes de IA
+
+O Lemon.meet processa cada reunião com 4 agentes especializados:
+
+```
+Reunião Transcrita
+      │
+      ├── Agente 1 ──► Estrutura (participantes, empresas, tópicos)
+      ├── Agente 2 ──► Resumo executivo em texto
+      ├── Agente 3 ──► Avaliação qualitativa + Meet Score /10
+      └── Agente 4 ──► Diagnóstico completo para e-mail
+                        (score visual, decisões, análise de deal, ações)
+```
+
+### Meet Score
+Cada reunião recebe uma nota de **0 a 10** baseada em critérios comerciais e de condução:
+- ≥ 8 → Alta qualidade 🟢
+- 5–7 → Qualidade média 🟡
+- < 5 → Necessita atenção 🔴
+
+---
 
 ## 🛠️ Tech Stack
 
 ### Frontend
-- **React 18** com TypeScript
-- **Vite** para build ultrarrápido
-- **Tailwind CSS** para estilização
-- **Lucide React** para ícones
-- **i18next** para internacionalização
-- **Socket.io Client** para WebSocket
+- **React 18** + TypeScript
+- **Vite 5** — build ultrarrápido
+- **Tailwind CSS v3** — design system customizado com cores Lemon.meet
+- **React Router v6** — navegação SPA
+- **i18next** — internacionalização (PT-BR / EN-US / ES)
+- **Lucide React** — ícones
 
 ### Backend
-- **Node.js 20+** com Express
-- **TypeScript** para type safety
-- **Socket.io** para comunicação real-time
-- **Puppeteer** para automação do Google Meet
-- **OpenAI API** (Whisper + GPT-4o)
+- **Node.js 20+** + Express + TypeScript
+- **Supabase** — PostgreSQL + Auth (Google OAuth)
+- **Puppeteer** — automação do Google Meet
+- **OpenAI API** — Whisper (transcrição) + GPT-4o (agentes)
+- **Socket.io** — comunicação em tempo real
 
 ### Infraestrutura
-- **Supabase** (PostgreSQL + Auth)
-- **Docker** para containerização
-- **pnpm** para gerenciamento de monorepo
+- **Supabase** — banco de dados e autenticação
+- **Docker** + Docker Compose
+- **pnpm** — monorepo
+
+---
 
 ## 🚀 Quick Start
+
+### Pré-requisitos
+- Node.js 20+
+- pnpm (`npm install -g pnpm`)
+- Conta Supabase
+- Chave de API OpenAI
 
 ### 1. Clone o repositório
 
 ```bash
-git clone https://github.com/seu-usuario/vibe-ai.git
-cd vibe-ai
+git clone https://github.com/pietrogmedeiros/lemon.meet.git
+cd lemon.meet
 ```
 
 ### 2. Instale as dependências
 
 ```bash
-npm install -g pnpm
 pnpm install
 ```
 
 ### 3. Configure as variáveis de ambiente
 
 ```bash
+# Raiz do projeto
 cp .env.example .env
-# Edite o .env com suas credenciais
+
+# Frontend
+cp web/.env.example web/.env
 ```
 
-### 4. Execute o projeto
+Edite `web/.env`:
 
-**Opção A: Desenvolvimento Local**
+```env
+VITE_SUPABASE_URL=https://seu-projeto.supabase.co
+VITE_SUPABASE_ANON_KEY=sua-anon-key
+VITE_API_URL=http://localhost:3000
+```
+
+Edite `.env` (backend):
+
+```env
+SUPABASE_URL=https://seu-projeto.supabase.co
+SUPABASE_SERVICE_KEY=sua-service-role-key
+OPENAI_API_KEY=sk-...
+PORT=3000
+```
+
+### 4. Configure o Supabase
+
+Execute os scripts SQL no Supabase SQL Editor:
+
 ```bash
+# 1. Criar tabelas
+supabase-setup.sql
+
+# 2. Criar usuário de serviço
+supabase-create-user.sql
+```
+
+Consulte [SUPABASE_SETUP_GUIDE.md](./SUPABASE_SETUP_GUIDE.md) para instruções detalhadas.
+
+### 5. Execute o projeto
+
+```bash
+# Desenvolvimento (frontend + backend em paralelo)
 pnpm dev
-```
 
-**Opção B: Docker (Recomendado)**
-```bash
+# Ou com Docker
 docker-compose up --build
 ```
 
-### 5. Acesse a aplicação
+### 6. Acesse
 
-- Frontend: http://localhost:5173
-- Backend API: http://localhost:3000
+| Serviço | URL |
+|---|---|
+| Frontend | http://localhost:5173 |
+| Backend API | http://localhost:3000 |
 
-## 📖 Documentação Completa
+---
 
-Para instruções detalhadas de configuração, troubleshooting e deployment, consulte [instructions.md](./instructions.md).
-
-## 🏗️ Arquitetura
+## 📁 Estrutura do Projeto
 
 ```
-┌─────────────────┐         ┌──────────────────┐
-│                 │         │                  │
-│  React Frontend │◄────────│  Express Backend │
-│   (Port 5173)   │ Socket  │   (Port 3000)    │
-│                 │  .io    │                  │
-└─────────────────┘         └────────┬─────────┘
-                                     │
-                 ┌───────────────────┼──────────────────┐
-                 │                   │                  │
-         ┌───────▼─────┐    ┌────────▼────┐   ┌────────▼────┐
-         │             │    │             │   │             │
-         │  Supabase   │    │  Puppeteer  │   │  OpenAI API │
-         │  (Auth+DB)  │    │  (Bot Meet) │   │ (Whisper+   │
-         │             │    │             │   │   GPT-4o)   │
-         └─────────────┘    └─────────────┘   └─────────────┘
+lemon.meet/
+├── web/                        # Frontend React
+│   ├── src/
+│   │   ├── pages/
+│   │   │   ├── DashboardPage.tsx
+│   │   │   ├── MeetingsPage.tsx
+│   │   │   ├── TranscricaoDetalhesPage.tsx
+│   │   │   └── InsightsPage.tsx
+│   │   ├── components/
+│   │   │   ├── layout/         # Sidebar, TopNavBar, MainLayout
+│   │   │   └── ui/             # Button, Card, Badge
+│   │   ├── contexts/           # AuthContext, ThemeContext
+│   │   └── locales/            # pt-BR, en-US, es
+│   └── public/
+│       ├── logo.png            # Ícone Lemon
+│       └── lemon.meet.png      # Logo completo
+│
+├── server/                     # Backend Node.js
+│   └── src/
+│       ├── routes/
+│       ├── services/           # AudioCapture, Bot, Transcription
+│       └── config/             # Supabase, Socket
+│
+├── docker-compose.yml
+├── supabase-setup.sql
+└── SUPABASE_SETUP_GUIDE.md
 ```
 
-## 📋 Status do Projeto
-
-- ✅ **Fase 1**: Setup Inicial e Infraestrutura Base
-- ⏳ **Fase 2**: Design System e Layout Base
-- ⏳ **Fase 3**: Autenticação e i18n
-- ⏳ **Fase 4**: Core do Bot - Automação Google Meet
-- ⏳ **Fase 5**: Transcrição Real-Time e WebSocket
-- ⏳ **Fase 6**: Dashboard e Insights com IA
-
-## 🎨 Preview
-
-*Screenshots serão adicionados nas próximas fases*
-
-## 🧪 Testes
-
-```bash
-# Executar todos os testes
-pnpm test
-
-# Testes do backend
-pnpm --filter @vibe-ai/server test
-
-# Testes do frontend
-pnpm --filter @vibe-ai/web test
-```
+---
 
 ## 📝 Scripts Disponíveis
 
 ```bash
-pnpm dev              # Executar frontend + backend em paralelo
-pnpm dev:web          # Apenas frontend
-pnpm dev:server       # Apenas backend
+pnpm dev              # Frontend + backend em paralelo
+pnpm dev:web          # Apenas frontend (porta 5173)
+pnpm dev:server       # Apenas backend (porta 3000)
 pnpm build            # Build de produção
 pnpm lint             # Lint em todos os pacotes
-pnpm clean            # Limpar build e node_modules
 ```
 
-## 🤝 Contribuindo
-
-Contribuições são bem-vindas! Por favor:
-
-1. Faça um fork do projeto
-2. Crie uma branch para sua feature (`git checkout -b feature/AmazingFeature`)
-3. Commit suas mudanças (`git commit -m 'Add some AmazingFeature'`)
-4. Push para a branch (`git push origin feature/AmazingFeature`)
-5. Abra um Pull Request
-
-## ⚠️ Avisos Importantes
-
-- **Custos**: OpenAI API tem custos variáveis. Whisper: ~$0.006/min de áudio
-- **Privacidade**: Use apenas em reuniões onde você tem permissão
-- **Google Meet**: O bot pode ser detectado. Use com responsabilidade
-- **Rate Limiting**: API tem limite de 10 req/min por IP
+---
 
 ## 📄 Licença
 
-Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para mais detalhes.
+MIT © [Pietro Medeiros](https://github.com/pietrogmedeiros)
 
 ## 🙏 Agradecimentos
 
