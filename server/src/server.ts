@@ -17,6 +17,7 @@ const httpServer = createServer(app)
 const PORT = process.env.PORT || 3000
 
 // Middleware
+app.set('trust proxy', 1) // necessário atrás de proxies (Railway, Heroku, etc.)
 app.use(helmet())
 app.use(cors({
   origin: (origin, callback) => {
