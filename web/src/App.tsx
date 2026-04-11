@@ -1,7 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { ThemeProvider, AuthProvider } from '@/contexts'
 import { ProtectedRoute } from '@/components/auth'
-import { LoginPage, DashboardPage, MeetingsPage, TranscricaoDetalhesPage, InsightsPage, SettingsPage } from '@/pages'
+import { LoginPage, DashboardPage, MeetingsPage, TranscricaoDetalhesPage, InsightsPage, SettingsPage, TeamPage } from '@/pages'
 
 function App() {
   return (
@@ -46,6 +46,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <SettingsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/team"
+            element={
+              <ProtectedRoute>
+                <TeamPage />
               </ProtectedRoute>
             }
           />

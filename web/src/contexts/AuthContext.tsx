@@ -2,6 +2,19 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { User, Session, AuthError } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 
+const API = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+
+async function tryAcceptInvite(session: Session) {
+  try {
+    await fetch(`${API}/api/teams/accept-invite`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    })
+  } catch {
+    // não bloqueia o login
+  }
+}
+
 interface AuthContextType {
   user: User | null
   session: Session | null
@@ -29,10 +42,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Escutar mudanças na autenticação
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session)
       setUser(session?.user ?? null)
       setLoading(false)
+      // Ativa convites pendentes quando o usuário loga
+      if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session) {
+        tryAcceptInvite(session)
+      }
     })
 
     return () => subscription.unsubscribe()

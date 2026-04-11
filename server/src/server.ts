@@ -7,6 +7,7 @@ import rateLimit from 'express-rate-limit'
 import dotenv from 'dotenv'
 import transcricoesRouter from './routes/transcricoes.routes.js'
 import extensionRouter from './routes/extension.routes.js'
+import teamsRouter from './routes/teams.routes.js'
 
 // Load environment variables
 dotenv.config()
@@ -60,6 +61,7 @@ app.get('/health', (req, res) => {
 // API Routes
 app.use('/api/transcricoes', transcricoesRouter)
 app.use('/api/meetings', extensionRouter)
+app.use('/api/teams', teamsRouter)
 
 // 404 handler
 app.use((req, res) => {
