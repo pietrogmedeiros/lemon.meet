@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Globe } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { clsx } from 'clsx'
-import { useAuth } from '@/contexts'
+import { useAuth, useSubscription } from '@/contexts'
 
 const languages = [
   { code: 'pt-BR', label: 'Português', flag: '🇧🇷' },
@@ -10,9 +10,16 @@ const languages = [
   { code: 'es', label: 'Español', flag: '🇪🇸' },
 ]
 
+const PLAN_CONFIG: Record<string, { label: string; cls: string }> = {
+  trial:        { label: 'Trial', cls: 'bg-blue-50 text-blue-600 border-blue-200' },
+  starter:      { label: 'Starter', cls: 'bg-[#2D5A27]/8 text-[#2D5A27] border-[#2D5A27]/20' },
+  professional: { label: 'Professional', cls: 'bg-amber-50 text-amber-600 border-amber-200' },
+}
+
 export function TopNavBar() {
   const { t, i18n } = useTranslation()
   const { user } = useAuth()
+  const { subscription, loading: subLoading } = useSubscription()
   const [showLangMenu, setShowLangMenu] = useState(false)
   const langMenuRef = useRef<HTMLDivElement>(null)
 
@@ -36,8 +43,18 @@ export function TopNavBar() {
 
   return (
     <header className="h-16 bg-white border-b border-neutral-light px-8 flex items-center justify-end sticky top-0 z-40">
-      {/* Right: Language, Profile */}
+      {/* Right: Plan badge, Language, Profile */}
       <div className="flex items-center gap-3">
+
+        {/* Plan badge */}
+        {!subLoading && subscription && (() => {
+          const cfg = PLAN_CONFIG[subscription.plan]
+          return cfg ? (
+            <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${cfg.cls}`}>
+              {cfg.label}
+            </span>
+          ) : null
+        })()}
         {/* Language Selector */}
         <div className="relative" ref={langMenuRef}>
           <button
