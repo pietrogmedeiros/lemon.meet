@@ -11,11 +11,19 @@
 
 import { Router, type Response } from 'express'
 import type express from 'express'
+import { createClient } from '@supabase/supabase-js'
 import { supabase } from '../config/supabase.js'
 import { authMiddleware, type AuthRequest } from '../middleware/auth.middleware.js'
 import { logger } from '../utils/logger.js'
 
 const router: express.Router = Router()
+
+// Cliente com anon key — necessário para signInWithOtp (envia e-mail)
+const supabaseAnon = createClient(
+  process.env.SUPABASE_URL!,
+  process.env.SUPABASE_ANON_KEY!,
+  { auth: { persistSession: false, autoRefreshToken: false } }
+)
 
 // ── POST /api/teams ───────────────────────────────────────────
 router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
@@ -176,6 +184,8 @@ router.post('/:id/invite', authMiddleware, async (req: AuthRequest, res: Respons
 
     if (insertError) throw insertError
 
+    const redirectTo = `${process.env.FRONTEND_URL || 'https://lemon-meet.web.app'}/dashboard`
+
     // Verifica se o e-mail já tem conta no Supabase
     const { data: existingUsers } = await supabase.auth.admin.listUsers()
     const alreadyRegistered = existingUsers?.users?.some(
@@ -183,25 +193,24 @@ router.post('/:id/invite', authMiddleware, async (req: AuthRequest, res: Respons
     )
 
     if (alreadyRegistered) {
-      // Usuário já existe → envia magic link de login com redirect para /dashboard
-      // O accept-invite será ativado automaticamente no login
-      const { error: magicLinkError } = await supabase.auth.admin.generateLink({
-        type: 'magiclink',
+      // Usuário já existe → signInWithOtp envia magic link por e-mail
+      const { error: otpError } = await supabaseAnon.auth.signInWithOtp({
         email: email.toLowerCase(),
         options: {
-          redirectTo: `${process.env.FRONTEND_URL || 'https://lemon-meet.web.app'}/dashboard`,
+          shouldCreateUser: false,
+          emailRedirectTo: redirectTo,
         },
       })
-      if (magicLinkError) {
-        logger.warn(`Magic link error (non-fatal): ${magicLinkError.message}`)
+      if (otpError) {
+        logger.warn(`OTP email error (non-fatal): ${otpError.message}`)
       }
     } else {
-      // Novo usuário → envia convite de criação de conta
+      // Novo usuário → convite cria conta + envia e-mail
       const { error: inviteError } = await supabase.auth.admin.inviteUserByEmail(
         email.toLowerCase(),
         {
           data: { team_id: teamId, team_name: team.name },
-          redirectTo: `${process.env.FRONTEND_URL || 'https://lemon-meet.web.app'}/dashboard`,
+          redirectTo,
         }
       )
       if (inviteError) {
