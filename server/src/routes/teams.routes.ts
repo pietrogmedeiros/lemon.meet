@@ -176,17 +176,37 @@ router.post('/:id/invite', authMiddleware, async (req: AuthRequest, res: Respons
 
     if (insertError) throw insertError
 
-    // Envia convite via Supabase Auth (cria conta ou envia magic link)
-    const { error: inviteError } = await supabase.auth.admin.inviteUserByEmail(
-      email.toLowerCase(),
-      {
-        data: { team_id: teamId, team_name: team.name },
-        redirectTo: `${process.env.FRONTEND_URL || 'https://lemon-meet.web.app'}/dashboard`,
-      }
+    // Verifica se o e-mail já tem conta no Supabase
+    const { data: existingUsers } = await supabase.auth.admin.listUsers()
+    const alreadyRegistered = existingUsers?.users?.some(
+      (u) => u.email?.toLowerCase() === email.toLowerCase()
     )
 
-    if (inviteError) {
-      logger.warn(`Invite email error (non-fatal): ${inviteError.message}`)
+    if (alreadyRegistered) {
+      // Usuário já existe → envia magic link de login com redirect para /dashboard
+      // O accept-invite será ativado automaticamente no login
+      const { error: magicLinkError } = await supabase.auth.admin.generateLink({
+        type: 'magiclink',
+        email: email.toLowerCase(),
+        options: {
+          redirectTo: `${process.env.FRONTEND_URL || 'https://lemon-meet.web.app'}/dashboard`,
+        },
+      })
+      if (magicLinkError) {
+        logger.warn(`Magic link error (non-fatal): ${magicLinkError.message}`)
+      }
+    } else {
+      // Novo usuário → envia convite de criação de conta
+      const { error: inviteError } = await supabase.auth.admin.inviteUserByEmail(
+        email.toLowerCase(),
+        {
+          data: { team_id: teamId, team_name: team.name },
+          redirectTo: `${process.env.FRONTEND_URL || 'https://lemon-meet.web.app'}/dashboard`,
+        }
+      )
+      if (inviteError) {
+        logger.warn(`Invite email error (non-fatal): ${inviteError.message}`)
+      }
     }
 
     logger.info(`Invited ${email} to team ${teamId}`)
