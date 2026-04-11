@@ -8,6 +8,7 @@ import dotenv from 'dotenv'
 import transcricoesRouter from './routes/transcricoes.routes.js'
 import extensionRouter from './routes/extension.routes.js'
 import teamsRouter from './routes/teams.routes.js'
+import subscriptionRouter from './routes/subscription.routes.js'
 
 // Load environment variables
 dotenv.config()
@@ -63,6 +64,7 @@ app.get('/health', (req, res) => {
 app.use('/api/transcricoes', transcricoesRouter)
 app.use('/api/meetings', extensionRouter)
 app.use('/api/teams', teamsRouter)
+app.use('/api/subscription', subscriptionRouter)
 
 // 404 handler
 app.use((req, res) => {

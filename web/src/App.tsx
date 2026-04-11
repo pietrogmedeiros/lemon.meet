@@ -1,5 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
-import { ThemeProvider, AuthProvider } from '@/contexts'
+import { ThemeProvider, AuthProvider, SubscriptionProvider } from '@/contexts'
 import { ProtectedRoute } from '@/components/auth'
 import { LoginPage, DashboardPage, MeetingsPage, TranscricaoDetalhesPage, InsightsPage, SettingsPage, TeamPage } from '@/pages'
 
@@ -7,6 +7,7 @@ function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
+        <SubscriptionProvider>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route
@@ -60,6 +61,7 @@ function App() {
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
+        </SubscriptionProvider>
       </AuthProvider>
     </ThemeProvider>
   )

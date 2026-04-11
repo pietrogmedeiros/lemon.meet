@@ -3,7 +3,8 @@ import { MainLayout } from '@/components/layout'
 import { supabase } from '@/lib/supabase'
 import {
   Users, Plus, Mail, Trash2, CheckCircle, Clock,
-  AlertCircle, Loader, Video, Crown, UserPlus, ChevronRight
+  AlertCircle, Loader, Video, Crown, UserPlus, ChevronRight,
+  Shield
 } from 'lucide-react'
 import { formatDate } from '@/lib'
 import { useNavigate } from 'react-router-dom'
@@ -174,7 +175,7 @@ export function TeamPage() {
     return (
       <MainLayout>
         <div className="flex items-center justify-center py-32">
-          <Loader size={28} className="animate-spin text-primary" />
+          <Loader size={28} className="animate-spin text-[#2D5A27]" />
         </div>
       </MainLayout>
     )
@@ -184,19 +185,38 @@ export function TeamPage() {
   if (!team) {
     return (
       <MainLayout>
-        <div className="max-w-md mx-auto mt-16 text-center space-y-6">
-          <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto">
-            <Users size={32} className="text-primary" />
-          </div>
-          <div>
-            <h1 className="text-headline-1 text-primary">Criar meu time</h1>
-            <p className="mt-2 text-secondary text-sm">
-              Crie um time para compartilhar reuniões com sua equipe.
+        <div className="max-w-lg mx-auto mt-20">
+          {/* Hero */}
+          <div className="text-center mb-10">
+            <div className="w-20 h-20 rounded-3xl bg-[#2D5A27]/10 flex items-center justify-center mx-auto mb-5 shadow-sm">
+              <Users size={36} className="text-[#2D5A27]" />
+            </div>
+            <h1 className="text-2xl font-bold text-[#333333]">Criar meu time</h1>
+            <p className="mt-2 text-[#666666] text-sm max-w-xs mx-auto leading-relaxed">
+              Reúna sua equipe e acesse as reuniões de todos em um só lugar.
             </p>
           </div>
-          <div className="bg-white border border-neutral-light rounded-2xl p-6 space-y-4 text-left">
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-secondary uppercase tracking-wide">
+
+          {/* Features resumidas */}
+          <div className="grid grid-cols-3 gap-3 mb-8">
+            {[
+              { icon: UserPlus, label: 'Convide membros' },
+              { icon: Video, label: 'Reuniões do time' },
+              { icon: Shield, label: 'Controle de acesso' },
+            ].map(({ icon: Icon, label }) => (
+              <div key={label} className="bg-white rounded-2xl border border-[#E0E0E0] p-4 flex flex-col items-center gap-2 text-center">
+                <div className="w-8 h-8 rounded-xl bg-[#2D5A27]/10 flex items-center justify-center">
+                  <Icon size={15} className="text-[#2D5A27]" />
+                </div>
+                <span className="text-xs text-[#666666] font-medium">{label}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Card de criação */}
+          <div className="bg-white border border-[#E0E0E0] rounded-2xl p-6 shadow-sm space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-[#666666] uppercase tracking-wider">
                 Nome do time
               </label>
               <input
@@ -205,18 +225,18 @@ export function TeamPage() {
                 onChange={(e) => setTeamName(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleCreateTeam()}
                 placeholder="Ex: Time Comercial"
-                className="w-full px-4 py-2.5 rounded-xl border border-neutral-light text-primary text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
+                className="w-full px-4 py-2.5 rounded-xl border border-[#E0E0E0] text-[#333333] text-sm focus:outline-none focus:ring-2 focus:ring-[#2D5A27]/25 focus:border-[#2D5A27] transition bg-white placeholder:text-[#999]"
               />
             </div>
             {createError && (
-              <p className="text-xs text-danger flex items-center gap-1">
-                <AlertCircle size={12} /> {createError}
+              <p className="text-xs text-[#DC3545] flex items-center gap-1.5">
+                <AlertCircle size={13} /> {createError}
               </p>
             )}
             <button
               onClick={handleCreateTeam}
               disabled={createStatus === 'loading' || !teamName.trim()}
-              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-primary text-white text-sm font-medium hover:bg-primary/90 transition disabled:opacity-60"
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-[#2D5A27] text-white text-sm font-semibold hover:bg-[#1E3D1A] transition disabled:opacity-50 shadow-sm"
             >
               {createStatus === 'loading' ? <Loader size={15} className="animate-spin" /> : <Plus size={15} />}
               Criar time
@@ -228,35 +248,69 @@ export function TeamPage() {
   }
 
   // ── Time existente ────────────────────────────────────────────
+  const activeCount = members.filter(m => m.status === 'active').length
+  const pendingCount = members.filter(m => m.status === 'invited').length
+
   return (
     <MainLayout>
       <div className="max-w-3xl space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-headline-1 text-primary flex items-center gap-2">
-              <Users size={24} />
-              {team.name}
-            </h1>
-            <p className="mt-1 text-secondary text-sm">
-              {members.filter(m => m.status === 'active').length} membro(s) ativos
-              {members.filter(m => m.status === 'invited').length > 0 &&
-                ` · ${members.filter(m => m.status === 'invited').length} convite(s) pendente(s)`}
-            </p>
+
+        {/* Header com stats */}
+        <div className="bg-white border border-[#E0E0E0] rounded-2xl p-6 shadow-sm">
+          <div className="flex items-start gap-4">
+            <div className="w-14 h-14 rounded-2xl bg-[#2D5A27]/10 flex items-center justify-center shrink-0">
+              <Users size={26} className="text-[#2D5A27]" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h1 className="text-xl font-bold text-[#333333] truncate">{team.name}</h1>
+              <p className="text-sm text-[#666666] mt-0.5">
+                {activeCount} membro(s) ativo(s)
+                {pendingCount > 0 && (
+                  <span className="ml-2 inline-flex items-center gap-1 text-xs bg-amber-50 text-amber-600 border border-amber-200 px-2 py-0.5 rounded-full font-medium">
+                    <Clock size={10} /> {pendingCount} pendente(s)
+                  </span>
+                )}
+              </p>
+            </div>
+          </div>
+          {/* Mini stats */}
+          <div className="grid grid-cols-3 gap-3 mt-5 pt-5 border-t border-[#F0F0F0]">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-[#2D5A27]">{members.length}</div>
+              <div className="text-xs text-[#666666] mt-0.5">Membros total</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-[#2D5A27]">{activeCount}</div>
+              <div className="text-xs text-[#666666] mt-0.5">Ativos</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-amber-500">{pendingCount}</div>
+              <div className="text-xs text-[#666666] mt-0.5">Pendentes</div>
+            </div>
           </div>
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1 bg-neutral-lighter rounded-xl p-1 w-fit">
+        <div className="flex gap-1 bg-[#F5F5F5] rounded-xl p-1 w-fit">
           {(['members', 'meetings'] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                tab === t ? 'bg-white text-primary shadow-sm' : 'text-secondary hover:text-primary'
+              className={`px-5 py-2 rounded-lg text-sm font-medium transition-all ${
+                tab === t
+                  ? 'bg-white text-[#2D5A27] shadow-sm font-semibold'
+                  : 'text-[#666666] hover:text-[#333333]'
               }`}
             >
-              {t === 'members' ? 'Membros' : 'Reuniões do Time'}
+              {t === 'members' ? (
+                <span className="flex items-center gap-2">
+                  <Users size={14} /> Membros
+                </span>
+              ) : (
+                <span className="flex items-center gap-2">
+                  <Video size={14} /> Reuniões do Time
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -266,10 +320,12 @@ export function TeamPage() {
           <div className="space-y-4">
             {/* Convidar */}
             {isOwner && (
-              <div className="bg-white border border-neutral-light rounded-2xl p-5 space-y-4">
-                <div className="flex items-center gap-2">
-                  <UserPlus size={17} className="text-primary" />
-                  <span className="text-sm font-semibold text-primary">Convidar membro</span>
+              <div className="bg-white border border-[#E0E0E0] rounded-2xl p-5 shadow-sm">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-7 h-7 rounded-lg bg-[#2D5A27]/10 flex items-center justify-center">
+                    <UserPlus size={14} className="text-[#2D5A27]" />
+                  </div>
+                  <span className="text-sm font-semibold text-[#333333]">Convidar membro</span>
                 </div>
                 <div className="flex gap-2">
                   <input
@@ -278,12 +334,16 @@ export function TeamPage() {
                     onChange={(e) => setInviteEmail(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleInvite()}
                     placeholder="email@exemplo.com"
-                    className="flex-1 px-4 py-2.5 rounded-xl border border-neutral-light text-primary text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
+                    className="flex-1 px-4 py-2.5 rounded-xl border border-[#E0E0E0] text-[#333333] text-sm focus:outline-none focus:ring-2 focus:ring-[#2D5A27]/25 focus:border-[#2D5A27] transition bg-white placeholder:text-[#999]"
                   />
                   <button
                     onClick={handleInvite}
                     disabled={inviteStatus === 'loading' || !inviteEmail.trim()}
-                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-white text-sm font-medium hover:bg-primary/90 transition disabled:opacity-60 shrink-0"
+                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition shrink-0 shadow-sm ${
+                      inviteStatus === 'success'
+                        ? 'bg-[#4CAF50] text-white'
+                        : 'bg-[#2D5A27] text-white hover:bg-[#1E3D1A] disabled:opacity-50'
+                    }`}
                   >
                     {inviteStatus === 'loading' ? (
                       <Loader size={15} className="animate-spin" />
@@ -296,60 +356,74 @@ export function TeamPage() {
                   </button>
                 </div>
                 {inviteError && (
-                  <p className="text-xs text-danger flex items-center gap-1">
-                    <AlertCircle size={12} /> {inviteError}
+                  <p className="text-xs text-[#DC3545] flex items-center gap-1.5 mt-2">
+                    <AlertCircle size={13} /> {inviteError}
                   </p>
                 )}
               </div>
             )}
 
             {/* Lista de membros */}
-            <div className="bg-white border border-neutral-light rounded-2xl divide-y divide-neutral-light overflow-hidden">
-              {members.map((m) => (
-                <div key={m.id} className="flex items-center gap-4 px-5 py-4">
-                  {/* Avatar */}
-                  <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary shrink-0">
-                    {(m.name ?? m.invited_email)[0].toUpperCase()}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-primary truncate">
-                        {m.name ?? m.invited_email}
-                      </span>
-                      {m.role === 'admin' && (
-                        <span title="Admin">
-                          <Crown size={13} className="text-accent shrink-0" />
+            <div className="bg-white border border-[#E0E0E0] rounded-2xl shadow-sm overflow-hidden">
+              <div className="px-5 py-3.5 border-b border-[#F0F0F0] flex items-center justify-between">
+                <span className="text-xs font-semibold text-[#666666] uppercase tracking-wider">
+                  Membros ({members.length})
+                </span>
+              </div>
+              <div className="divide-y divide-[#F5F5F5]">
+                {members.map((m) => (
+                  <div key={m.id} className="flex items-center gap-4 px-5 py-4 hover:bg-[#F8F9FA] transition-colors">
+                    {/* Avatar */}
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${
+                      m.status === 'active'
+                        ? 'bg-[#2D5A27]/15 text-[#2D5A27]'
+                        : 'bg-[#F5F5F5] text-[#999999]'
+                    }`}>
+                      {(m.name ?? m.invited_email)[0].toUpperCase()}
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-semibold text-[#333333] truncate">
+                          {m.name ?? m.invited_email.split('@')[0]}
+                        </span>
+                        {m.role === 'admin' && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-amber-50 text-amber-600 border border-amber-200 px-1.5 py-0.5 rounded-full">
+                            <Crown size={9} /> Admin
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-xs text-[#999999]">{m.invited_email}</span>
+                    </div>
+
+                    <div className="flex items-center gap-3 shrink-0">
+                      {m.status === 'active' ? (
+                        <span className="inline-flex items-center gap-1.5 text-xs font-medium text-[#4CAF50] bg-green-50 border border-green-200 px-2.5 py-1 rounded-full">
+                          <CheckCircle size={11} /> Ativo
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-600 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full">
+                          <Clock size={11} /> Pendente
                         </span>
                       )}
+                      {isOwner && m.role !== 'admin' && (
+                        <button
+                          onClick={() => handleRemove(m.invited_email)}
+                          disabled={removingEmail === m.invited_email}
+                          title="Remover membro"
+                          className="w-8 h-8 rounded-lg flex items-center justify-center text-[#999999] hover:text-[#DC3545] hover:bg-[#DC3545]/8 transition"
+                        >
+                          {removingEmail === m.invited_email ? (
+                            <Loader size={14} className="animate-spin" />
+                          ) : (
+                            <Trash2 size={14} />
+                          )}
+                        </button>
+                      )}
                     </div>
-                    <span className="text-xs text-secondary truncate">{m.invited_email}</span>
                   </div>
-                  <div className="flex items-center gap-3 shrink-0">
-                    {m.status === 'active' ? (
-                      <span className="flex items-center gap-1 text-xs text-success font-medium">
-                        <CheckCircle size={12} /> Ativo
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-1 text-xs text-secondary">
-                        <Clock size={12} /> Pendente
-                      </span>
-                    )}
-                    {isOwner && m.role !== 'admin' && (
-                      <button
-                        onClick={() => handleRemove(m.invited_email)}
-                        disabled={removingEmail === m.invited_email}
-                        className="w-8 h-8 rounded-lg flex items-center justify-center text-neutral-mid hover:text-danger hover:bg-danger/5 transition"
-                      >
-                        {removingEmail === m.invited_email ? (
-                          <Loader size={14} className="animate-spin" />
-                        ) : (
-                          <Trash2 size={14} />
-                        )}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </div>
         )}
@@ -359,29 +433,32 @@ export function TeamPage() {
           <div className="space-y-3">
             {meetingsLoading ? (
               <div className="flex justify-center py-16">
-                <Loader size={24} className="animate-spin text-primary" />
+                <Loader size={24} className="animate-spin text-[#2D5A27]" />
               </div>
             ) : meetings.length === 0 ? (
-              <div className="flex flex-col items-center py-20 text-secondary gap-3">
-                <Video size={36} className="opacity-30" />
-                <span className="text-sm">Nenhuma reunião encontrada no time.</span>
+              <div className="bg-white border border-[#E0E0E0] rounded-2xl p-16 flex flex-col items-center gap-3 shadow-sm">
+                <div className="w-14 h-14 rounded-2xl bg-[#F5F5F5] flex items-center justify-center">
+                  <Video size={24} className="text-[#CCCCCC]" />
+                </div>
+                <p className="text-sm text-[#999999] font-medium">Nenhuma reunião encontrada no time.</p>
+                <p className="text-xs text-[#BBBBBB]">As reuniões dos membros aparecerão aqui.</p>
               </div>
             ) : (
               meetings.map((m) => (
                 <button
                   key={m.id}
                   onClick={() => navigate(`/meetings/${m.id}`)}
-                  className="w-full bg-white border border-neutral-light rounded-2xl px-5 py-4 flex items-center gap-4 hover:border-primary/30 hover:shadow-sm transition text-left"
+                  className="w-full bg-white border border-[#E0E0E0] rounded-2xl px-5 py-4 flex items-center gap-4 hover:border-[#2D5A27]/30 hover:shadow-md transition text-left group shadow-sm"
                 >
-                  <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                    <Video size={16} className="text-primary" />
+                  <div className="w-10 h-10 rounded-xl bg-[#2D5A27]/10 flex items-center justify-center shrink-0 group-hover:bg-[#2D5A27]/15 transition">
+                    <Video size={16} className="text-[#2D5A27]" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-primary truncate">
-                      {m.title ?? m.id.split('-')[0]}
+                    <div className="text-sm font-semibold text-[#333333] truncate">
+                      {m.title ?? `Reunião ${m.id.split('-')[0]}`}
                     </div>
-                    <div className="text-xs text-secondary mt-0.5 flex items-center gap-2">
-                      <span>{m.member_name}</span>
+                    <div className="text-xs text-[#999999] mt-0.5 flex items-center gap-1.5 flex-wrap">
+                      <span className="font-medium text-[#666666]">{m.member_name}</span>
                       <span>·</span>
                       <span>{formatDate(m.started_at ?? '')}</span>
                       <span>·</span>
@@ -389,14 +466,16 @@ export function TeamPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    {m.status === 'completed' ? (
-                      <span className="text-xs text-success font-medium">Concluída</span>
-                    ) : m.status === 'error' ? (
-                      <span className="text-xs text-danger font-medium">Erro</span>
-                    ) : (
-                      <span className="text-xs text-secondary">{m.status}</span>
+                    {m.status === 'completed' && (
+                      <span className="text-xs font-medium text-[#4CAF50] bg-green-50 border border-green-200 px-2 py-0.5 rounded-full">Concluída</span>
                     )}
-                    <ChevronRight size={16} className="text-neutral-mid" />
+                    {m.status === 'error' && (
+                      <span className="text-xs font-medium text-[#DC3545] bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">Erro</span>
+                    )}
+                    {m.status !== 'completed' && m.status !== 'error' && (
+                      <span className="text-xs text-[#999999]">{m.status}</span>
+                    )}
+                    <ChevronRight size={16} className="text-[#CCCCCC] group-hover:text-[#2D5A27] transition" />
                   </div>
                 </button>
               ))
