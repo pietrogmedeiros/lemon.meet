@@ -4,7 +4,7 @@
 // Mistura tab audio (participantes remotos) + microfone (voz local)
 // ============================================================
 
-const API_URL = 'http://localhost:3000'
+const API_URL = 'https://vibe-aiserver-production.up.railway.app'
 
 let mediaRecorder: MediaRecorder | null = null
 let audioContext: AudioContext | null = null

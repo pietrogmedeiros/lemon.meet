@@ -24,7 +24,7 @@ export interface MessageFromBackground {
 
 let recordingState: RecordingState = 'idle'
 let currentSession: MeetingSession | null = null
-const API_URL = 'http://localhost:3000'
+const API_URL = 'https://vibe-aiserver-production.up.railway.app'
 
 function setState(next: RecordingState) { recordingState = next; broadcastState() }
 function broadcastState() {
