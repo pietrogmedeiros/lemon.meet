@@ -50,7 +50,7 @@ export function MeetingsPage() {
 
   const getStatusBadge = (status: string | null) => {
     if (status === 'completed') return <Badge variant="success">Concluída</Badge>;
-    if (status === 'recording') return <Badge variant="warning">Gravando</Badge>;
+    if (status === 'recording') return <Badge variant="danger">Gravando</Badge>;
     if (status === 'processing') return <Badge variant="secondary">Processando</Badge>;
     return <Badge variant="secondary">{status ?? 'Desconhecido'}</Badge>;
   };

@@ -22,8 +22,11 @@ app.use(cors({
     const allowed = [
       process.env.FRONTEND_URL || 'http://localhost:5173',
       'http://localhost:5173',
+      // Firebase Hosting (domínio padrão e domínio customizado)
+      'https://lemon-meet.web.app',
+      'https://lemon-meet.firebaseapp.com',
     ]
-    // Permite extensões Chrome (chrome-extension://) e requisições sem origin (ex: curl)
+    // Permite extensões Chrome e requisições sem origin (ex: curl)
     if (!origin || origin.startsWith('chrome-extension://') || allowed.includes(origin)) {
       callback(null, true)
     } else {

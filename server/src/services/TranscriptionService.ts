@@ -46,14 +46,16 @@ export class TranscriptionService {
 
       // Converte resposta verbose em chunks
       const chunks: TranscriptChunk[] = [];
+      // Cast para any: verbose_json retorna segments/language mas o tipo SDK não os declara
+      const verboseResponse = response as any;
 
       // Limiar de probabilidade de não-fala — segmentos acima disso são alucinações do Whisper
       const NO_SPEECH_THRESHOLD = 0.6;
 
-      if (response.segments && Array.isArray(response.segments)) {
-        for (const segment of response.segments) {
+      if (verboseResponse.segments && Array.isArray(verboseResponse.segments)) {
+        for (const segment of verboseResponse.segments) {
           // Filtra segmentos provavelmente sem fala (alucinações do Whisper)
-          const noSpeechProb = (segment as any).no_speech_prob ?? 0;
+          const noSpeechProb = segment.no_speech_prob ?? 0;
           if (noSpeechProb > NO_SPEECH_THRESHOLD) {
             logger.debug(`Seg descartado (no_speech_prob=${noSpeechProb.toFixed(2)}): "${segment.text.trim()}"`);
             continue;
@@ -64,7 +66,7 @@ export class TranscriptionService {
             text,
             timestamp: new Date(Date.now() + (segment.start || 0) * 1000),
             duration: (segment.end || 0) - (segment.start || 0),
-            language: response.language ?? 'pt',
+            language: verboseResponse.language ?? 'pt',
             startSeconds: segment.start ?? 0,
             endSeconds: segment.end ?? 0,
           });
@@ -73,7 +75,7 @@ export class TranscriptionService {
         chunks.push({
           text: response.text.trim(),
           timestamp: new Date(),
-          language: response.language ?? 'pt',
+          language: verboseResponse.language ?? 'pt',
           startSeconds: 0,
           endSeconds: 0,
         });

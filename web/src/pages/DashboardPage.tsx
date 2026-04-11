@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { MainLayout } from '@/components/layout';
 import { Card, Badge } from '@/components/ui';
 import { Video, Clock, Calendar, TrendingUp, CheckCircle, Loader } from 'lucide-react';
-import { formatDate, formatTime } from '@/lib';
+import { formatDate } from '@/lib';
 import { supabase } from '@/lib/supabase';
 
 interface Meeting {
@@ -51,7 +51,7 @@ export function DashboardPage() {
 
   const getStatusBadge = (status: string | null) => {
     if (status === 'completed') return <Badge variant="success">Concluída</Badge>;
-    if (status === 'recording') return <Badge variant="warning">Gravando</Badge>;
+    if (status === 'recording') return <Badge variant="danger">Gravando</Badge>;
     if (status === 'processing') return <Badge variant="secondary">Processando</Badge>;
     return <Badge variant="secondary">{status ?? 'Desconhecido'}</Badge>;
   };
@@ -169,19 +169,5 @@ export function DashboardPage() {
       </div>
     </MainLayout>
   );
-}
-
-
-interface Transcricao {
-  id: number;
-  created_at: string;
-  id_drive: string | null;
-  responsavel: string | null;
-  'r:agente1': string | null;
-  'r:agente2': string | null;
-  'r:agente3': string | null;
-  'r:agente4': string | null;
-  status: boolean | null;
-  email_lead: string | null;
 }
 
