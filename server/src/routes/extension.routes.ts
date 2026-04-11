@@ -267,6 +267,7 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
       return res.status(500).json({ success: false, message: 'Error fetching meetings' })
     }
 
+    res.set('Cache-Control', 'private, max-age=20, stale-while-revalidate=40')
     return res.json({ success: true, meetings: data ?? [] })
   } catch (err) {
     logger.error('Unexpected error in GET /meetings:', err)

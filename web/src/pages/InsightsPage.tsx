@@ -8,7 +8,7 @@ import {
   MessageSquare, Award, Calendar
 } from 'lucide-react';
 import { formatDate } from '@/lib';
-import { supabase } from '@/lib/supabase';
+import { fetchMeetings as fetchMeetingsCache } from '@/lib/meetingsCache';
 
 interface MeetingInsights {
   sentiment: 'positive' | 'neutral' | 'negative';
@@ -64,15 +64,8 @@ export function InsightsPage() {
     const load = async () => {
       setIsLoading(true);
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        const res = await fetch(
-          `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/meetings?limit=100`,
-          { headers: { Authorization: `Bearer ${session?.access_token}` } }
-        );
-        if (res.ok) {
-          const data = await res.json();
-          setMeetings(data.meetings || []);
-        }
+        const data = await fetchMeetingsCache();
+        setMeetings(data as any);
       } catch {}
       finally { setIsLoading(false); }
     };

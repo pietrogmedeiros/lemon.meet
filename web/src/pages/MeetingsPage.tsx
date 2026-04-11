@@ -5,21 +5,7 @@ import { MainLayout } from '@/components/layout';
 import { Card, Badge } from '@/components/ui';
 import { Video, Clock, Calendar, ChevronRight } from 'lucide-react';
 import { formatDate, formatTime } from '@/lib';
-import { supabase } from '@/lib/supabase';
-
-interface Meeting {
-  id: string;
-  title: string | null;
-  platform: string | null;
-  status: string | null;
-  meet_link: string | null;
-  started_at: string | null;
-  ended_at: string | null;
-  duration_seconds: number | null;
-  created_at: string;
-}
-
-const API = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+import { fetchMeetings as fetchMeetingsCache, type Meeting } from '@/lib/meetingsCache';
 
 export function MeetingsPage() {
   const { t, i18n } = useTranslation();
@@ -28,24 +14,18 @@ export function MeetingsPage() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const fetchMeetings = async () => {
+    const load = async () => {
       setIsLoading(true);
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        const res = await fetch(`${API}/api/meetings?limit=100`, {
-          headers: { Authorization: `Bearer ${session?.access_token}` },
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setMeetings(data.meetings || []);
-        }
+        const data = await fetchMeetingsCache();
+        setMeetings(data);
       } catch (err) {
         console.error('Erro ao buscar reuniões:', err);
       } finally {
         setIsLoading(false);
       }
     };
-    fetchMeetings();
+    load();
   }, []);
 
   const getStatusBadge = (status: string | null) => {
