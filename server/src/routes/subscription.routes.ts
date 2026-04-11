@@ -1,9 +1,9 @@
-import { Router } from 'express'
-import { requireAuth } from '../middleware/auth.middleware.js'
+import { Router, type RequestHandler } from 'express'
+import { authMiddleware } from '../middleware/auth.middleware.js'
 import { supabase } from '../config/supabase.js'
 import type { AuthRequest } from '../middleware/auth.middleware.js'
 
-const router = Router()
+const router: Router = Router()
 
 const TRIAL_DAYS = 7
 
@@ -13,7 +13,7 @@ const TRIAL_DAYS = 7
  * Idempotente — pode ser chamado a cada login sem efeitos colaterais.
  * Também atualiza o status para "expired" se o trial já venceu.
  */
-router.post('/init', requireAuth, async (req: AuthRequest, res) => {
+router.post('/init', authMiddleware as RequestHandler, async (req: AuthRequest, res) => {
   const userId = req.user!.id
 
   try {
@@ -74,7 +74,7 @@ router.post('/init', requireAuth, async (req: AuthRequest, res) => {
  * GET /api/subscription/me
  * Retorna a assinatura atual, verificando expiração em tempo real.
  */
-router.get('/me', requireAuth, async (req: AuthRequest, res) => {
+router.get('/me', authMiddleware as RequestHandler, async (req: AuthRequest, res) => {
   const userId = req.user!.id
 
   try {
