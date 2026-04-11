@@ -1,7 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { ThemeProvider, AuthProvider } from '@/contexts'
 import { ProtectedRoute } from '@/components/auth'
-import { LoginPage, DashboardPage, MeetingsPage, TranscricaoDetalhesPage, InsightsPage } from '@/pages'
+import { LoginPage, DashboardPage, MeetingsPage, TranscricaoDetalhesPage, InsightsPage, SettingsPage } from '@/pages'
 
 function App() {
   return (
@@ -38,6 +38,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <InsightsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/settings"
+            element={
+              <ProtectedRoute>
+                <SettingsPage />
               </ProtectedRoute>
             }
           />
