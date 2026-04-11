@@ -3,173 +3,126 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { MainLayout } from '@/components/layout';
 import { Card, Badge } from '@/components/ui';
-import { FileText, Clock, Calendar, User, Mail, ChevronRight } from 'lucide-react';
+import { Video, Clock, Calendar, ChevronRight } from 'lucide-react';
 import { formatDate, formatTime } from '@/lib';
+import { supabase } from '@/lib/supabase';
 
-interface Transcricao {
-  id: number;
+interface Meeting {
+  id: string;
+  title: string | null;
+  platform: string | null;
+  status: string | null;
+  meet_link: string | null;
+  started_at: string | null;
+  ended_at: string | null;
+  duration_seconds: number | null;
   created_at: string;
-  id_drive: string | null;
-  responsavel: string | null;
-  'r:agente1': string | null;
-  'r:agente2': string | null;
-  'r:agente3': string | null;
-  'r:agente4': string | null;
-  status: boolean | null;
-  email_lead: string | null;
 }
+
+const API = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 export function MeetingsPage() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
-  const [transcricoes, setTranscricoes] = useState<Transcricao[]>([]);
+  const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const fetchTranscricoes = async () => {
+    const fetchMeetings = async () => {
       setIsLoading(true);
       try {
-        const response = await fetch(
-          `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/transcricoes?limit=100`
-        );
-        if (response.ok) {
-          const data = await response.json();
-          setTranscricoes(data.transcricoes || []);
+        const { data: { session } } = await supabase.auth.getSession();
+        const res = await fetch(`${API}/api/meetings?limit=100`, {
+          headers: { Authorization: `Bearer ${session?.access_token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setMeetings(data.meetings || []);
         }
-      } catch (error) {
-        console.error('Erro ao buscar transcrições:', error);
+      } catch (err) {
+        console.error('Erro ao buscar reuniões:', err);
       } finally {
         setIsLoading(false);
       }
     };
-
-    fetchTranscricoes();
+    fetchMeetings();
   }, []);
 
-  const getStatusBadge = (status: boolean | null) => {
-    if (status === null) return <Badge variant="secondary">Indefinido</Badge>;
-    return status ? (
-      <Badge variant="success">Ativa</Badge>
-    ) : (
-      <Badge variant="secondary">Inativa</Badge>
-    );
+  const getStatusBadge = (status: string | null) => {
+    if (status === 'completed') return <Badge variant="success">Concluída</Badge>;
+    if (status === 'recording') return <Badge variant="warning">Gravando</Badge>;
+    if (status === 'processing') return <Badge variant="secondary">Processando</Badge>;
+    return <Badge variant="secondary">{status ?? 'Desconhecido'}</Badge>;
   };
 
-  const getAgentes = (t: Transcricao) => {
-    return [t['r:agente1'], t['r:agente2'], t['r:agente3'], t['r:agente4']].filter(Boolean);
-  };
-
-  const extractMeetScore = (transcricao: Transcricao): string | null => {
-    try {
-      const json4 = transcricao['r:agente4'] ? JSON.parse(transcricao['r:agente4']) : null;
-      if (json4?.meet_score) return String(json4.meet_score).includes('/') ? String(json4.meet_score) : `${json4.meet_score}/10`;
-    } catch {}
-    const match = (transcricao['r:agente3'] || '').match(/[Nn]ota.*?[:\s]+([0-9]+(?:[.,][0-9]+)?\s*\/\s*10)/i);
-    return match ? match[1].trim() : null;
-  };
-
-  const getScoreBadgeStyle = (score: string): string => {
-    const num = parseFloat(score.replace(',', '.'));
-    if (num >= 8) return 'bg-success/10 text-success border border-success/30 font-bold';
-    if (num >= 5) return 'bg-amber-50 text-amber-700 border border-amber-200 font-bold';
-    return 'bg-danger/10 text-danger border border-danger/20 font-bold';
+  const formatDuration = (seconds: number | null) => {
+    if (!seconds) return null;
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}m ${s}s`;
   };
 
   return (
     <MainLayout>
       <div className="space-y-6">
-        {/* Header */}
         <div>
-          <h1 className="text-headline-1 text-primary">
-            {t('nav.meetings', 'Reuniões')}
-          </h1>
+          <h1 className="text-headline-1 text-primary">{t('nav.meetings', 'Reuniões')}</h1>
           <p className="mt-2 text-body-large text-secondary">
             {t('meetings.subtitle', 'Acompanhe todas as suas reuniões transcritas e insights gerados')}
           </p>
         </div>
 
-        {/* Content */}
         {isLoading ? (
           <div className="flex flex-col items-center justify-center py-20">
             <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-primary border-r-transparent"></div>
-            <p className="mt-4 text-body-large text-secondary">Carregando reuniões...</p>
           </div>
-        ) : transcricoes.length === 0 ? (
+        ) : meetings.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20">
-            <FileText className="h-12 w-12 text-neutral-mid" />
+            <Video className="h-12 w-12 text-neutral-mid" />
             <h3 className="mt-4 text-headline-2 text-primary">Nenhuma reunião encontrada</h3>
-            <p className="mt-2 text-body-large text-secondary">Aguarde novos dados serem adicionados</p>
+            <p className="mt-2 text-body-large text-secondary">Use a extensão para gravar sua primeira reunião</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {transcricoes.map((transcricao) => (
+            {meetings.map((meeting) => (
               <Card
-                key={transcricao.id}
-                onClick={() => navigate(`/meetings/${transcricao.id}`)}
+                key={meeting.id}
+                onClick={() => navigate(`/meetings/${meeting.id}`)}
                 className="p-5 cursor-pointer hover:border-primary hover:shadow-md transition-all duration-200 group"
               >
-                {/* Card Header */}
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center gap-2">
                     <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                      <FileText className="h-4 w-4 text-primary" />
+                      <Video className="h-4 w-4 text-primary" />
                     </div>
-                    <div>
-                      <h3 className="text-headline-2 text-primary leading-tight">
-                        Transcrição #{transcricao.id}
-                      </h3>
-                    </div>
+                    <h3 className="text-headline-2 text-primary leading-tight">
+                      {meeting.title || meeting.meet_link || 'Reunião sem título'}
+                    </h3>
                   </div>
                   <ChevronRight className="h-4 w-4 text-neutral-mid group-hover:text-primary transition-colors flex-shrink-0 mt-0.5" />
                 </div>
 
-                {/* Status + Score */}
-                <div className="mb-3 flex items-center gap-2 flex-wrap">
-                  {getStatusBadge(transcricao.status)}
-                  {(() => {
-                    const score = extractMeetScore(transcricao);
-                    return score ? (
-                      <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs ${getScoreBadgeStyle(score)}`}>
-                        ⭐ {score}
-                      </span>
-                    ) : null;
-                  })()}
-                </div>
+                <div className="mb-3">{getStatusBadge(meeting.status)}</div>
 
-                {/* Info */}
                 <div className="space-y-1.5 text-body-small text-secondary">
-                  {transcricao.responsavel && (
+                  {meeting.platform && (
                     <div className="flex items-center gap-2">
-                      <User className="h-3.5 w-3.5 flex-shrink-0" />
-                      <span className="truncate">{transcricao.responsavel}</span>
+                      <Video className="h-3.5 w-3.5 flex-shrink-0" />
+                      <span className="capitalize">{meeting.platform.replace('_', ' ')}</span>
                     </div>
                   )}
-                  {transcricao.email_lead && (
-                    <div className="flex items-center gap-2">
-                      <Mail className="h-3.5 w-3.5 flex-shrink-0" />
-                      <span className="truncate">{transcricao.email_lead}</span>
-                    </div>
-                  )}
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2">
-                      <Calendar className="h-3.5 w-3.5 flex-shrink-0" />
-                      <span>{formatDate(transcricao.created_at, i18n.language as 'pt-BR' | 'en-US' | 'es')}</span>
-                    </div>
+                  {meeting.duration_seconds && (
                     <div className="flex items-center gap-2">
                       <Clock className="h-3.5 w-3.5 flex-shrink-0" />
-                      <span>{formatTime(transcricao.created_at)}</span>
+                      <span>{formatDuration(meeting.duration_seconds)}</span>
                     </div>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-3.5 w-3.5 flex-shrink-0" />
+                    <span>{formatDate(meeting.created_at, i18n.language as any)}</span>
+                    <span className="ml-1">{formatTime(meeting.created_at)}</span>
                   </div>
                 </div>
-
-                {/* Agentes */}
-                {getAgentes(transcricao).length > 0 && (
-                  <div className="mt-3 pt-3 border-t border-neutral-light flex flex-wrap gap-1.5">
-                    {getAgentes(transcricao).map((_, i) => (
-                      <Badge key={i} variant="secondary">Agente {i + 1}</Badge>
-                    ))}
-                  </div>
-                )}
               </Card>
             ))}
           </div>

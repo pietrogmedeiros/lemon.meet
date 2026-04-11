@@ -4,41 +4,32 @@ import { useTranslation } from 'react-i18next';
 import { MainLayout } from '@/components/layout';
 import { Card } from '@/components/ui';
 import {
-  TrendingUp, TrendingDown, Minus, Users, Building2,
-  BarChart3, MessageSquare, Award, Calendar
+  TrendingUp, TrendingDown, Minus, BarChart3,
+  MessageSquare, Award, Calendar
 } from 'lucide-react';
 import { formatDate } from '@/lib';
+import { supabase } from '@/lib/supabase';
 
-interface Transcricao {
-  id: number;
+interface MeetingInsights {
+  sentiment: 'positive' | 'neutral' | 'negative';
+  commercialQuality: number;
+  executiveContext: string;
+  closingProbability: number;
+  followUp: string[];
+  keyTopics: string[];
+  actionItems: string[];
+}
+
+interface Meeting {
+  id: string;
+  title: string | null;
+  platform: string;
+  status: string;
+  started_at: string | null;
+  ended_at: string | null;
+  duration_seconds: number | null;
+  insights: MeetingInsights | null;
   created_at: string;
-  responsavel: string | null;
-  'r:agente1': string | null;
-  'r:agente2': string | null;
-  'r:agente3': string | null;
-  'r:agente4': string | null;
-  status: boolean | null;
-  email_lead: string | null;
-}
-
-// Extrai meet score de uma transcrição
-function extractScore(t: Transcricao): number | null {
-  try {
-    const j = t['r:agente4'] ? JSON.parse(t['r:agente4']) : null;
-    if (j?.meet_score) return parseFloat(String(j.meet_score).replace('/10', '').replace(',', '.').trim());
-  } catch {}
-  const m = (t['r:agente3'] || '').match(/[Nn]ota.*?[:\s]+([0-9]+(?:[.,][0-9]+)?)\s*\/\s*10/i);
-  return m ? parseFloat(m[1].replace(',', '.')) : null;
-}
-
-// Extrai JSON do agente 4
-function getAgent4Json(t: Transcricao): any {
-  try { return t['r:agente4'] ? JSON.parse(t['r:agente4']) : null; } catch { return null; }
-}
-
-// Extrai JSON do agente 1
-function getAgent1Json(t: Transcricao): any {
-  try { return t['r:agente1'] ? JSON.parse(t['r:agente1']) : null; } catch { return null; }
 }
 
 function ScoreBar({ score, max = 10 }: { score: number; max?: number }) {
@@ -66,22 +57,26 @@ function ScoreTrendIcon({ scores }: { scores: number[] }) {
 export function InsightsPage() {
   const { i18n } = useTranslation();
   const navigate = useNavigate();
-  const [transcricoes, setTranscricoes] = useState<Transcricao[]>([]);
+  const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const fetch_ = async () => {
+    const load = async () => {
       setIsLoading(true);
       try {
-        const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/transcricoes?limit=100`);
+        const { data: { session } } = await supabase.auth.getSession();
+        const res = await fetch(
+          `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/meetings?limit=100`,
+          { headers: { Authorization: `Bearer ${session?.access_token}` } }
+        );
         if (res.ok) {
           const data = await res.json();
-          setTranscricoes(data.transcricoes || []);
+          setMeetings(data.meetings || []);
         }
       } catch {}
       finally { setIsLoading(false); }
     };
-    fetch_();
+    load();
   }, []);
 
   if (isLoading) {
@@ -94,74 +89,41 @@ export function InsightsPage() {
     );
   }
 
-  // ── Derivar métricas reais ──────────────────────────────────────────────────
-
-  // Scores
-  const withScores = transcricoes
-    .map(t => ({ id: t.id, created_at: t.created_at, score: extractScore(t), t }))
-    .filter(x => x.score !== null) as { id: number; created_at: string; score: number; t: Transcricao }[];
+  // Metrics derived from meetings
+  const withScores = meetings
+    .filter(m => m.insights?.commercialQuality != null)
+    .map(m => ({ ...m, score: m.insights!.commercialQuality }));
 
   const avgScore = withScores.length
-    ? Math.round((withScores.reduce((s, x) => s + x.score, 0) / withScores.length) * 10) / 10
+    ? Math.round((withScores.reduce((s, m) => s + m.score, 0) / withScores.length) * 10) / 10
     : null;
 
-  const scores = withScores.map(x => x.score);
+  const scores = withScores.map(m => m.score);
+  const highQ = withScores.filter(m => m.score >= 8).length;
+  const medQ = withScores.filter(m => m.score >= 5 && m.score < 8).length;
+  const lowQ = withScores.filter(m => m.score < 5).length;
 
-  // Classificação de qualidade
-  const highQ = withScores.filter(x => x.score >= 8).length;
-  const medQ = withScores.filter(x => x.score >= 5 && x.score < 8).length;
-  const lowQ = withScores.filter(x => x.score < 5).length;
-
-  // Empresas mais frequentes (agente 1)
-  const companyCounts: Record<string, number> = {};
-  transcricoes.forEach(t => {
-    const j = getAgent1Json(t);
-    const companies: string[] = j?.otherCompaniesInvolved || [];
-    companies.forEach(c => { companyCounts[c] = (companyCounts[c] || 0) + 1; });
-  });
-  const topCompanies = Object.entries(companyCounts)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 8);
-
-  // Responsáveis + média de score
-  const respMap: Record<string, { count: number; totalScore: number; scoredCount: number }> = {};
-  transcricoes.forEach(t => {
-    const name = t.responsavel || 'Desconhecido';
-    if (!respMap[name]) respMap[name] = { count: 0, totalScore: 0, scoredCount: 0 };
-    respMap[name].count++;
-    const s = extractScore(t);
-    if (s !== null) { respMap[name].totalScore += s; respMap[name].scoredCount++; }
-  });
-  const topResps = Object.entries(respMap)
-    .map(([name, d]) => ({ name, count: d.count, avg: d.scoredCount ? Math.round((d.totalScore / d.scoredCount) * 10) / 10 : null }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 5);
-
-  // Reuniões por qualidade (para o ranking)
   const sortedByScore = [...withScores].sort((a, b) => b.score - a.score);
 
-  // Tópicos frequentes — extrai do agente 3 buscando padrões de "Análise", "Diagnóstico" etc.
-  const topicKeywords: Record<string, number> = {};
-  transcricoes.forEach(t => {
-    const text = (t['r:agente3'] || '') + ' ' + (t['r:agente4'] || '');
-    const keywords = [
-      'compliance', 'LGPD', 'NR-1', 'integração', 'técnica', 'comercial',
-      'proposta', 'follow-up', 'objeção', 'contrato', 'deadline', 'automação',
-      'vendas', 'CRM', 'API', 'webhook', 'onboarding', 'demo', 'piloto'
-    ];
-    keywords.forEach(kw => {
-      if (text.toLowerCase().includes(kw.toLowerCase())) {
-        topicKeywords[kw] = (topicKeywords[kw] || 0) + 1;
-      }
+  // Aggregate key topics
+  const topicCounts: Record<string, number> = {};
+  meetings.forEach(m => {
+    m.insights?.keyTopics?.forEach(topic => {
+      topicCounts[topic] = (topicCounts[topic] || 0) + 1;
     });
   });
-  const topTopics = Object.entries(topicKeywords)
-    .filter(([, v]) => v > 0)
+  const topTopics = Object.entries(topicCounts)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 10);
 
-  const total = transcricoes.length;
-  const ativas = transcricoes.filter(t => t.status === true).length;
+  const total = meetings.length;
+  const completed = meetings.filter(m => m.status === 'completed').length;
+
+  const sentimentCounts = {
+    positive: meetings.filter(m => m.insights?.sentiment === 'positive').length,
+    neutral: meetings.filter(m => m.insights?.sentiment === 'neutral').length,
+    negative: meetings.filter(m => m.insights?.sentiment === 'negative').length,
+  };
 
   return (
     <MainLayout>
@@ -170,7 +132,7 @@ export function InsightsPage() {
         <div>
           <h1 className="text-headline-1 text-primary">Insights</h1>
           <p className="mt-2 text-body-large text-secondary">
-            Análise real extraída de {total} reunião{total !== 1 ? 'ões' : ''} transcritas
+            Análise real extraída de {total} reunião{total !== 1 ? 'ões' : ''} gravada{total !== 1 ? 's' : ''}
           </p>
         </div>
 
@@ -178,16 +140,16 @@ export function InsightsPage() {
           <Card className="p-12 text-center">
             <BarChart3 className="h-12 w-12 text-neutral-mid mx-auto mb-4" />
             <h3 className="text-headline-2 text-primary">Nenhum dado disponível</h3>
-            <p className="mt-2 text-secondary">Aguarde reuniões serem transcritas para gerar insights.</p>
+            <p className="mt-2 text-secondary">Aguarde reuniões serem processadas para gerar insights.</p>
           </Card>
         ) : (
           <>
-            {/* Cards de resumo */}
+            {/* Summary cards */}
             <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
               <Card className="p-5">
                 <p className="text-xs font-medium text-secondary uppercase tracking-wider">Total de Reuniões</p>
                 <p className="mt-2 text-3xl font-bold text-primary">{total}</p>
-                <p className="mt-1 text-xs text-secondary">{ativas} ativas</p>
+                <p className="mt-1 text-xs text-secondary">{completed} concluídas</p>
               </Card>
 
               {avgScore !== null && (
@@ -216,7 +178,7 @@ export function InsightsPage() {
             </div>
 
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-              {/* Ranking por qualidade */}
+              {/* Quality ranking */}
               {sortedByScore.length > 0 && (
                 <Card className="p-5">
                   <div className="flex items-center gap-2 mb-4">
@@ -224,42 +186,38 @@ export function InsightsPage() {
                     <h2 className="text-headline-2 text-primary">Ranking por Qualidade</h2>
                   </div>
                   <div className="space-y-3">
-                    {sortedByScore.slice(0, 8).map((x, i) => {
-                      const j4 = getAgent4Json(x.t);
-                      const j1 = getAgent1Json(x.t);
-                      const title = j4?.titulo_reuniao || j1?.meetingInfo?.title || `Transcrição #${x.id}`;
-                      return (
-                        <div
-                          key={x.id}
-                          onClick={() => navigate(`/meetings/${x.id}`)}
-                          className="flex items-center gap-3 cursor-pointer hover:bg-neutral-lighter rounded-lg px-2 py-1.5 transition-colors group"
-                        >
-                          <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
-                            i === 0 ? 'bg-accent text-primary' :
-                            i === 1 ? 'bg-neutral-light text-primary' :
-                            i === 2 ? 'bg-orange-100 text-orange-700' :
-                            'bg-neutral-lighter text-secondary'
-                          }`}>{i + 1}</span>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-primary truncate group-hover:text-primary-light">{title}</p>
-                            <p className="text-xs text-secondary">{formatDate(x.created_at, i18n.language as 'pt-BR' | 'en-US' | 'es')}</p>
-                          </div>
-                          <ScoreBar score={x.score} />
+                    {sortedByScore.slice(0, 8).map((m, i) => (
+                      <div
+                        key={m.id}
+                        onClick={() => navigate(`/meetings/${m.id}`)}
+                        className="flex items-center gap-3 cursor-pointer hover:bg-neutral-lighter rounded-lg px-2 py-1.5 transition-colors group"
+                      >
+                        <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
+                          i === 0 ? 'bg-accent text-primary' :
+                          i === 1 ? 'bg-neutral-light text-primary' :
+                          i === 2 ? 'bg-orange-100 text-orange-700' :
+                          'bg-neutral-lighter text-secondary'
+                        }`}>{i + 1}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-primary truncate group-hover:text-primary-light">
+                            {m.title || `Reunião ${m.id.slice(0, 8)}`}
+                          </p>
+                          <p className="text-xs text-secondary">{formatDate(m.created_at, i18n.language as 'pt-BR' | 'en-US' | 'es')}</p>
                         </div>
-                      );
-                    })}
+                        <ScoreBar score={m.score} />
+                      </div>
+                    ))}
                   </div>
                 </Card>
               )}
 
-              {/* Distribuição de qualidade */}
+              {/* Quality distribution */}
               {withScores.length > 0 && (
                 <Card className="p-5">
                   <div className="flex items-center gap-2 mb-4">
                     <BarChart3 className="h-5 w-5 text-primary" />
                     <h2 className="text-headline-2 text-primary">Distribuição de Qualidade</h2>
                   </div>
-
                   <div className="space-y-4">
                     {[
                       { label: 'Alta (8–10)', count: highQ, color: 'bg-success', textColor: 'text-success' },
@@ -279,72 +237,55 @@ export function InsightsPage() {
                         </div>
                       </div>
                     ))}
-
-                    {/* Scores individuais */}
-                    <div className="mt-4 pt-4 border-t border-neutral-light">
-                      <p className="text-xs font-medium text-secondary uppercase tracking-wider mb-3">Score por Reunião</p>
-                      <div className="space-y-2">
-                        {withScores.map(x => {
-                          const j4 = getAgent4Json(x.t);
-                          const j1 = getAgent1Json(x.t);
-                          const title = j4?.titulo_reuniao || j1?.meetingInfo?.title || `#${x.id}`;
-                          return (
-                            <div key={x.id} className="flex items-center gap-2">
-                              <span className="text-xs text-secondary w-28 truncate flex-shrink-0" title={title}>{title}</span>
-                              <ScoreBar score={x.score} />
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
                   </div>
                 </Card>
               )}
 
-              {/* Top responsáveis */}
-              {topResps.length > 0 && (
+              {/* Sentiment distribution */}
+              {meetings.filter(m => m.insights?.sentiment).length > 0 && (
                 <Card className="p-5">
                   <div className="flex items-center gap-2 mb-4">
-                    <Users className="h-5 w-5 text-primary" />
-                    <h2 className="text-headline-2 text-primary">Responsáveis</h2>
+                    <MessageSquare className="h-5 w-5 text-primary" />
+                    <h2 className="text-headline-2 text-primary">Sentimento das Reuniões</h2>
                   </div>
                   <div className="space-y-3">
-                    {topResps.map(({ name, count, avg }) => (
-                      <div key={name} className="flex items-center justify-between py-2 border-b border-neutral-light last:border-0">
-                        <div>
-                          <p className="text-sm font-medium text-primary">{name}</p>
-                          <p className="text-xs text-secondary">{count} reunião{count !== 1 ? 'ões' : ''}</p>
+                    {[
+                      { label: 'Positivo', count: sentimentCounts.positive, color: 'bg-success', emoji: '😊' },
+                      { label: 'Neutro', count: sentimentCounts.neutral, color: 'bg-accent', emoji: '😐' },
+                      { label: 'Negativo', count: sentimentCounts.negative, color: 'bg-danger', emoji: '😟' },
+                    ].map(({ label, count, color, emoji }) => (
+                      <div key={label} className="flex items-center gap-3">
+                        <span className="text-lg w-6">{emoji}</span>
+                        <div className="flex-1">
+                          <div className="flex justify-between text-sm mb-1">
+                            <span className="font-medium text-primary">{label}</span>
+                            <span className="text-secondary">{count}</span>
+                          </div>
+                          <div className="h-2 rounded-full bg-neutral-lighter overflow-hidden">
+                            <div className={`h-full rounded-full ${color}`} style={{ width: total ? `${(count / total) * 100}%` : '0%' }} />
+                          </div>
                         </div>
-                        {avg !== null && (
-                          <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm font-bold ${
-                            avg >= 8 ? 'bg-success/10 text-success' :
-                            avg >= 5 ? 'bg-amber-50 text-amber-700' :
-                            'bg-danger/10 text-danger'
-                          }`}>
-                            ⭐ {avg}/10
-                          </span>
-                        )}
                       </div>
                     ))}
                   </div>
                 </Card>
               )}
 
-              {/* Empresas mencionadas */}
-              {topCompanies.length > 0 && (
+              {/* Key topics */}
+              {topTopics.length > 0 && (
                 <Card className="p-5">
                   <div className="flex items-center gap-2 mb-4">
-                    <Building2 className="h-5 w-5 text-primary" />
-                    <h2 className="text-headline-2 text-primary">Empresas Envolvidas</h2>
+                    <Calendar className="h-5 w-5 text-primary" />
+                    <h2 className="text-headline-2 text-primary">Tópicos Frequentes</h2>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {topCompanies.map(([company, count]) => (
+                    {topTopics.map(([topic, count]) => (
                       <span
-                        key={company}
-                        className="inline-flex items-center gap-1.5 rounded-full bg-primary/8 border border-primary/20 px-3 py-1.5 text-sm font-medium text-primary"
+                        key={topic}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 px-3 py-1.5 text-sm font-medium text-primary"
                         style={{ backgroundColor: 'rgba(45,90,39,0.07)' }}
                       >
-                        {company}
+                        {topic}
                         {count > 1 && (
                           <span className="rounded-full bg-primary text-white text-[10px] font-bold px-1.5 py-0.5 leading-none">{count}</span>
                         )}
@@ -354,31 +295,7 @@ export function InsightsPage() {
                 </Card>
               )}
 
-              {/* Tópicos frequentes */}
-              {topTopics.length > 0 && (
-                <Card className="p-5">
-                  <div className="flex items-center gap-2 mb-4">
-                    <MessageSquare className="h-5 w-5 text-primary" />
-                    <h2 className="text-headline-2 text-primary">Tópicos Frequentes</h2>
-                  </div>
-                  <div className="space-y-2">
-                    {topTopics.map(([kw, count]) => (
-                      <div key={kw} className="flex items-center gap-3">
-                        <span className="text-sm text-primary font-medium w-28 capitalize">{kw}</span>
-                        <div className="flex-1 h-2 rounded-full bg-neutral-lighter overflow-hidden">
-                          <div
-                            className="h-full rounded-full bg-primary/60 transition-all duration-500"
-                            style={{ width: `${(count / (topTopics[0]?.[1] || 1)) * 100}%` }}
-                          />
-                        </div>
-                        <span className="text-xs text-secondary w-10 text-right font-medium">{count}×</span>
-                      </div>
-                    ))}
-                  </div>
-                </Card>
-              )}
-
-              {/* Timeline de reuniões com score */}
+              {/* Timeline */}
               {withScores.length > 0 && (
                 <Card className="p-5">
                   <div className="flex items-center gap-2 mb-4">
@@ -388,41 +305,28 @@ export function InsightsPage() {
                   <div className="space-y-3">
                     {[...withScores]
                       .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
-                      .map((x) => {
-                        const j4 = getAgent4Json(x.t);
-                        const j1 = getAgent1Json(x.t);
-                        const title = j4?.titulo_reuniao || j1?.meetingInfo?.title || `Transcrição #${x.id}`;
-                        const scoreColor = x.score >= 8 ? 'bg-success' : x.score >= 5 ? 'bg-accent' : 'bg-danger';
+                      .map((m) => {
+                        const scoreColor = m.score >= 8 ? 'bg-success' : m.score >= 5 ? 'bg-accent' : 'bg-danger';
                         return (
                           <div
-                            key={x.id}
-                            onClick={() => navigate(`/meetings/${x.id}`)}
+                            key={m.id}
+                            onClick={() => navigate(`/meetings/${m.id}`)}
                             className="flex items-center gap-3 cursor-pointer hover:bg-neutral-lighter rounded-lg px-2 py-2 transition-colors"
                           >
                             <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${scoreColor}`} />
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-primary truncate">{title}</p>
-                              <p className="text-xs text-secondary">{formatDate(x.created_at, i18n.language as 'pt-BR' | 'en-US' | 'es')}</p>
+                              <p className="text-sm font-medium text-primary truncate">
+                                {m.title || `Reunião ${m.id.slice(0, 8)}`}
+                              </p>
+                              <p className="text-xs text-secondary">{formatDate(m.created_at, i18n.language as 'pt-BR' | 'en-US' | 'es')}</p>
                             </div>
-                            <span className={`text-sm font-bold ${x.score >= 8 ? 'text-success' : x.score >= 5 ? 'text-amber-600' : 'text-danger'}`}>
-                              {x.score}/10
+                            <span className={`text-sm font-bold ${m.score >= 8 ? 'text-success' : m.score >= 5 ? 'text-amber-600' : 'text-danger'}`}>
+                              {m.score}/10
                             </span>
                           </div>
                         );
                       })}
                   </div>
-                  {withScores.length > 1 && (
-                    <div className="mt-4 pt-4 border-t border-neutral-light flex items-center justify-between text-sm">
-                      <span className="text-secondary">Variação total</span>
-                      <span className={`font-bold flex items-center gap-1 ${
-                        scores[scores.length - 1] > scores[0] ? 'text-success' :
-                        scores[scores.length - 1] < scores[0] ? 'text-danger' : 'text-secondary'
-                      }`}>
-                        <ScoreTrendIcon scores={scores} />
-                        {scores[scores.length - 1] > scores[0] ? '+' : ''}{Math.round((scores[scores.length - 1] - scores[0]) * 10) / 10} pts
-                      </span>
-                    </div>
-                  )}
                 </Card>
               )}
             </div>

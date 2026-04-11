@@ -6,6 +6,7 @@ import morgan from 'morgan'
 import rateLimit from 'express-rate-limit'
 import dotenv from 'dotenv'
 import transcricoesRouter from './routes/transcricoes.routes.js'
+import extensionRouter from './routes/extension.routes.js'
 
 // Load environment variables
 dotenv.config()
@@ -17,7 +18,18 @@ const PORT = process.env.PORT || 3000
 // Middleware
 app.use(helmet())
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: (origin, callback) => {
+    const allowed = [
+      process.env.FRONTEND_URL || 'http://localhost:5173',
+      'http://localhost:5173',
+    ]
+    // Permite extensões Chrome (chrome-extension://) e requisições sem origin (ex: curl)
+    if (!origin || origin.startsWith('chrome-extension://') || allowed.includes(origin)) {
+      callback(null, true)
+    } else {
+      callback(new Error(`CORS bloqueado para origin: ${origin}`))
+    }
+  },
   credentials: true,
 }))
 app.use(morgan('dev'))
@@ -43,6 +55,7 @@ app.get('/health', (req, res) => {
 
 // API Routes
 app.use('/api/transcricoes', transcricoesRouter)
+app.use('/api/meetings', extensionRouter)
 
 // 404 handler
 app.use((req, res) => {
@@ -69,6 +82,7 @@ httpServer.listen(PORT, () => {
 ║  Environment: ${process.env.NODE_ENV || 'development'}                              ║
 ║                                                          ║
 ║  API Transcrições: /api/transcricoes                     ║
+║  API Meetings (ext): /api/meetings                       ║
 ║  Health Check: /health                                   ║
 ║                                                          ║
 ╚══════════════════════════════════════════════════════════╝

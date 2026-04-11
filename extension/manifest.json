@@ -1,0 +1,49 @@
+{
+  "manifest_version": 3,
+  "name": "Lemon.meet",
+  "version": "1.0.0",
+  "description": "Grave, transcreva e gere insights das suas reuniões automaticamente.",
+
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Lemon.meet"
+  },
+
+  "background": {
+    "service_worker": "src/background.js",
+    "type": "module"
+  },
+
+  "content_scripts": [
+    {
+      "matches": [
+        "https://meet.google.com/*",
+        "https://*.zoom.us/wc/*",
+        "https://*.zoom.us/j/*",
+        "https://teams.microsoft.com/*",
+        "https://teams.live.com/*"
+      ],
+      "js": ["src/content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+
+  "permissions": [
+    "tabCapture",
+    "storage",
+    "tabs",
+    "activeTab",
+    "scripting",
+    "alarms",
+    "offscreen"
+  ],
+
+  "host_permissions": [
+    "https://meet.google.com/*",
+    "https://*.zoom.us/*",
+    "https://teams.microsoft.com/*",
+    "https://teams.live.com/*",
+    "http://localhost:5173/*"
+  ]
+}
+

@@ -2,8 +2,10 @@ import OpenAI from 'openai';
 import { logger } from '../utils/logger';
 import { supabase } from '../config/supabase';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
+// DeepSeek usa a mesma interface do OpenAI SDK
+const deepseek = new OpenAI({
+  apiKey: process.env.DEEPSEEK_API_KEY,
+  baseURL: 'https://api.deepseek.com',
 });
 
 export interface MeetingInsights {
@@ -57,21 +59,21 @@ Retorne APENAS o JSON válido, sem texto adicional.`;
 
       const userPrompt = `Transcrição da reunião:\n\n${transcript}`;
 
-      // Chama GPT-4o
-      const response = await openai.chat.completions.create({
-        model: 'gpt-4o',
+      // Chama DeepSeek V3
+      const response = await deepseek.chat.completions.create({
+        model: 'deepseek-chat', // deepseek-chat = DeepSeek V3
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
         ],
-        temperature: 0.3, // Baixa temperatura para respostas mais consistentes
-        response_format: { type: 'json_object' }
+        temperature: 0.3,
+        response_format: { type: 'json_object' },
       });
 
       const content = response.choices[0]?.message?.content;
-      
+
       if (!content) {
-        throw new Error('No content in GPT-4o response');
+        throw new Error('No content in DeepSeek response');
       }
 
       // Parse JSON
@@ -79,7 +81,7 @@ Retorne APENAS o JSON válido, sem texto adicional.`;
 
       // Validações básicas
       if (!insights.sentiment || !insights.executiveContext) {
-        throw new Error('Invalid insights format from GPT-4o');
+        throw new Error('Invalid insights format from DeepSeek');
       }
 
       logger.info(`Insights generated successfully for meeting ${meetingId}`);
@@ -88,14 +90,6 @@ Retorne APENAS o JSON válido, sem texto adicional.`;
 
     } catch (error: any) {
       logger.error('Error generating insights:', error);
-      
-      if (error.response) {
-        logger.error('OpenAI API error:', {
-          status: error.response.status,
-          data: error.response.data
-        });
-      }
-
       throw error;
     }
   }

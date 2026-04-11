@@ -1,10 +1,10 @@
-import OpenAI from 'openai';
+import Groq, { toFile } from 'groq-sdk';
 import { logger } from '../utils/logger';
 import * as fs from 'fs';
 import * as path from 'path';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
+const groq = new Groq({
+  apiKey: process.env.GROQ_API_KEY
 });
 
 export interface TranscriptChunk {
@@ -12,6 +12,8 @@ export interface TranscriptChunk {
   timestamp: Date;
   duration?: number;
   language?: string;
+  startSeconds?: number; // segundos relativos ao início do chunk
+  endSeconds?: number;   // segundos relativos ao início do chunk
 }
 
 export class TranscriptionService {
@@ -27,16 +29,17 @@ export class TranscriptionService {
         throw new Error(`Audio file not found: ${audioFilePath}`);
       }
 
-      // Cria stream de leitura do arquivo
+      // Usa toFile() para garantir nome e tipo corretos para o Groq
       const audioStream = fs.createReadStream(audioFilePath);
+      const audioFile = await toFile(audioStream, 'audio.webm', { type: 'audio/webm' });
 
-      // Envia para Whisper API
-      const response = await openai.audio.transcriptions.create({
-        file: audioStream,
-        model: 'whisper-1',
-        language: 'pt', // português por padrão
-        response_format: 'verbose_json', // retorna timestamps
-        timestamp_granularities: ['segment'] // timestamps por segmento
+      // Envia para Groq Whisper (whisper-large-v3-turbo — mais rápido e barato)
+      const response = await groq.audio.transcriptions.create({
+        file: audioFile,
+        model: 'whisper-large-v3-turbo',
+        language: 'pt',
+        response_format: 'verbose_json',
+        timestamp_granularities: ['segment'],
       });
 
       logger.info(`Transcription completed: ${response.text.length} characters`);
@@ -44,21 +47,35 @@ export class TranscriptionService {
       // Converte resposta verbose em chunks
       const chunks: TranscriptChunk[] = [];
 
+      // Limiar de probabilidade de não-fala — segmentos acima disso são alucinações do Whisper
+      const NO_SPEECH_THRESHOLD = 0.6;
+
       if (response.segments && Array.isArray(response.segments)) {
         for (const segment of response.segments) {
+          // Filtra segmentos provavelmente sem fala (alucinações do Whisper)
+          const noSpeechProb = (segment as any).no_speech_prob ?? 0;
+          if (noSpeechProb > NO_SPEECH_THRESHOLD) {
+            logger.debug(`Seg descartado (no_speech_prob=${noSpeechProb.toFixed(2)}): "${segment.text.trim()}"`);
+            continue;
+          }
+          const text = segment.text.trim();
+          if (!text) continue;
           chunks.push({
-            text: segment.text,
+            text,
             timestamp: new Date(Date.now() + (segment.start || 0) * 1000),
             duration: (segment.end || 0) - (segment.start || 0),
-            language: response.language
+            language: response.language ?? 'pt',
+            startSeconds: segment.start ?? 0,
+            endSeconds: segment.end ?? 0,
           });
         }
-      } else {
-        // Fallback se não houver segmentos
+      } else if (response.text.trim()) {
         chunks.push({
-          text: response.text,
+          text: response.text.trim(),
           timestamp: new Date(),
-          language: response.language
+          language: response.language ?? 'pt',
+          startSeconds: 0,
+          endSeconds: 0,
         });
       }
 
@@ -66,15 +83,6 @@ export class TranscriptionService {
 
     } catch (error: any) {
       logger.error('Error transcribing audio:', error);
-      
-      // Trata erros específicos da API
-      if (error.response) {
-        logger.error('OpenAI API error:', {
-          status: error.response.status,
-          data: error.response.data
-        });
-      }
-
       throw error;
     }
   }
