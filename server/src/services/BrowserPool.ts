@@ -1,5 +1,5 @@
 import puppeteer, { Browser, Page } from 'puppeteer';
-import { logger } from '../utils/logger';
+import { logger } from '../utils/logger.js';
 
 interface BrowserInstance {
   id: string;

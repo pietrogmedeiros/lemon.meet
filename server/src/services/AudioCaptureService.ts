@@ -1,8 +1,8 @@
 import { Page } from 'puppeteer';
 import { CDPSession } from 'puppeteer';
-import { logger } from '../utils/logger';
-import { getIO } from '../config/socket';
-import { audioProcessorService } from './AudioProcessorService';
+import { logger } from '../utils/logger.js';
+import { getIO } from '../config/socket.js';
+import { audioProcessorService } from './AudioProcessorService.js';
 import * as fs from 'fs';
 import * as path from 'path';
 

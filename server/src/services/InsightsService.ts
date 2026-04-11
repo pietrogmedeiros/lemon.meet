@@ -1,6 +1,6 @@
 import OpenAI from 'openai';
-import { logger } from '../utils/logger';
-import { supabase } from '../config/supabase';
+import { logger } from '../utils/logger.js';
+import { supabase } from '../config/supabase.js';
 
 // DeepSeek usa a mesma interface do OpenAI SDK
 const deepseek = new OpenAI({

@@ -1,9 +1,9 @@
 import { EventEmitter } from 'events';
-import { transcriptionService, TranscriptChunk } from './TranscriptionService';
-import { insightsService } from './InsightsService';
-import { supabase } from '../config/supabase';
-import { getIO } from '../config/socket';
-import { logger } from '../utils/logger';
+import { transcriptionService, TranscriptChunk } from './TranscriptionService.js';
+import { insightsService } from './InsightsService.js';
+import { supabase } from '../config/supabase.js';
+import { getIO } from '../config/socket.js';
+import { logger } from '../utils/logger.js';
 
 interface AudioBuffer {
   meetingId: string;

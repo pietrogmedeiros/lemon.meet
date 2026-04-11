@@ -1,10 +1,10 @@
 import { Browser, Page } from 'puppeteer';
-import { browserPool } from './BrowserPool';
-import { AudioCaptureService } from './AudioCaptureService';
-import { audioProcessorService } from './AudioProcessorService';
-import { supabase } from '../config/supabase';
-import { logger } from '../utils/logger';
-import { getIO } from '../config/socket';
+import { browserPool } from './BrowserPool.js';
+import { AudioCaptureService } from './AudioCaptureService.js';
+import { audioProcessorService } from './AudioProcessorService.js';
+import { supabase } from '../config/supabase.js';
+import { logger } from '../utils/logger.js';
+import { getIO } from '../config/socket.js';
 
 interface BotSession {
   meetingId: string;

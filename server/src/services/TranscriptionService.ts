@@ -1,5 +1,5 @@
 import Groq, { toFile } from 'groq-sdk';
-import { logger } from '../utils/logger';
+import { logger } from '../utils/logger.js';
 import * as fs from 'fs';
 import * as path from 'path';
 
