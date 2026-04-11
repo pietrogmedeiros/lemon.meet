@@ -2,11 +2,11 @@
   "extends": "../tsconfig.json",
   "compilerOptions": {
     "target": "ES2022",
-    "module": "NodeNext",
+    "module": "ESNext",
     "lib": ["ES2022"],
     "outDir": "./dist",
     "rootDir": "./src",
-    "moduleResolution": "NodeNext",
+    "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "declaration": true,
     "declarationMap": true,
