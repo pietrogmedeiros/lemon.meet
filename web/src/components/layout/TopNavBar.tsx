@@ -35,17 +35,7 @@ export function TopNavBar() {
   }
 
   return (
-    <header className="h-16 bg-white border-b border-neutral-light px-8 flex items-center justify-between sticky top-0 z-40">
-      {/* Left: Google Partner */}
-      <div className="flex items-center gap-2">
-        <img
-          src="https://e7.pngegg.com/pngimages/704/688/png-clipart-google-google.png"
-          alt="Google"
-          className="h-6 w-6 object-contain rounded-sm"
-        />
-        <span className="text-body-small font-medium text-secondary">Google Partner</span>
-      </div>
-
+    <header className="h-16 bg-white border-b border-neutral-light px-8 flex items-center justify-end sticky top-0 z-40">
       {/* Right: Language, Profile */}
       <div className="flex items-center gap-3">
         {/* Language Selector */}

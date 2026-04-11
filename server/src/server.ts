@@ -34,6 +34,7 @@ app.use(cors({
     }
   },
   credentials: true,
+  maxAge: 600, // cache preflight OPTIONS por 10 minutos
 }))
 app.use(morgan('dev'))
 app.use(express.json())
