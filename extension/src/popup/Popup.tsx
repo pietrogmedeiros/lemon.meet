@@ -56,12 +56,12 @@ function LoginView({ onLogin }: { onLogin: () => void }) {
       <p style={{ marginTop: 16, fontSize: 12, color: 'var(--text-muted)', textAlign: 'center' }}>
         Faça login com Google em{' '}
         <a
-          href="http://localhost:5173"
+          href="https://lemon-meet.web.app"
           target="_blank"
           rel="noreferrer"
           style={{ color: 'var(--green)', textDecoration: 'none', fontWeight: 600 }}
         >
-          localhost:5173
+          lemon-meet.web.app
         </a>
         {' '}e clique em "Conectar com o app".
       </p>
@@ -261,7 +261,7 @@ function DashboardView({
           {email}
         </span>
         <a
-          href="http://localhost:5173"
+          href="https://lemon-meet.web.app"
           target="_blank"
           rel="noreferrer"
           style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--green)', textDecoration: 'none', fontWeight: 600 }}

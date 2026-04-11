@@ -83,11 +83,11 @@ export async function importSessionFromWebApp(): Promise<Session> {
   const SUPABASE_KEY = `sb-fzphfdvlsvxqrpwpmfuv-auth-token`
 
   // Verifica se já há uma aba do app aberta
-  const tabs = await chrome.tabs.query({ url: 'http://localhost:5173/*' })
+  const tabs = await chrome.tabs.query({ url: 'https://lemon-meet.web.app/*' })
 
   if (!tabs.length || !tabs[0].id) {
     // Abre o app e avisa o usuário
-    await chrome.tabs.create({ url: 'http://localhost:5173' })
+    await chrome.tabs.create({ url: 'https://lemon-meet.web.app' })
     throw new Error('App aberto! Faça login com Google e clique em "Conectar extensão" novamente.')
   }
 
@@ -106,7 +106,7 @@ export async function importSessionFromWebApp(): Promise<Session> {
 
   const sessionData = results[0]?.result
   if (!sessionData?.access_token) {
-    throw new Error('Sem sessão no app. Faça login com Google em localhost:5173 primeiro.')
+    throw new Error('Sem sessão no app. Faça login com Google em lemon-meet.web.app primeiro.')
   }
 
   const session = sessionData as Session

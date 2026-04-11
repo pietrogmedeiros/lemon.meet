@@ -43,7 +43,7 @@
     "https://*.zoom.us/*",
     "https://teams.microsoft.com/*",
     "https://teams.live.com/*",
-    "http://localhost:5173/*"
+    "https://lemon-meet.web.app/*"
   ]
 }
 
