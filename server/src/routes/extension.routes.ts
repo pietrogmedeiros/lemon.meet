@@ -306,6 +306,46 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
   }
 })
 
+// ── POST /api/meetings/:id/reprocess-insights ────────────────
+// Regera insights (e followUpSuggestions) para uma reunião existente
+router.post('/:id/reprocess-insights', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params
+    const userId = req.user!.id
+
+    const { data: meeting, error } = await supabase
+      .from('meetings')
+      .select('transcript, status')
+      .eq('id', id)
+      .eq('user_id', userId)
+      .single()
+
+    if (error || !meeting) {
+      return res.status(404).json({ success: false, message: 'Meeting not found' })
+    }
+
+    if (!meeting.transcript || meeting.transcript.trim().length === 0) {
+      return res.status(400).json({ success: false, message: 'No transcript available' })
+    }
+
+    // Dispara em background, responde imediatamente
+    res.json({ success: true, message: 'Reprocessing started' })
+
+    setImmediate(async () => {
+      try {
+        const insights = await insightsService.generateInsights(meeting.transcript, id)
+        await supabase.from('meetings').update({ insights, status: 'completed' }).eq('id', id)
+        logger.info(`Reprocessed insights for meeting ${id}`)
+      } catch (err) {
+        logger.error(`Error reprocessing insights for meeting ${id}:`, err)
+      }
+    })
+  } catch (err) {
+    logger.error('Unexpected error in POST /meetings/:id/reprocess-insights:', err)
+    return res.status(500).json({ success: false, message: 'Internal server error' })
+  }
+})
+
 // ── POST /api/meetings/:id/follow-up-email ────────────────────
 // Gera e-mail de follow-up profissional com IA
 router.post('/:id/follow-up-email', authMiddleware, async (req: AuthRequest, res: Response) => {

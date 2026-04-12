@@ -73,7 +73,7 @@ Critérios:
 - executiveContext: Resuma os pontos principais para um executivo
 - closingProbability: Probabilidade de fechamento do negócio baseado nos sinais da reunião
 - followUp: Próximos passos gerais recomendados
-- followUpSuggestions: EXATAMENTE 4 sugestões de follow-up altamente específicas e priorizadas para o time de vendas, baseadas nos sinais da reunião. Cada sugestão deve ser uma ação concreta, pessoal e com contexto (ex: "Enviar proposta com os preços discutidos até sexta-feira", "Agendar demo do produto focando na dor X mencionada pelo cliente"). Ordene da mais urgente para a menos urgente.
+- followUpSuggestions: EXATAMENTE 4 mensagens prontas para enviar diretamente ao cliente via e-mail ou WhatsApp após a reunião. Cada mensagem deve estar escrita na primeira pessoa ("Olá [nome/cliente], ...") em português do Brasil, tom profissional mas humano, referenciar algo específico discutido na reunião, e ter uma chamada para ação clara. Não escreva instruções para o vendedor — escreva o texto da mensagem em si, como se fosse disparar agora. Ordene da mais urgente para a menos urgente.
 - keyTopics: Principais temas discutidos
 - actionItems: Itens de ação identificados
 - bantScore: Avalie a qualidade de cada dimensão BANT com base em evidências concretas da transcrição. Score 0 = sem evidência, 10 = confirmação explícita e forte. Se não houver evidência para alguma dimensão, use score 0 e evidence "Não mencionado na reunião".
