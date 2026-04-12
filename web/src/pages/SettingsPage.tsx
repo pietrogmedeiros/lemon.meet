@@ -10,7 +10,7 @@ const API = import.meta.env.VITE_API_URL || 'http://localhost:3000'
 
 export function SettingsPage() {
   const { user, session } = useAuth()
-  const { subscription, isTrial, isExpired, daysLeft, refetch } = useSubscription()
+  const { subscription, loading: subLoading, isTrial, isExpired, daysLeft, refetch } = useSubscription()
   const navigate = useNavigate()
 
   // --- Checkout Stripe ---
@@ -429,7 +429,7 @@ export function SettingsPage() {
           )}
 
           {/* Cards de planos */}
-          {!isPaid && (
+          {!subLoading && !isPaid && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
               {/* Starter */}
