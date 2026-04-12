@@ -34,9 +34,9 @@ interface Meeting {
 
 function ScorePill({ score }: { score: number }) {
   const cls =
-    score >= 8 ? 'bg-green-100 text-green-700' :
-    score >= 5 ? 'bg-amber-100 text-amber-700' :
-    'bg-red-100 text-red-700';
+    score >= 8 ? 'bg-[#2D5A27]/10 text-[#2D5A27]' :
+    score >= 5 ? 'bg-[#FFD700]/30 text-[#7A5C00]' :
+    'bg-[#DC3545]/10 text-[#DC3545]';
   return (
     <span className={`inline-flex items-center justify-center min-w-[2.25rem] px-2 h-7 rounded-lg text-sm font-bold tabular-nums ${cls}`}>
       {score}
@@ -46,7 +46,7 @@ function ScorePill({ score }: { score: number }) {
 
 function ScoreBar({ score, max = 10 }: { score: number; max?: number }) {
   const pct = (score / max) * 100;
-  const color = score >= 8 ? 'bg-green-500' : score >= 5 ? 'bg-amber-400' : 'bg-red-500';
+  const color = score >= 8 ? 'bg-[#2D5A27]' : score >= 5 ? 'bg-[#FFD700]' : 'bg-[#DC3545]';
   return (
     <div className="flex-1 h-2 rounded-full bg-neutral-100 overflow-hidden">
       <div className={`h-full rounded-full ${color} transition-all duration-500`} style={{ width: `${pct}%` }} />
@@ -58,8 +58,8 @@ function ScoreTrendIcon({ scores }: { scores: number[] }) {
   if (scores.length < 2) return <Minus className="h-4 w-4 text-neutral-400" />;
   const last = scores[scores.length - 1];
   const prev = scores[scores.length - 2];
-  if (last > prev) return <TrendingUp className="h-4 w-4 text-green-500" />;
-  if (last < prev) return <TrendingDown className="h-4 w-4 text-red-500" />;
+  if (last > prev) return <TrendingUp className="h-4 w-4 text-[#2D5A27]" />;
+  if (last < prev) return <TrendingDown className="h-4 w-4 text-[#DC3545]" />;
   return <Minus className="h-4 w-4 text-neutral-400" />;
 }
 
@@ -167,7 +167,7 @@ export function InsightsPage() {
               </Card>
 
               {avgScore !== null ? (
-                <Card className="p-5 border-l-4 border-l-blue-400">
+                <Card className="p-5 border-l-4 border-l-[#E0E0E0]">
                   <div className="flex items-start justify-between">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-widest text-[#999]">
@@ -182,13 +182,13 @@ export function InsightsPage() {
                         {t('insights.aggregate.stats.basedOn', { count: withScores.length })}
                       </p>
                     </div>
-                    <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center">
-                      <BarChart3 size={17} className="text-blue-500" />
+                    <div className="w-9 h-9 rounded-xl bg-[#F5F5F5] flex items-center justify-center">
+                      <BarChart3 size={17} className="text-[#666]" />
                     </div>
                   </div>
                 </Card>
               ) : (
-                <Card className="p-5 border-l-4 border-l-blue-400">
+                <Card className="p-5 border-l-4 border-l-[#E0E0E0]">
                   <p className="text-xs font-semibold uppercase tracking-widest text-[#999]">
                     {t('insights.aggregate.stats.avgScore')}
                   </p>
@@ -196,32 +196,32 @@ export function InsightsPage() {
                 </Card>
               )}
 
-              <Card className="p-5 border-l-4 border-l-green-500">
+              <Card className="p-5 border-l-4 border-l-[#2D5A27]">
                 <div className="flex items-start justify-between">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-widest text-[#999]">
                       {t('insights.aggregate.stats.highQuality')}
                     </p>
-                    <p className="mt-2 text-4xl font-bold text-green-600">{highQ}</p>
+                    <p className="mt-2 text-4xl font-bold text-[#2D5A27]">{highQ}</p>
                     <p className="mt-1 text-xs text-[#888]">{t('insights.aggregate.stats.scoreHigh')}</p>
                   </div>
-                  <div className="w-9 h-9 rounded-xl bg-green-50 flex items-center justify-center">
-                    <TrendingUp size={17} className="text-green-500" />
+                  <div className="w-9 h-9 rounded-xl bg-[#2D5A27]/10 flex items-center justify-center">
+                    <TrendingUp size={17} className="text-[#2D5A27]" />
                   </div>
                 </div>
               </Card>
 
-              <Card className="p-5 border-l-4 border-l-red-500">
+              <Card className="p-5 border-l-4 border-l-[#DC3545]">
                 <div className="flex items-start justify-between">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-widest text-[#999]">
                       {t('insights.aggregate.stats.needsAttention')}
                     </p>
-                    <p className="mt-2 text-4xl font-bold text-red-500">{lowQ}</p>
+                    <p className="mt-2 text-4xl font-bold text-[#DC3545]">{lowQ}</p>
                     <p className="mt-1 text-xs text-[#888]">{t('insights.aggregate.stats.scoreLow')}</p>
                   </div>
-                  <div className="w-9 h-9 rounded-xl bg-red-50 flex items-center justify-center">
-                    <TrendingDown size={17} className="text-red-500" />
+                  <div className="w-9 h-9 rounded-xl bg-[#DC3545]/8 flex items-center justify-center">
+                    <TrendingDown size={17} className="text-[#DC3545]" />
                   </div>
                 </div>
               </Card>
@@ -234,8 +234,8 @@ export function InsightsPage() {
               {sortedByScore.length > 0 && (
                 <Card className="p-5">
                   <div className="flex items-center gap-2 mb-4">
-                    <div className="w-7 h-7 rounded-lg bg-amber-50 flex items-center justify-center">
-                      <Award size={15} className="text-amber-500" />
+                    <div className="w-7 h-7 rounded-lg bg-[#FFD700]/20 flex items-center justify-center">
+                      <Award size={15} className="text-[#7A5C00]" />
                     </div>
                     <h2 className="text-[15px] font-semibold text-[#1a1a1a]">
                       {t('insights.aggregate.ranking.title')}
@@ -249,9 +249,9 @@ export function InsightsPage() {
                         className="flex items-center gap-3 cursor-pointer hover:bg-[#f5f5f5] rounded-lg px-2 py-2 transition-colors group"
                       >
                         <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold flex-shrink-0 ${
-                          i === 0 ? 'bg-amber-400 text-white' :
+                          i === 0 ? 'bg-[#FFD700] text-[#333]' :
                           i === 1 ? 'bg-neutral-300 text-white' :
-                          i === 2 ? 'bg-orange-300 text-white' :
+                          i === 2 ? 'bg-neutral-200 text-[#666]' :
                           'bg-neutral-100 text-[#888]'
                         }`}>{i + 1}</span>
 
@@ -285,9 +285,9 @@ export function InsightsPage() {
                   </div>
                   <div className="space-y-5">
                     {[
-                      { key: 'high',   label: t('insights.aggregate.distribution.high'),   count: highQ, barCls: 'bg-green-500' },
-                      { key: 'medium', label: t('insights.aggregate.distribution.medium'), count: medQ,  barCls: 'bg-amber-400' },
-                      { key: 'low',    label: t('insights.aggregate.distribution.low'),    count: lowQ,  barCls: 'bg-red-500' },
+                      { key: 'high',   label: t('insights.aggregate.distribution.high'),   count: highQ, barCls: 'bg-[#2D5A27]' },
+                      { key: 'medium', label: t('insights.aggregate.distribution.medium'), count: medQ,  barCls: 'bg-[#FFD700]' },
+                      { key: 'low',    label: t('insights.aggregate.distribution.low'),    count: lowQ,  barCls: 'bg-[#DC3545]' },
                     ].map(({ key, label, count, barCls }) => {
                       const pct = withScores.length ? Math.round((count / withScores.length) * 100) : 0;
                       return (
@@ -315,9 +315,9 @@ export function InsightsPage() {
                   {/* Score summary */}
                   <div className="mt-6 pt-5 border-t border-[#F0F0F0] grid grid-cols-3 gap-3 text-center">
                     {[
-                      { label: t('insights.aggregate.distribution.high'),   value: highQ, cls: 'text-green-600' },
-                      { label: t('insights.aggregate.distribution.medium'), value: medQ,  cls: 'text-amber-600' },
-                      { label: t('insights.aggregate.distribution.low'),    value: lowQ,  cls: 'text-red-500' },
+                      { label: t('insights.aggregate.distribution.high'),   value: highQ, cls: 'text-[#2D5A27]' },
+                      { label: t('insights.aggregate.distribution.medium'), value: medQ,  cls: 'text-[#7A5C00]' },
+                      { label: t('insights.aggregate.distribution.low'),    value: lowQ,  cls: 'text-[#DC3545]' },
                     ].map(({ label, value, cls }) => (
                       <div key={label} className="bg-[#fafafa] rounded-xl py-3">
                         <p className={`text-2xl font-bold ${cls}`}>{value}</p>
@@ -332,8 +332,8 @@ export function InsightsPage() {
               {hasSentiment && (
                 <Card className="p-5">
                   <div className="flex items-center gap-2 mb-4">
-                    <div className="w-7 h-7 rounded-lg bg-purple-50 flex items-center justify-center">
-                      <MessageSquare size={15} className="text-purple-500" />
+                    <div className="w-7 h-7 rounded-lg bg-[#F5F5F5] flex items-center justify-center">
+                      <MessageSquare size={15} className="text-[#666]" />
                     </div>
                     <h2 className="text-[15px] font-semibold text-[#1a1a1a]">
                       {t('insights.aggregate.sentiment.title')}
@@ -341,9 +341,9 @@ export function InsightsPage() {
                   </div>
                   <div className="space-y-3">
                     {[
-                      { key: 'positive', emoji: '😊', count: sentimentCounts.positive, barCls: 'bg-green-500' },
-                      { key: 'neutral',  emoji: '😐', count: sentimentCounts.neutral,  barCls: 'bg-amber-400' },
-                      { key: 'negative', emoji: '😟', count: sentimentCounts.negative, barCls: 'bg-red-500' },
+                      { key: 'positive', emoji: '😊', count: sentimentCounts.positive, barCls: 'bg-[#2D5A27]' },
+                      { key: 'neutral',  emoji: '😐', count: sentimentCounts.neutral,  barCls: 'bg-[#E0E0E0]' },
+                      { key: 'negative', emoji: '😟', count: sentimentCounts.negative, barCls: 'bg-[#DC3545]' },
                     ].map(({ key, emoji, count, barCls }) => (
                       <div key={key} className="flex items-center gap-3">
                         <span className="text-lg w-5 flex-shrink-0">{emoji}</span>
@@ -369,8 +369,8 @@ export function InsightsPage() {
               {topTopics.length > 0 && (
                 <Card className="p-5">
                   <div className="flex items-center gap-2 mb-4">
-                    <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center">
-                      <Hash size={15} className="text-blue-500" />
+                    <div className="w-7 h-7 rounded-lg bg-[#2D5A27]/10 flex items-center justify-center">
+                      <Hash size={15} className="text-[#2D5A27]" />
                     </div>
                     <h2 className="text-[15px] font-semibold text-[#1a1a1a]">
                       {t('insights.aggregate.topics.title')}
@@ -413,7 +413,7 @@ export function InsightsPage() {
                         onClick={() => navigate(`/meetings/${m.id}`)}
                         className="flex items-center gap-3 cursor-pointer hover:bg-[#f5f5f5] rounded-lg px-3 py-2.5 transition-colors group"
                       >
-                        <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${m.score >= 8 ? 'bg-green-500' : m.score >= 5 ? 'bg-amber-400' : 'bg-red-500'}`} />
+                        <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${m.score >= 8 ? 'bg-[#2D5A27]' : m.score >= 5 ? 'bg-[#FFD700]' : 'bg-[#DC3545]'}`} />
                         <div className="flex-1 min-w-0">
                           <p className="text-[13px] font-medium text-[#222] truncate group-hover:text-[#2D5A27] transition-colors">
                             {m.title || `${t('insights.aggregate.ranking.meeting')} ${m.id.slice(0, 8)}`}
