@@ -10,6 +10,7 @@ import extensionRouter from './routes/extension.routes.js'
 import teamsRouter from './routes/teams.routes.js'
 import subscriptionRouter, { stripeWebhookHandler } from './routes/subscription.routes.js'
 import integrationsRouter from './routes/integrations.routes.js'
+import coachingRouter from './routes/coaching.routes.js'
 
 // Load environment variables
 dotenv.config()
@@ -71,6 +72,7 @@ app.use('/api/meetings', extensionRouter)
 app.use('/api/teams', teamsRouter)
 app.use('/api/subscription', subscriptionRouter)
 app.use('/api/integrations', integrationsRouter)
+app.use('/api/coaching', coachingRouter)
 
 // 404 handler
 app.use((req, res) => {

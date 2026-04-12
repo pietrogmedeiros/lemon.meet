@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Home, Video, TrendingUp, LogOut, Settings, ChevronLeft, ChevronRight, Users, CreditCard, Plug } from 'lucide-react'
+import { Home, Video, TrendingUp, LogOut, Settings, ChevronLeft, ChevronRight, Users, CreditCard, Plug, GraduationCap, FileText } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '@/contexts'
@@ -27,9 +27,11 @@ export function Sidebar() {
   const groups: MenuGroup[] = [
     {
       items: [
-        { id: 'dashboard',    path: '/dashboard',    icon: Home,       label: t('nav.dashboard') },
-        { id: 'meetings',     path: '/meetings',     icon: Video,      label: t('nav.meetings') },
-        { id: 'insights',     path: '/insights',     icon: TrendingUp, label: t('nav.insights') },
+        { id: 'dashboard',    path: '/dashboard',    icon: Home,           label: t('nav.dashboard') },
+        { id: 'meetings',     path: '/meetings',     icon: Video,          label: t('nav.meetings') },
+        { id: 'insights',     path: '/insights',     icon: TrendingUp,     label: t('nav.insights') },
+        { id: 'coaching',     path: '/coaching',     icon: GraduationCap,  label: 'Coaching' },
+        { id: 'relatorio',    path: '/relatorio',    icon: FileText,       label: 'Relatório Semanal' },
       ],
     },
     {

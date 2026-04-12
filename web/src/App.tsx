@@ -1,7 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { ThemeProvider, AuthProvider, SubscriptionProvider } from '@/contexts'
 import { ProtectedRoute } from '@/components/auth'
-import { LoginPage, DashboardPage, MeetingsPage, TranscricaoDetalhesPage, InsightsPage, SettingsPage, TeamPage, SubscriptionPage, CheckoutPage, IntegrationsPage } from '@/pages'
+import { LoginPage, DashboardPage, MeetingsPage, TranscricaoDetalhesPage, InsightsPage, SettingsPage, TeamPage, SubscriptionPage, CheckoutPage, IntegrationsPage, CoachingPage, RelatorioPage } from '@/pages'
 
 function App() {
   return (
@@ -67,6 +67,22 @@ function App() {
             }
           />
           <Route path="/checkout" element={<CheckoutPage />} />
+          <Route
+            path="/coaching"
+            element={
+              <ProtectedRoute>
+                <CoachingPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/relatorio"
+            element={
+              <ProtectedRoute>
+                <RelatorioPage />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/integrations"
             element={
