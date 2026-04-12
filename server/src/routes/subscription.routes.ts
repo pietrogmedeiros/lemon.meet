@@ -278,10 +278,14 @@ router.post('/portal', authMiddleware as RequestHandler, async (req: AuthRequest
 
     const frontendUrl = process.env.FRONTEND_URL || 'https://lemon-meet.web.app'
 
-    const session = await getStripe().billingPortal.sessions.create({
+    const portalParams: Stripe.BillingPortal.SessionCreateParams = {
       customer: sub.stripe_customer_id,
       return_url: `${frontendUrl}/settings`,
-    })
+    }
+    if (process.env.STRIPE_PORTAL_CONFIG_ID) {
+      portalParams.configuration = process.env.STRIPE_PORTAL_CONFIG_ID
+    }
+    const session = await getStripe().billingPortal.sessions.create(portalParams)
 
     return res.json({ url: session.url })
   } catch (err: any) {
