@@ -42,7 +42,12 @@ export function TopNavBar() {
   }
 
   return (
-    <header className="h-16 bg-white border-b border-neutral-light px-8 flex items-center justify-end sticky top-0 z-40">
+    <header className="h-16 bg-white border-b border-neutral-light px-8 flex items-center justify-between sticky top-0 z-40">
+      {/* Left: tagline sutil */}
+      <p className="text-[12px] text-[#bbb] font-normal tracking-wide select-none hidden sm:block">
+        Esprema o melhor das suas reuniões 🍋
+      </p>
+
       {/* Right: Plan badge, Language, Profile */}
       <div className="flex items-center gap-3">
 
