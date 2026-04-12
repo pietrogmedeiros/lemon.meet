@@ -76,13 +76,21 @@ export function SubscriptionPage() {
         headers: { Authorization: `Bearer ${session.access_token}` },
       })
       const data = await res.json()
-      if (data.url) window.location.href = data.url
+      if (data.url) {
+        window.location.href = data.url
+      } else {
+        // Sem customer Stripe vinculado — redireciona para fazer o checkout
+        navigate('/settings')
+      }
     } catch {
       alert('Erro ao conectar com o servidor.')
     } finally {
       setPortalLoading(false)
     }
   }
+
+  // Tem dados reais do Stripe vinculados (passou pelo checkout)
+  const hasStripeData = !!(details && details.amount !== null)
 
   const planLabel: Record<string, string> = {
     trial: 'Trial',
@@ -111,7 +119,7 @@ export function SubscriptionPage() {
             <ArrowLeft size={16} />
             Configurações
           </button>
-          {!loading && details && details.plan !== 'trial' && (
+          {!loading && details && details.plan !== 'trial' && hasStripeData && (
             <button
               onClick={handlePortal}
               disabled={portalLoading}
