@@ -306,4 +306,230 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
   }
 })
 
+// ── POST /api/meetings/:id/follow-up-email ────────────────────
+// Gera e-mail de follow-up profissional com IA
+router.post('/:id/follow-up-email', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params
+    const userId = req.user!.id
+
+    const { data: meeting, error } = await supabase
+      .from('meetings')
+      .select('title, insights')
+      .eq('id', id)
+      .eq('user_id', userId)
+      .single()
+
+    if (error || !meeting) {
+      return res.status(404).json({ success: false, message: 'Meeting not found' })
+    }
+
+    if (!meeting.insights) {
+      return res.status(400).json({ success: false, message: 'Meeting has no insights yet' })
+    }
+
+    const email = await insightsService.generateFollowUpEmail(
+      meeting.title ?? 'Reunião',
+      meeting.insights as any
+    )
+
+    return res.json({ success: true, email })
+  } catch (err) {
+    logger.error('Unexpected error in POST /meetings/:id/follow-up-email:', err)
+    return res.status(500).json({ success: false, message: 'Internal server error' })
+  }
+})
+
+// ── GET /api/meetings/:id/briefing ────────────────────────────
+// Gera briefing pré-reunião com base no histórico do usuário
+router.get('/:id/briefing', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params
+    const userId = req.user!.id
+
+    // Busca a reunião atual
+    const { data: current, error: currentError } = await supabase
+      .from('meetings')
+      .select('title, created_at')
+      .eq('id', id)
+      .eq('user_id', userId)
+      .single()
+
+    if (currentError || !current) {
+      return res.status(404).json({ success: false, message: 'Meeting not found' })
+    }
+
+    // Busca as 3 reuniões anteriores concluídas com insights
+    const { data: past } = await supabase
+      .from('meetings')
+      .select('title, insights')
+      .eq('user_id', userId)
+      .eq('status', 'completed')
+      .not('insights', 'is', null)
+      .lt('created_at', current.created_at)
+      .order('created_at', { ascending: false })
+      .limit(3)
+
+    if (!past || past.length === 0) {
+      return res.json({ success: true, briefing: null })
+    }
+
+    const validPast = past.filter((m: any) => m.insights?.executiveContext)
+
+    if (validPast.length === 0) {
+      return res.json({ success: true, briefing: null })
+    }
+
+    const briefing = await insightsService.generateBriefing(
+      current.title ?? 'Reunião',
+      validPast as any
+    )
+
+    return res.json({ success: true, briefing })
+  } catch (err) {
+    logger.error('Unexpected error in GET /meetings/:id/briefing:', err)
+    return res.status(500).json({ success: false, message: 'Internal server error' })
+  }
+})
+
+// ── GET /api/meetings/:id/action-items ───────────────────────
+// Lista action items da reunião
+router.get('/:id/action-items', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params
+    const userId = req.user!.id
+
+    // Verifica ownership
+    const { data: meeting, error: meetingError } = await supabase
+      .from('meetings')
+      .select('id')
+      .eq('id', id)
+      .eq('user_id', userId)
+      .single()
+
+    if (meetingError || !meeting) {
+      return res.status(404).json({ success: false, message: 'Meeting not found' })
+    }
+
+    const { data: items, error } = await supabase
+      .from('meeting_action_items')
+      .select('*')
+      .eq('meeting_id', id)
+      .order('created_at', { ascending: true })
+
+    if (error) {
+      return res.status(500).json({ success: false, message: 'Error fetching action items' })
+    }
+
+    return res.json({ success: true, items: items ?? [] })
+  } catch (err) {
+    logger.error('Unexpected error in GET /meetings/:id/action-items:', err)
+    return res.status(500).json({ success: false, message: 'Internal server error' })
+  }
+})
+
+// ── POST /api/meetings/:id/action-items ──────────────────────
+// Cria action items (em bulk a partir dos insights ou individualmente)
+router.post('/:id/action-items', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params
+    const userId = req.user!.id
+    const { texts } = req.body as { texts: string[] }
+
+    if (!Array.isArray(texts) || texts.length === 0) {
+      return res.status(400).json({ success: false, message: 'texts array is required' })
+    }
+
+    // Verifica ownership
+    const { data: meeting, error: meetingError } = await supabase
+      .from('meetings')
+      .select('id')
+      .eq('id', id)
+      .eq('user_id', userId)
+      .single()
+
+    if (meetingError || !meeting) {
+      return res.status(404).json({ success: false, message: 'Meeting not found' })
+    }
+
+    const rows = texts.map((text: string) => ({
+      meeting_id: id,
+      user_id: userId,
+      text: text.trim(),
+      status: 'pending',
+    }))
+
+    const { data: items, error } = await supabase
+      .from('meeting_action_items')
+      .insert(rows)
+      .select()
+
+    if (error) {
+      return res.status(500).json({ success: false, message: 'Error creating action items' })
+    }
+
+    return res.status(201).json({ success: true, items })
+  } catch (err) {
+    logger.error('Unexpected error in POST /meetings/:id/action-items:', err)
+    return res.status(500).json({ success: false, message: 'Internal server error' })
+  }
+})
+
+// ── PATCH /api/meetings/:id/action-items/:itemId ─────────────
+// Atualiza status de um action item
+router.patch('/:id/action-items/:itemId', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id, itemId } = req.params
+    const userId = req.user!.id
+    const { status } = req.body as { status: 'pending' | 'done' }
+
+    if (!status || !['pending', 'done'].includes(status)) {
+      return res.status(400).json({ success: false, message: 'status must be "pending" or "done"' })
+    }
+
+    const { data: item, error } = await supabase
+      .from('meeting_action_items')
+      .update({ status, updated_at: new Date().toISOString() })
+      .eq('id', itemId)
+      .eq('meeting_id', id)
+      .eq('user_id', userId)
+      .select()
+      .single()
+
+    if (error || !item) {
+      return res.status(404).json({ success: false, message: 'Action item not found' })
+    }
+
+    return res.json({ success: true, item })
+  } catch (err) {
+    logger.error('Unexpected error in PATCH /meetings/:id/action-items/:itemId:', err)
+    return res.status(500).json({ success: false, message: 'Internal server error' })
+  }
+})
+
+// ── DELETE /api/meetings/:id/action-items/:itemId ─────────────
+// Remove um action item
+router.delete('/:id/action-items/:itemId', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id, itemId } = req.params
+    const userId = req.user!.id
+
+    const { error } = await supabase
+      .from('meeting_action_items')
+      .delete()
+      .eq('id', itemId)
+      .eq('meeting_id', id)
+      .eq('user_id', userId)
+
+    if (error) {
+      return res.status(500).json({ success: false, message: 'Error deleting action item' })
+    }
+
+    return res.json({ success: true })
+  } catch (err) {
+    logger.error('Unexpected error in DELETE /meetings/:id/action-items/:itemId:', err)
+    return res.status(500).json({ success: false, message: 'Internal server error' })
+  }
+})
+
 export default router

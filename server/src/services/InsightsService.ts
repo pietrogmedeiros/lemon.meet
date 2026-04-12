@@ -8,6 +8,18 @@ const deepseek = new OpenAI({
   baseURL: 'https://api.deepseek.com',
 });
 
+export interface BantDimension {
+  score: number;   // 0-10
+  evidence: string;
+}
+
+export interface BantScore {
+  budget: BantDimension;
+  authority: BantDimension;
+  need: BantDimension;
+  timeline: BantDimension;
+}
+
 export interface MeetingInsights {
   sentiment: 'positive' | 'neutral' | 'negative';
   commercialQuality: number; // 0-10
@@ -17,6 +29,7 @@ export interface MeetingInsights {
   followUpSuggestions: string[]; // exactly 4 sales follow-up suggestions
   keyTopics: string[];
   actionItems: string[];
+  bantScore?: BantScore;
   participants?: number;
   duration?: number;
 }
@@ -45,7 +58,13 @@ Analise a transcrição fornecida e retorne um JSON estruturado com os seguintes
   "followUp": ["<ação 1>", "<ação 2>", ...],
   "followUpSuggestions": ["<sugestão 1>", "<sugestão 2>", "<sugestão 3>", "<sugestão 4>"],
   "keyTopics": ["<tópico 1>", "<tópico 2>", ...],
-  "actionItems": ["<item 1>", "<item 2>", ...]
+  "actionItems": ["<item 1>", "<item 2>", ...],
+  "bantScore": {
+    "budget": { "score": <0-10>, "evidence": "<evidência encontrada na transcrição>" },
+    "authority": { "score": <0-10>, "evidence": "<evidência encontrada na transcrição>" },
+    "need": { "score": <0-10>, "evidence": "<evidência encontrada na transcrição>" },
+    "timeline": { "score": <0-10>, "evidence": "<evidência encontrada na transcrição>" }
+  }
 }
 
 Critérios:
@@ -57,6 +76,7 @@ Critérios:
 - followUpSuggestions: EXATAMENTE 4 sugestões de follow-up altamente específicas e priorizadas para o time de vendas, baseadas nos sinais da reunião. Cada sugestão deve ser uma ação concreta, pessoal e com contexto (ex: "Enviar proposta com os preços discutidos até sexta-feira", "Agendar demo do produto focando na dor X mencionada pelo cliente"). Ordene da mais urgente para a menos urgente.
 - keyTopics: Principais temas discutidos
 - actionItems: Itens de ação identificados
+- bantScore: Avalie a qualidade de cada dimensão BANT com base em evidências concretas da transcrição. Score 0 = sem evidência, 10 = confirmação explícita e forte. Se não houver evidência para alguma dimensão, use score 0 e evidence "Não mencionado na reunião".
 
 Retorne APENAS o JSON válido, sem texto adicional.`;
 
@@ -164,6 +184,75 @@ Retorne APENAS o JSON válido, sem texto adicional.`;
       logger.error('Error in getInsights:', error);
       return null;
     }
+  }
+
+  /**
+   * Gera e-mail de follow-up profissional baseado nos insights da reunião
+   */
+  async generateFollowUpEmail(meetingTitle: string, insights: MeetingInsights): Promise<string> {
+    const systemPrompt = `Você é um especialista em vendas consultivas. Com base nos insights de uma reunião comercial, escreva um e-mail de follow-up profissional, personalizado e persuasivo em português do Brasil.
+
+O e-mail deve:
+- Ter assunto na primeira linha no formato "Assunto: ..."
+- Ser conciso (máx. 200 palavras no corpo)
+- Referenciar os pontos discutidos na reunião
+- Incluir os próximos passos acordados
+- Ter tom profissional mas humano
+- Terminar com uma chamada para ação clara
+
+Retorne APENAS o texto do e-mail (assunto + corpo), sem explicações.`;
+
+    const userPrompt = `Reunião: ${meetingTitle}
+Contexto executivo: ${insights.executiveContext}
+Probabilidade de fechamento: ${insights.closingProbability}%
+Próximos passos: ${insights.actionItems.slice(0, 3).join('; ')}
+Sugestões de follow-up: ${insights.followUpSuggestions.slice(0, 2).join('; ')}`;
+
+    const response = await deepseek.chat.completions.create({
+      model: 'deepseek-chat',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+      temperature: 0.5,
+    });
+
+    return response.choices[0]?.message?.content ?? '';
+  }
+
+  /**
+   * Gera briefing pré-reunião baseado no histórico de reuniões anteriores
+   */
+  async generateBriefing(currentMeetingTitle: string, pastMeetings: { title: string | null; insights: MeetingInsights }[]): Promise<string> {
+    if (pastMeetings.length === 0) return '';
+
+    const systemPrompt = `Você é um assistente de vendas. Com base no histórico de reuniões anteriores com este cliente, gere um briefing pré-reunião conciso e útil em português do Brasil.
+
+O briefing deve:
+- Resumir os principais pontos discutidos anteriormente
+- Destacar os compromissos e próximos passos que ficaram em aberto
+- Pontuar o histórico de interesse e objeções do cliente
+- Sugerir 2-3 pontos para abordar na reunião atual
+- Ser objetivo (máx. 180 palavras)
+
+Retorne APENAS o texto do briefing, sem cabeçalhos ou formatação markdown.`;
+
+    const history = pastMeetings.map((m, i) =>
+      `Reunião ${i + 1}: ${m.title ?? 'Sem título'}\nContexto: ${m.insights.executiveContext}\nAções pendentes: ${m.insights.actionItems.slice(0, 2).join('; ')}`
+    ).join('\n\n');
+
+    const userPrompt = `Reunião atual: ${currentMeetingTitle}\n\nHistórico:\n${history}`;
+
+    const response = await deepseek.chat.completions.create({
+      model: 'deepseek-chat',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+      temperature: 0.4,
+    });
+
+    return response.choices[0]?.message?.content ?? '';
   }
 
   /**
