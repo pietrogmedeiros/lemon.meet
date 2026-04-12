@@ -12,7 +12,7 @@ export interface MeetingSession {
 }
 
 export interface MessageToBackground {
-  type: 'START_RECORDING' | 'STOP_RECORDING' | 'GET_STATE' | 'MEETING_DETECTED' | 'MEETING_ENDED' | 'AUTH_CHANGED' | 'RESET_STATE'
+  type: 'START_RECORDING' | 'STOP_RECORDING' | 'GET_STATE' | 'MEETING_DETECTED' | 'MEETING_ENDED' | 'AUTH_CHANGED' | 'RESET_STATE' | 'OPEN_POPUP'
   tabId?: number
   streamId?: string
 }
@@ -52,6 +52,8 @@ chrome.runtime.onMessage.addListener((msg: MessageToBackground, sender, sendResp
       return true
     case 'RESET_STATE':
       setState('idle'); sendResponse({ ok: true }); break
+    case 'OPEN_POPUP':
+      chrome.action.openPopup().catch(() => {}); break
     case 'MEETING_DETECTED':
       chrome.storage.local.set({ lastDetected: msg }); break
     case 'MEETING_ENDED':

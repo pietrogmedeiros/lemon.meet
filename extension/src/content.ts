@@ -165,15 +165,7 @@ function injectFloatingButton(info: MeetingInfo) {
   const btn = document.getElementById('lemon-meet-toggle')!
   btn.addEventListener('click', () => {
     try {
-      chrome.runtime.sendMessage({ type: 'GET_STATE' }, (response) => {
-        if (chrome.runtime.lastError) return
-        const state = response?.state
-        if (state === 'idle') {
-          chrome.runtime.sendMessage({ type: 'START_RECORDING' }).catch(() => {})
-        } else if (state === 'recording') {
-          chrome.runtime.sendMessage({ type: 'STOP_RECORDING' }).catch(() => {})
-        }
-      })
+      chrome.runtime.sendMessage({ type: 'OPEN_POPUP' })
     } catch { /* contexto invalidado — extensão foi atualizada */ }
   })
 }

@@ -4,7 +4,7 @@ import { MainLayout } from '../components/layout/MainLayout';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
-import { ArrowLeft, Clock, Calendar, Mic, Target, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Clock, Calendar, Mic, Target, CheckCircle, Mail } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 interface TranscriptSegment {
@@ -23,6 +23,7 @@ interface MeetingInsights {
   executiveContext: string;
   closingProbability: number;
   followUp: string[];
+  followUpSuggestions: string[];
   keyTopics: string[];
   actionItems: string[];
 }
@@ -237,6 +238,27 @@ export function TranscricaoDetalhesPage() {
               )}
             </Card>
           </div>
+        )}
+
+        {/* Follow-up Suggestions */}
+        {(meeting.insights?.followUpSuggestions ?? []).length > 0 && (
+          <Card className="p-5">
+            <h2 className="text-headline-2 text-primary mb-4 flex items-center gap-2">
+              <Mail className="h-5 w-5" />
+              Sugestões de Follow-up
+              <span className="ml-2 text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">Vendas</span>
+            </h2>
+            <div className="space-y-3">
+              {(meeting.insights?.followUpSuggestions ?? []).slice(0, 4).map((suggestion, i) => (
+                <div key={i} className="flex items-start gap-3 p-3 rounded-lg bg-primary/5 border border-primary/10">
+                  <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-white text-xs font-bold flex items-center justify-center">
+                    {i + 1}
+                  </span>
+                  <span className="text-sm text-secondary leading-relaxed">{suggestion}</span>
+                </div>
+              ))}
+            </div>
+          </Card>
         )}
 
         {/* Transcript segments */}

@@ -83,6 +83,8 @@
     "executiveContext": "Executive Summary",
     "keyTopics": "Key Topics",
     "actionItems": "Action Items",
+    "followUpSuggestions": "Follow-up Suggestions",
+    "followUpSuggestionsBadge": "Sales",
     "followUp": "Follow-up",
     "fullTranscript": "Full Transcript",
     "error": {

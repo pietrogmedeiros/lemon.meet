@@ -5,7 +5,7 @@ import { MainLayout } from '../components/layout/MainLayout';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
-import { ArrowLeft, TrendingUp, Target, Lightbulb, CheckCircle, Clock, Users } from 'lucide-react';
+import { ArrowLeft, TrendingUp, Target, Lightbulb, CheckCircle, Clock, Users, Mail } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { formatDate, formatTime } from '../lib/dateUtils';
 
@@ -15,6 +15,7 @@ interface MeetingInsights {
   executiveContext: string;
   closingProbability: number;
   followUp: string[];
+  followUpSuggestions: string[];
   keyTopics: string[];
   actionItems: string[];
 }
@@ -314,6 +315,34 @@ export function MeetingInsightsPage() {
                   </ul>
                 </div>
               </Card>
+
+              {/* Follow-up de Vendas */}
+              {insights.followUpSuggestions?.length > 0 && (
+                <Card>
+                  <div className="p-6">
+                    <div className="flex items-center gap-2 mb-4">
+                      <Mail className="w-5 h-5 text-primary" />
+                      <h3 className="font-semibold text-primary">{t('insights.followUpSuggestions')}</h3>
+                      <span className="ml-auto text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">
+                        {t('insights.followUpSuggestionsBadge')}
+                      </span>
+                    </div>
+                    <div className="space-y-3">
+                      {insights.followUpSuggestions.slice(0, 4).map((suggestion, index) => (
+                        <div
+                          key={index}
+                          className="flex items-start gap-3 p-3 rounded-lg bg-primary/5 border border-primary/10"
+                        >
+                          <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-white text-xs font-bold flex items-center justify-center">
+                            {index + 1}
+                          </span>
+                          <span className="text-primary text-sm leading-relaxed">{suggestion}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </Card>
+              )}
 
               {/* Follow-up */}
               <Card>

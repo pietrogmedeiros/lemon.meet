@@ -85,6 +85,8 @@
     "executiveContext": "Contexto Executivo",
     "keyTopics": "Tópicos-Chave",
     "actionItems": "Itens de Ação",
+    "followUpSuggestions": "Sugestões de Follow-up",
+    "followUpSuggestionsBadge": "Vendas",
     "followUp": "Próximos Passos",
     "fullTranscript": "Transcrição Completa",
     "error": {

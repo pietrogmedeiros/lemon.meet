@@ -14,6 +14,7 @@ export interface MeetingInsights {
   executiveContext: string;
   closingProbability: number; // 0-100%
   followUp: string[];
+  followUpSuggestions: string[]; // exactly 4 sales follow-up suggestions
   keyTopics: string[];
   actionItems: string[];
   participants?: number;
@@ -33,7 +34,7 @@ export class InsightsService {
       }
 
       // Prompt estruturado para GPT-4o
-      const systemPrompt = `Você é um assistente especializado em análise de reuniões comerciais. 
+      const systemPrompt = `Você é um assistente especializado em análise de reuniões comerciais para times de vendas. 
 Analise a transcrição fornecida e retorne um JSON estruturado com os seguintes campos:
 
 {
@@ -42,6 +43,7 @@ Analise a transcrição fornecida e retorne um JSON estruturado com os seguintes
   "executiveContext": "<resumo executivo em 2-3 frases>",
   "closingProbability": <número de 0 a 100>,
   "followUp": ["<ação 1>", "<ação 2>", ...],
+  "followUpSuggestions": ["<sugestão 1>", "<sugestão 2>", "<sugestão 3>", "<sugestão 4>"],
   "keyTopics": ["<tópico 1>", "<tópico 2>", ...],
   "actionItems": ["<item 1>", "<item 2>", ...]
 }
@@ -51,7 +53,8 @@ Critérios:
 - commercialQuality: Avalie a qualidade comercial da reunião (engajamento, clareza, objetividade)
 - executiveContext: Resuma os pontos principais para um executivo
 - closingProbability: Probabilidade de fechamento do negócio baseado nos sinais da reunião
-- followUp: Próximos passos recomendados
+- followUp: Próximos passos gerais recomendados
+- followUpSuggestions: EXATAMENTE 4 sugestões de follow-up altamente específicas e priorizadas para o time de vendas, baseadas nos sinais da reunião. Cada sugestão deve ser uma ação concreta, pessoal e com contexto (ex: "Enviar proposta com os preços discutidos até sexta-feira", "Agendar demo do produto focando na dor X mencionada pelo cliente"). Ordene da mais urgente para a menos urgente.
 - keyTopics: Principais temas discutidos
 - actionItems: Itens de ação identificados
 
