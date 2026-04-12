@@ -18,6 +18,7 @@ import { supabase } from '../config/supabase.js'
 import { logger } from '../utils/logger.js'
 import { transcriptionService } from '../services/TranscriptionService.js'
 import { insightsService } from '../services/InsightsService.js'
+import { fireWebhookForMeeting } from './integrations.routes.js'
 
 const router: express.Router = Router()
 
@@ -200,6 +201,9 @@ router.post('/:id/stop', authMiddleware, async (req: AuthRequest, res: Response)
           insights,
           status: 'completed',
         }).eq('id', id)
+
+        // Dispara webhook do usuário (se configurado e ativo)
+        await fireWebhookForMeeting(meeting.user_id, { ...meeting, id }, insights)
 
         logger.info(`Meeting ${id} fully processed`)
       } catch (err) {
