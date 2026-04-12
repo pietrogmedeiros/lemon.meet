@@ -1,7 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { ThemeProvider, AuthProvider, SubscriptionProvider } from '@/contexts'
 import { ProtectedRoute } from '@/components/auth'
-import { LoginPage, DashboardPage, MeetingsPage, TranscricaoDetalhesPage, InsightsPage, SettingsPage, TeamPage, SubscriptionPage } from '@/pages'
+import { LoginPage, DashboardPage, MeetingsPage, TranscricaoDetalhesPage, InsightsPage, SettingsPage, TeamPage, SubscriptionPage, CheckoutPage } from '@/pages'
 
 function App() {
   return (
@@ -66,6 +66,7 @@ function App() {
               </ProtectedRoute>
             }
           />
+          <Route path="/checkout" element={<CheckoutPage />} />
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>

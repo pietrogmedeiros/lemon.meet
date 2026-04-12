@@ -1,12 +1,23 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui'
 import { Mail, Lock } from 'lucide-react'
 import { useAuth } from '@/contexts'
 
 export function LoginPage() {
   const { t } = useTranslation()
-  const { signInWithEmail, signInWithGoogle } = useAuth()
+  const { signInWithEmail, signInWithGoogle, user, loading: authLoading } = useAuth()
+  const [searchParams] = useSearchParams()
+  const navigate = useNavigate()
+  const nextUrl = searchParams.get('next') || '/dashboard'
+
+  // Se já logado, redireciona para ?next
+  useEffect(() => {
+    if (!authLoading && user) {
+      navigate(nextUrl, { replace: true })
+    }
+  }, [authLoading, user, navigate, nextUrl])
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -20,8 +31,10 @@ export function LoginPage() {
     const { error } = await signInWithEmail(email, password)
     if (error) {
       setError('Email ou senha inválidos.')
+      setLoading(false)
+    } else {
+      navigate(nextUrl, { replace: true })
     }
-    setLoading(false)
   }
 
   const handleGoogleSignIn = async () => {
