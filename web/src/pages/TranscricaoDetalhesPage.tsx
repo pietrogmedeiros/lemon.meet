@@ -413,7 +413,7 @@ export function TranscricaoDetalhesPage() {
             )}
 
             {/* Action items with status tracking */}
-            <Card className="p-5 lg:col-span-1">
+            <Card className="p-5 lg:col-span-2">
               <h2 className="text-headline-2 text-primary mb-4 flex items-center gap-2">
                 <CheckCircle className="h-5 w-5" />
                 Próximos Passos
