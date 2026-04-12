@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Home, Video, TrendingUp, LogOut, Settings, ChevronRight, Users } from 'lucide-react'
+import { Home, Video, TrendingUp, LogOut, Settings, ChevronRight, Users, CreditCard } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '@/contexts'
@@ -17,6 +17,7 @@ export function Sidebar() {
     { id: 'meetings', path: '/meetings', icon: Video, label: t('nav.meetings') },
     { id: 'insights', path: '/insights', icon: TrendingUp, label: t('nav.insights') },
     { id: 'team', path: '/team', icon: Users, label: t('nav.team', 'Meu Time') },
+    { id: 'subscription', path: '/subscription', icon: CreditCard, label: 'Minha Assinatura' },
     { id: 'settings', path: '/settings', icon: Settings, label: t('nav.settings', 'Configurações') },
   ]
 

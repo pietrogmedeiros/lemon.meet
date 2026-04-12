@@ -136,6 +136,75 @@ router.get('/me', authMiddleware as RequestHandler, async (req: AuthRequest, res
   }
 })
 
+// ── GET /api/subscription/details ────────────────────────────
+// Retorna detalhes ricos da assinatura: plano, valor, pagamentos, método de pagamento.
+router.get('/details', authMiddleware as RequestHandler, async (req: AuthRequest, res: Response) => {
+  const userId = req.user!.id
+
+  try {
+    const { data: sub } = await supabase
+      .from('user_subscriptions')
+      .select('*')
+      .eq('user_id', userId)
+      .maybeSingle()
+
+    if (!sub) return res.json({ details: null })
+
+    // Sem assinatura Stripe ainda (trial)
+    if (!sub.stripe_subscription_id || !sub.stripe_customer_id) {
+      return res.json({
+        details: {
+          plan: sub.plan,
+          status: sub.status,
+          amount: null,
+          currency: null,
+          currentPeriodEnd: sub.plan_ends_at ?? sub.trial_ends_at,
+          lastPayment: null,
+          paymentMethod: null,
+        }
+      })
+    }
+
+    const stripe = getStripe()
+
+    // Busca subscription, último invoice e método de pagamento em paralelo
+    const [stripeSub, invoices] = await Promise.all([
+      stripe.subscriptions.retrieve(sub.stripe_subscription_id, { expand: ['default_payment_method'] }),
+      stripe.invoices.list({ customer: sub.stripe_customer_id, limit: 1, status: 'paid' }),
+    ])
+
+    const rawSub = stripeSub as any
+    const price = stripeSub.items.data[0]?.price
+    const pm = (stripeSub as any).default_payment_method as any
+    const lastInvoice = invoices.data[0]
+
+    return res.json({
+      details: {
+        plan: sub.plan,
+        status: sub.status,
+        amount: price?.unit_amount ?? null,
+        currency: price?.currency ?? null,
+        currentPeriodEnd: rawSub.current_period_end
+          ? new Date(rawSub.current_period_end * 1000).toISOString()
+          : sub.plan_ends_at,
+        lastPayment: lastInvoice
+          ? {
+              amount: lastInvoice.amount_paid,
+              currency: lastInvoice.currency,
+              date: new Date(((lastInvoice as any).status_transitions?.paid_at || lastInvoice.created) * 1000).toISOString(),
+            }
+          : null,
+        paymentMethod: pm?.card
+          ? { brand: pm.card.brand, last4: pm.card.last4, expMonth: pm.card.exp_month, expYear: pm.card.exp_year }
+          : null,
+      }
+    })
+  } catch (err: any) {
+    console.error('[subscription/details]', err)
+    return res.status(500).json({ error: 'Erro ao buscar detalhes da assinatura.' })
+  }
+})
+
 // ── POST /api/subscription/checkout ──────────────────────────
 // Cria uma Stripe Checkout Session e retorna a URL de pagamento.
 router.post('/checkout', authMiddleware as RequestHandler, async (req: AuthRequest, res: Response) => {

@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { MainLayout } from '@/components/layout'
 import { useAuth } from '@/contexts'
 import { useSubscription } from '@/contexts'
@@ -10,10 +11,10 @@ const API = import.meta.env.VITE_API_URL || 'http://localhost:3000'
 export function SettingsPage() {
   const { user, session } = useAuth()
   const { subscription, isTrial, isExpired, daysLeft, refetch } = useSubscription()
+  const navigate = useNavigate()
 
-  // --- Checkout / Portal Stripe ---
+  // --- Checkout Stripe ---
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null)
-  const [portalLoading, setPortalLoading] = useState(false)
 
   // Feedback de retorno do Stripe
   const stripeMsg = useMemo<'success' | 'cancelled' | null>(() => {
@@ -50,23 +51,6 @@ export function SettingsPage() {
     }
   }
 
-  const handlePortal = async () => {
-    if (!session?.access_token) return
-    setPortalLoading(true)
-    try {
-      const res = await fetch(`${API}/api/subscription/portal`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      })
-      const data = await res.json()
-      if (data.url) window.location.href = data.url
-      else alert(data.error ?? 'Erro ao abrir portal.')
-    } catch {
-      alert('Erro ao conectar com o servidor.')
-    } finally {
-      setPortalLoading(false)
-    }
-  }
 
   const isPaid = subscription?.plan === 'starter' || subscription?.plan === 'professional'
 
@@ -434,11 +418,10 @@ export function SettingsPage() {
               </div>
               {isPaid && (
                 <button
-                  onClick={handlePortal}
-                  disabled={portalLoading}
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl border border-[#2D5A27] text-[#2D5A27] text-sm font-semibold hover:bg-[#2D5A27]/5 transition disabled:opacity-50"
+                  onClick={() => navigate('/subscription')}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl border border-[#2D5A27] text-[#2D5A27] text-sm font-semibold hover:bg-[#2D5A27]/5 transition"
                 >
-                  {portalLoading ? <Loader size={14} className="animate-spin" /> : <CreditCard size={14} />}
+                  <CreditCard size={14} />
                   Gerenciar assinatura
                 </button>
               )}
