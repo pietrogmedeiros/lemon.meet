@@ -44,7 +44,7 @@ export function TopNavBar() {
   return (
     <header className="h-16 bg-white border-b border-neutral-light px-8 flex items-center justify-between sticky top-0 z-40">
       {/* Left: tagline sutil */}
-      <p className="text-[12px] text-[#bbb] font-normal tracking-wide select-none hidden sm:block">
+      <p className="text-[12px] text-[#2D5A27]/70 font-medium tracking-wide select-none hidden sm:block">
         Esprema o melhor das suas reuniões 🍋
       </p>
 
