@@ -1,7 +1,8 @@
 // ============================================================
 // coaching.routes.ts — Coaching de Vendas personalizado
 //
-// GET /api/coaching  → analisa histórico do usuário e retorna coaching com DeepSeek
+// GET /api/coaching         → analisa histórico e retorna coaching (com cache)
+// DELETE /api/coaching/cache → força regeneração na próxima requisição
 // ============================================================
 
 import { Router, type Response } from 'express'
@@ -18,10 +19,31 @@ const deepseek = new OpenAI({
   baseURL: 'https://api.deepseek.com',
 })
 
+// ── Cache em memória ──────────────────────────────────────────
+// Chave: userId  Valor: { coaching, meetingsAnalyzed, meetingCount, cachedAt }
+// Expira após 6h OU quando o número de reuniões do usuário muda
+const CACHE_TTL_MS = 6 * 60 * 60 * 1000 // 6 horas
+
+interface CacheEntry {
+  coaching: unknown
+  meetingsAnalyzed: number
+  meetingCount: number   // total de reuniões na época do cache
+  cachedAt: number
+}
+
+const coachingCache = new Map<string, CacheEntry>()
+
+// ── DELETE /api/coaching/cache — invalida cache do usuário ─────
+router.delete('/cache', authMiddleware, (req: AuthRequest, res: Response) => {
+  coachingCache.delete(req.user!.id)
+  res.json({ success: true })
+})
+
 // ── GET /api/coaching ─────────────────────────────────────────
 router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.id
+    const forceRefresh = req.query.refresh === '1'
 
     const { data: meetings, error } = await supabase
       .from('meetings')
@@ -43,6 +65,23 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
         coaching: null,
         reason: 'not_enough_data',
         count: meetings?.length ?? 0,
+      })
+    }
+
+    // Serve do cache se válido (mesmo count + dentro do TTL)
+    const cached = coachingCache.get(userId)
+    if (
+      !forceRefresh &&
+      cached &&
+      cached.meetingCount === meetings.length &&
+      Date.now() - cached.cachedAt < CACHE_TTL_MS
+    ) {
+      res.set('X-Coaching-Cache', 'HIT')
+      return res.json({
+        success: true,
+        coaching: cached.coaching,
+        meetingsAnalyzed: cached.meetingsAnalyzed,
+        cached: true,
       })
     }
 
@@ -103,10 +142,20 @@ Regras importantes:
 
     const coaching = JSON.parse(response.choices[0].message.content!)
 
+    // Armazena no cache
+    coachingCache.set(userId, {
+      coaching,
+      meetingsAnalyzed: meetings.length,
+      meetingCount: meetings.length,
+      cachedAt: Date.now(),
+    })
+
+    res.set('X-Coaching-Cache', 'MISS')
     return res.json({
       success: true,
       coaching,
       meetingsAnalyzed: meetings.length,
+      cached: false,
     })
   } catch (err) {
     logger.error('Unexpected error in GET /coaching:', err)

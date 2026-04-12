@@ -1,13 +1,33 @@
+import { lazy, Suspense } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { ThemeProvider, AuthProvider, SubscriptionProvider } from '@/contexts'
 import { ProtectedRoute } from '@/components/auth'
-import { LoginPage, DashboardPage, MeetingsPage, TranscricaoDetalhesPage, InsightsPage, SettingsPage, TeamPage, SubscriptionPage, CheckoutPage, IntegrationsPage, CoachingPage, RelatorioPage } from '@/pages'
+
+// Eager — carregam no bundle inicial (login + dashboard são as primeiras telas)
+import { LoginPage, DashboardPage } from '@/pages'
+
+// Lazy — cada página vira um chunk separado, carregado só quando navegado
+const MeetingsPage            = lazy(() => import('@/pages/MeetingsPage').then(m => ({ default: m.MeetingsPage })))
+const TranscricaoDetalhesPage = lazy(() => import('@/pages/TranscricaoDetalhesPage').then(m => ({ default: m.TranscricaoDetalhesPage })))
+const InsightsPage            = lazy(() => import('@/pages/InsightsPage').then(m => ({ default: m.InsightsPage })))
+const SettingsPage            = lazy(() => import('@/pages/SettingsPage').then(m => ({ default: m.SettingsPage })))
+const TeamPage                = lazy(() => import('@/pages/TeamPage').then(m => ({ default: m.TeamPage })))
+const SubscriptionPage        = lazy(() => import('@/pages/SubscriptionPage').then(m => ({ default: m.SubscriptionPage })))
+const CheckoutPage            = lazy(() => import('@/pages/CheckoutPage').then(m => ({ default: m.CheckoutPage })))
+const IntegrationsPage        = lazy(() => import('@/pages/IntegrationsPage').then(m => ({ default: m.IntegrationsPage })))
+const CoachingPage            = lazy(() => import('@/pages/CoachingPage').then(m => ({ default: m.CoachingPage })))
+const RelatorioPage           = lazy(() => import('@/pages/RelatorioPage').then(m => ({ default: m.RelatorioPage })))
 
 function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
         <SubscriptionProvider>
+        <Suspense fallback={
+          <div className="flex h-screen items-center justify-center bg-[#F8F9FA]">
+            <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-[#2D5A27] border-r-transparent" />
+          </div>
+        }>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route
@@ -94,6 +114,7 @@ function App() {
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
+        </Suspense>
         </SubscriptionProvider>
       </AuthProvider>
     </ThemeProvider>

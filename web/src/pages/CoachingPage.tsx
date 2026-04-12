@@ -103,6 +103,7 @@ export function CoachingPage() {
   const [notEnough, setNotEnough] = useState(false);
   const [meetingsCount, setMeetingsCount] = useState(0);
   const [meetingsAnalyzed, setMeetingsAnalyzed] = useState(0);
+  const [fromCache, setFromCache] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -113,12 +114,13 @@ export function CoachingPage() {
     return { Authorization: `Bearer ${session?.access_token}` };
   }, []);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (refresh = false) => {
     setIsLoading(true);
     setError(null);
     try {
       const headers = await getAuthHeader();
-      const res = await fetch(`${apiUrl}/api/coaching`, { headers });
+      const url = `${apiUrl}/api/coaching${refresh ? '?refresh=1' : ''}`;
+      const res = await fetch(url, { headers });
       if (!res.ok) throw new Error('Erro ao carregar coaching');
       const data = await res.json();
       if (!data.success) throw new Error(data.message || 'Erro desconhecido');
@@ -128,6 +130,7 @@ export function CoachingPage() {
       } else {
         setReport(data.coaching);
         setMeetingsAnalyzed(data.meetingsAnalyzed ?? 0);
+        setFromCache(data.cached ?? false);
       }
     } catch (e: any) {
       setError(e.message || 'Erro ao carregar coaching');
@@ -158,7 +161,7 @@ export function CoachingPage() {
           <AlertCircle className="h-10 w-10 text-[#DC3545]" />
           <p className="text-sm text-[#DC3545]">{error}</p>
           <button
-            onClick={load}
+            onClick={() => load(false)}
             className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#2D5A27] text-white text-sm font-medium hover:bg-[#245221] transition-colors"
           >
             <RefreshCw size={14} /> Tentar novamente
@@ -211,10 +214,11 @@ export function CoachingPage() {
             <h1 className="text-2xl font-bold text-[#1a1a1a]">Coaching de Vendas</h1>
             <p className="mt-1 text-sm text-[#666]">
               Baseado nas suas últimas <strong>{meetingsAnalyzed}</strong> reuniões concluídas
+              {fromCache && <span className="ml-2 text-xs text-[#bbb]">• resultado em cache</span>}
             </p>
           </div>
           <button
-            onClick={load}
+            onClick={() => load(true)}
             className="flex items-center gap-2 px-3 py-2 rounded-lg border border-[#E0E0E0] bg-white text-sm text-[#555] hover:border-[#2D5A27] hover:text-[#2D5A27] transition-colors"
           >
             <RefreshCw size={14} /> Atualizar análise

@@ -103,7 +103,9 @@ export function Sidebar() {
                     expanded ? 'px-4 py-2.5' : 'justify-center py-2.5',
                     active
                       ? 'text-[#2D5A27] bg-[#2D5A27]/[0.06]'
-                      : 'text-[#555] hover:text-[#2D5A27] hover:bg-[#2D5A27]/[0.04]'
+                      : item.id === 'coaching'
+                        ? 'text-[#7A5C00] bg-[#FFD700]/20 hover:bg-[#FFD700]/35'
+                        : 'text-[#555] hover:text-[#2D5A27] hover:bg-[#2D5A27]/[0.04]'
                   )}
                 >
                   {/* Borda esquerda ativa — estilo Stripe */}
@@ -115,14 +117,14 @@ export function Sidebar() {
                     size={18}
                     className={clsx(
                       'shrink-0 transition-colors',
-                      active ? 'text-[#2D5A27]' : 'text-[#888] group-hover:text-[#2D5A27]'
+                      active ? 'text-[#2D5A27]' : item.id === 'coaching' ? 'text-[#7A5C00]' : 'text-[#888] group-hover:text-[#2D5A27]'
                     )}
                   />
 
                   {expanded && (
                     <span className={clsx(
                       'text-[13.5px] leading-5 font-medium truncate',
-                      active ? 'text-[#2D5A27]' : 'text-[#444]'
+                      active ? 'text-[#2D5A27]' : item.id === 'coaching' ? 'text-[#7A5C00] font-semibold' : 'text-[#444]'
                     )}>
                       {item.label}
                     </span>
