@@ -89,6 +89,47 @@
     "fullTranscript": "Full Transcript",
     "error": {
       "generationFailed": "Error generating insights. Please try again."
+    },
+    "aggregate": {
+      "title": "Insights",
+      "subtitle_one": "Analysis from {{count}} recorded meeting",
+      "subtitle_other": "Analysis from {{count}} recorded meetings",
+      "stats": {
+        "total": "Total Meetings",
+        "completed_one": "{{count}} completed",
+        "completed_other": "{{count}} completed",
+        "avgScore": "Avg Score",
+        "basedOn_one": "based on {{count}} meeting",
+        "basedOn_other": "based on {{count}} meetings",
+        "highQuality": "High Quality",
+        "scoreHigh": "score ≥ 8/10",
+        "needsAttention": "Needs Attention",
+        "scoreLow": "score < 5/10"
+      },
+      "ranking": {
+        "title": "Quality Ranking",
+        "meeting": "Meeting"
+      },
+      "distribution": {
+        "title": "Quality Distribution",
+        "high": "High (8–10)",
+        "medium": "Medium (5–7)",
+        "low": "Low (0–4)",
+        "count_one": "{{count}} meeting",
+        "count_other": "{{count}} meetings"
+      },
+      "sentiment": {
+        "title": "Meeting Sentiment",
+        "positive": "Positive",
+        "neutral": "Neutral",
+        "negative": "Negative"
+      },
+      "topics": { "title": "Frequent Topics" },
+      "timeline": { "title": "Meeting Timeline" },
+      "empty": {
+        "title": "No data available",
+        "text": "Wait for meetings to be processed to generate insights."
+      }
     }
   },
   "auth": {

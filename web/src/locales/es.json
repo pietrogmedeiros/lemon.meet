@@ -89,6 +89,47 @@
     "fullTranscript": "Transcripción Completa",
     "error": {
       "generationFailed": "Error al generar insights. Inténtalo de nuevo."
+    },
+    "aggregate": {
+      "title": "Insights",
+      "subtitle_one": "Análisis extraído de {{count}} reunión grabada",
+      "subtitle_other": "Análisis extraído de {{count}} reuniones grabadas",
+      "stats": {
+        "total": "Total de Reuniones",
+        "completed_one": "{{count}} completada",
+        "completed_other": "{{count}} completadas",
+        "avgScore": "Score Promedio",
+        "basedOn_one": "basado en {{count}} reunión",
+        "basedOn_other": "basado en {{count}} reuniones",
+        "highQuality": "Alta Calidad",
+        "scoreHigh": "score ≥ 8/10",
+        "needsAttention": "Atención Necesaria",
+        "scoreLow": "score < 5/10"
+      },
+      "ranking": {
+        "title": "Ranking por Calidad",
+        "meeting": "Reunión"
+      },
+      "distribution": {
+        "title": "Distribución de Calidad",
+        "high": "Alta (8–10)",
+        "medium": "Media (5–7)",
+        "low": "Baja (0–4)",
+        "count_one": "{{count}} reunión",
+        "count_other": "{{count}} reuniones"
+      },
+      "sentiment": {
+        "title": "Sentimiento de Reuniones",
+        "positive": "Positivo",
+        "neutral": "Neutral",
+        "negative": "Negativo"
+      },
+      "topics": { "title": "Temas Frecuentes" },
+      "timeline": { "title": "Evolución de Reuniones" },
+      "empty": {
+        "title": "Sin datos disponibles",
+        "text": "Espera a que las reuniones sean procesadas para generar insights."
+      }
     }
   },
   "auth": {
