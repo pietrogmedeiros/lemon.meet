@@ -8,8 +8,17 @@ const router: Router = Router()
 
 const TRIAL_DAYS = 7
 
-// ── Stripe client ─────────────────────────────────────────────
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2026-03-25.dahlia' })
+// ── Stripe client (lazy — evita crash na inicialização sem env var) ──
+let _stripe: Stripe | null = null
+function getStripe(): Stripe {
+  if (!_stripe) {
+    if (!process.env.STRIPE_SECRET_KEY) {
+      throw new Error('STRIPE_SECRET_KEY não configurada. Adicione a variável de ambiente no Railway.')
+    }
+    _stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2026-03-25.dahlia' })
+  }
+  return _stripe
+}
 
 const PRICE_IDS: Record<string, string> = {
   starter:      process.env.STRIPE_PRICE_ID_STARTER!,
@@ -149,7 +158,7 @@ router.post('/checkout', authMiddleware as RequestHandler, async (req: AuthReque
     let customerId: string | undefined = sub?.stripe_customer_id ?? undefined
 
     if (!customerId) {
-      const customer = await stripe.customers.create({
+      const customer = await getStripe().customers.create({
         email: userEmail,
         metadata: { supabase_user_id: userId },
       })
@@ -163,7 +172,7 @@ router.post('/checkout', authMiddleware as RequestHandler, async (req: AuthReque
 
     const frontendUrl = process.env.FRONTEND_URL || 'https://lemon-meet.web.app'
 
-    const session = await stripe.checkout.sessions.create({
+    const session = await getStripe().checkout.sessions.create({
       customer: customerId,
       mode: 'subscription',
       line_items: [{ price: PRICE_IDS[plan], quantity: 1 }],
@@ -200,7 +209,7 @@ router.post('/portal', authMiddleware as RequestHandler, async (req: AuthRequest
 
     const frontendUrl = process.env.FRONTEND_URL || 'https://lemon-meet.web.app'
 
-    const session = await stripe.billingPortal.sessions.create({
+    const session = await getStripe().billingPortal.sessions.create({
       customer: sub.stripe_customer_id,
       return_url: `${frontendUrl}/settings`,
     })
@@ -219,7 +228,7 @@ export async function stripeWebhookHandler(req: Request, res: Response): Promise
 
   let event: Stripe.Event
   try {
-    event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET!)
+    event = getStripe().webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET!)
   } catch (err: any) {
     console.error('[webhook] Assinatura inválida:', err.message)
     res.status(400).send(`Webhook Error: ${err.message}`)
@@ -234,7 +243,7 @@ export async function stripeWebhookHandler(req: Request, res: Response): Promise
         const subscriptionId = session.subscription as string
 
         // Busca detalhes da subscription para pegar o price id
-        const stripeSub = await stripe.subscriptions.retrieve(subscriptionId)
+        const stripeSub = await getStripe().subscriptions.retrieve(subscriptionId)
         const priceId = stripeSub.items.data[0]?.price.id
         const plan = planFromPriceId(priceId) ?? 'starter'
         const rawSub = stripeSub as any
