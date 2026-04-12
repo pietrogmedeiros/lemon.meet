@@ -91,6 +91,9 @@ export function TranscricaoDetalhesPage() {
   const [emailText, setEmailText] = useState<string | null>(null);
   const [emailCopied, setEmailCopied] = useState(false);
 
+  // Per-suggestion copy state
+  const [copiedSuggestionIndex, setCopiedSuggestionIndex] = useState<number | null>(null);
+
   // Briefing state
   const [briefing, setBriefing] = useState<string | null>(null);
   const [briefingLoading, setBriefingLoading] = useState(false);
@@ -233,6 +236,12 @@ export function TranscricaoDetalhesPage() {
     await navigator.clipboard.writeText(emailText);
     setEmailCopied(true);
     setTimeout(() => setEmailCopied(false), 2000);
+  };
+
+  const copySuggestion = async (text: string, index: number) => {
+    await navigator.clipboard.writeText(text);
+    setCopiedSuggestionIndex(index);
+    setTimeout(() => setCopiedSuggestionIndex(null), 2000);
   };
 
   if (isLoading) {
@@ -481,7 +490,7 @@ export function TranscricaoDetalhesPage() {
             <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
               <h2 className="text-headline-2 text-primary flex items-center gap-2">
                 <Mail className="h-5 w-5" />
-                Sugestões de Follow-up
+                Mensagens de Follow-up para o Cliente
                 <span className="ml-2 text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">Vendas</span>
               </h2>
               <Button
@@ -496,16 +505,31 @@ export function TranscricaoDetalhesPage() {
                 ) : (
                   <Sparkles className="h-4 w-4" />
                 )}
-                {emailLoading ? 'Gerando…' : 'Gerar E-mail de Follow-up'}
+                {emailLoading ? 'Gerando…' : 'Gerar E-mail Completo'}
               </Button>
             </div>
             <div className="space-y-3">
               {(meeting.insights?.followUpSuggestions ?? []).slice(0, 4).map((suggestion, i) => (
-                <div key={i} className="flex items-start gap-3 p-3 rounded-lg bg-primary/5 border border-primary/10">
-                  <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-white text-xs font-bold flex items-center justify-center">
+                <div key={i} className="flex items-start gap-3 p-3 rounded-lg bg-primary/5 border border-primary/10 group">
+                  <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-white text-xs font-bold flex items-center justify-center mt-0.5">
                     {i + 1}
                   </span>
-                  <span className="text-sm text-secondary leading-relaxed">{suggestion}</span>
+                  <span className="flex-1 text-sm text-secondary leading-relaxed">{suggestion}</span>
+                  <button
+                    onClick={() => copySuggestion(suggestion, i)}
+                    title="Copiar mensagem"
+                    className={`flex-shrink-0 flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md transition-all ${
+                      copiedSuggestionIndex === i
+                        ? 'bg-primary text-white'
+                        : 'text-secondary opacity-0 group-hover:opacity-100 hover:bg-primary/10 hover:text-primary'
+                    }`}
+                  >
+                    {copiedSuggestionIndex === i ? (
+                      <><Check className="h-3.5 w-3.5" />Copiado</>
+                    ) : (
+                      <><Copy className="h-3.5 w-3.5" />Copiar</>
+                    )}
+                  </button>
                 </div>
               ))}
             </div>
