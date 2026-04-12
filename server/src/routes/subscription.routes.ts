@@ -1,4 +1,5 @@
-import { Router, type RequestHandler } from 'express'
+import { Router, type RequestHandler, type Request, type Response } from 'express'
+import Stripe from 'stripe'
 import { authMiddleware } from '../middleware/auth.middleware.js'
 import { supabase } from '../config/supabase.js'
 import type { AuthRequest } from '../middleware/auth.middleware.js'
@@ -6,6 +7,21 @@ import type { AuthRequest } from '../middleware/auth.middleware.js'
 const router: Router = Router()
 
 const TRIAL_DAYS = 7
+
+// ── Stripe client ─────────────────────────────────────────────
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2026-03-25.dahlia' })
+
+const PRICE_IDS: Record<string, string> = {
+  starter:      process.env.STRIPE_PRICE_ID_STARTER!,
+  professional: process.env.STRIPE_PRICE_ID_PROFESSIONAL!,
+}
+
+function planFromPriceId(priceId: string): 'starter' | 'professional' | null {
+  for (const [plan, id] of Object.entries(PRICE_IDS)) {
+    if (id === priceId) return plan as 'starter' | 'professional'
+  }
+  return null
+}
 
 /**
  * POST /api/subscription/init
@@ -110,5 +126,206 @@ router.get('/me', authMiddleware as RequestHandler, async (req: AuthRequest, res
     res.status(500).json({ error: 'Erro ao buscar assinatura.' })
   }
 })
+
+// ── POST /api/subscription/checkout ──────────────────────────
+// Cria uma Stripe Checkout Session e retorna a URL de pagamento.
+router.post('/checkout', authMiddleware as RequestHandler, async (req: AuthRequest, res: Response) => {
+  const userId = req.user!.id
+  const userEmail = req.user!.email ?? ''
+  const { plan } = req.body as { plan: 'starter' | 'professional' }
+
+  if (!plan || !PRICE_IDS[plan]) {
+    return res.status(400).json({ error: 'Plano inválido. Use "starter" ou "professional".' })
+  }
+
+  try {
+    const { data: sub } = await supabase
+      .from('user_subscriptions')
+      .select('stripe_customer_id')
+      .eq('user_id', userId)
+      .maybeSingle()
+
+    // Reutiliza ou cria o Customer no Stripe
+    let customerId: string | undefined = sub?.stripe_customer_id ?? undefined
+
+    if (!customerId) {
+      const customer = await stripe.customers.create({
+        email: userEmail,
+        metadata: { supabase_user_id: userId },
+      })
+      customerId = customer.id
+
+      await supabase
+        .from('user_subscriptions')
+        .update({ stripe_customer_id: customerId, updated_at: new Date().toISOString() })
+        .eq('user_id', userId)
+    }
+
+    const frontendUrl = process.env.FRONTEND_URL || 'https://lemon-meet.web.app'
+
+    const session = await stripe.checkout.sessions.create({
+      customer: customerId,
+      mode: 'subscription',
+      line_items: [{ price: PRICE_IDS[plan], quantity: 1 }],
+      success_url: `${frontendUrl}/settings?checkout=success`,
+      cancel_url: `${frontendUrl}/settings?checkout=cancelled`,
+      subscription_data: {
+        metadata: { supabase_user_id: userId, plan },
+      },
+      allow_promotion_codes: true,
+    })
+
+    return res.json({ url: session.url })
+  } catch (err: any) {
+    console.error('[subscription/checkout]', err)
+    return res.status(500).json({ error: 'Erro ao criar sessão de pagamento.' })
+  }
+})
+
+// ── POST /api/subscription/portal ────────────────────────────
+// Cria uma sessão no Customer Portal do Stripe para gerenciar a assinatura.
+router.post('/portal', authMiddleware as RequestHandler, async (req: AuthRequest, res: Response) => {
+  const userId = req.user!.id
+
+  try {
+    const { data: sub } = await supabase
+      .from('user_subscriptions')
+      .select('stripe_customer_id')
+      .eq('user_id', userId)
+      .maybeSingle()
+
+    if (!sub?.stripe_customer_id) {
+      return res.status(400).json({ error: 'Nenhuma assinatura ativa encontrada.' })
+    }
+
+    const frontendUrl = process.env.FRONTEND_URL || 'https://lemon-meet.web.app'
+
+    const session = await stripe.billingPortal.sessions.create({
+      customer: sub.stripe_customer_id,
+      return_url: `${frontendUrl}/settings`,
+    })
+
+    return res.json({ url: session.url })
+  } catch (err: any) {
+    console.error('[subscription/portal]', err)
+    return res.status(500).json({ error: 'Erro ao abrir portal de assinatura.' })
+  }
+})
+
+// ── POST /api/subscription/webhook ───────────────────────────
+// Handler do webhook Stripe — deve receber o body RAW (registrado no server.ts antes do express.json())
+export async function stripeWebhookHandler(req: Request, res: Response): Promise<void> {
+  const sig = req.headers['stripe-signature'] as string
+
+  let event: Stripe.Event
+  try {
+    event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET!)
+  } catch (err: any) {
+    console.error('[webhook] Assinatura inválida:', err.message)
+    res.status(400).send(`Webhook Error: ${err.message}`)
+    return
+  }
+
+  try {
+    switch (event.type) {
+      case 'checkout.session.completed': {
+        const session = event.data.object as Stripe.Checkout.Session
+        const customerId = session.customer as string
+        const subscriptionId = session.subscription as string
+
+        // Busca detalhes da subscription para pegar o price id
+        const stripeSub = await stripe.subscriptions.retrieve(subscriptionId)
+        const priceId = stripeSub.items.data[0]?.price.id
+        const plan = planFromPriceId(priceId) ?? 'starter'
+        const rawSub = stripeSub as any
+        const periodEnd = rawSub.current_period_end
+          ? new Date(rawSub.current_period_end * 1000).toISOString()
+          : null
+
+        await supabase
+          .from('user_subscriptions')
+          .update({
+            plan,
+            status: 'active',
+            stripe_subscription_id: subscriptionId,
+            stripe_price_id: priceId,
+            plan_ends_at: periodEnd,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('stripe_customer_id', customerId)
+
+        console.log(`[webhook] checkout.session.completed — customer ${customerId} → plano ${plan}`)
+        break
+      }
+
+      case 'customer.subscription.updated': {
+        const stripeSub = event.data.object as Stripe.Subscription
+        const customerId = stripeSub.customer as string
+        const priceId = stripeSub.items.data[0]?.price.id
+        const plan = planFromPriceId(priceId) ?? 'starter'
+        const rawSub = stripeSub as any
+        const periodEnd = rawSub.current_period_end
+          ? new Date(rawSub.current_period_end * 1000).toISOString()
+          : null
+        const status = (stripeSub as any).status === 'active' ? 'active' : 'expired'
+
+        await supabase
+          .from('user_subscriptions')
+          .update({
+            plan,
+            status,
+            stripe_price_id: priceId,
+            plan_ends_at: periodEnd,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('stripe_customer_id', customerId)
+
+        console.log(`[webhook] subscription.updated — customer ${customerId} → ${plan}/${status}`)
+        break
+      }
+
+      case 'customer.subscription.deleted': {
+        const stripeSub = event.data.object as Stripe.Subscription
+        const customerId = stripeSub.customer as string
+
+        await supabase
+          .from('user_subscriptions')
+          .update({
+            plan: 'trial',
+            status: 'cancelled',
+            stripe_subscription_id: null,
+            stripe_price_id: null,
+            plan_ends_at: null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('stripe_customer_id', customerId)
+
+        console.log(`[webhook] subscription.deleted — customer ${customerId}`)
+        break
+      }
+
+      case 'invoice.payment_failed': {
+        const invoice = event.data.object as Stripe.Invoice
+        const customerId = invoice.customer as string
+
+        await supabase
+          .from('user_subscriptions')
+          .update({ status: 'expired', updated_at: new Date().toISOString() })
+          .eq('stripe_customer_id', customerId)
+
+        console.log(`[webhook] invoice.payment_failed — customer ${customerId}`)
+        break
+      }
+
+      default:
+        console.log(`[webhook] Evento ignorado: ${event.type}`)
+    }
+
+    res.json({ received: true })
+  } catch (err: any) {
+    console.error('[webhook] Erro ao processar evento:', err)
+    res.status(500).json({ error: 'Erro interno ao processar webhook.' })
+  }
+}
 
 export default router

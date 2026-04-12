@@ -8,7 +8,7 @@ import dotenv from 'dotenv'
 import transcricoesRouter from './routes/transcricoes.routes.js'
 import extensionRouter from './routes/extension.routes.js'
 import teamsRouter from './routes/teams.routes.js'
-import subscriptionRouter from './routes/subscription.routes.js'
+import subscriptionRouter, { stripeWebhookHandler } from './routes/subscription.routes.js'
 
 // Load environment variables
 dotenv.config()
@@ -40,6 +40,10 @@ app.use(cors({
   maxAge: 600, // cache preflight OPTIONS por 10 minutos
 }))
 app.use(morgan('dev'))
+
+// Stripe webhook — deve usar raw body, registrado ANTES do express.json()
+app.post('/api/subscription/webhook', express.raw({ type: 'application/json' }), stripeWebhookHandler)
+
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 
