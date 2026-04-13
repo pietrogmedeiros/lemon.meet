@@ -9,6 +9,7 @@ const API_URL = 'https://vibe-aiserver-production.up.railway.app'
 let mediaRecorder: MediaRecorder | null = null
 let audioContext: AudioContext | null = null
 let chunkIndex = 0
+let keepAliveInterval: ReturnType<typeof setInterval> | null = null
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   switch (msg.type) {
@@ -22,17 +23,28 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       stopCapture()
       sendResponse({ ok: true })
       break
+
+    case 'PING':
+      // Responde confirmando que está vivo e retoma AudioContext se suspendido
+      if (audioContext?.state === 'suspended') {
+        audioContext.resume().catch(() => {})
+      }
+      sendResponse({ alive: true, recording: mediaRecorder?.state === 'recording' })
+      return true
   }
 })
 
 async function startCapture(streamId: string, meetingId: string, accessToken: string) {
   // 1. Captura áudio da aba (participantes remotos)
+  // suppressLocalAudioPlayback: false impede que o Chrome silencie o áudio da aba
+  // ao realizar o tab capture — sem isso, os participantes ficam "mudos" para o gravador
   const tabStream = await navigator.mediaDevices.getUserMedia({
     audio: {
-      // @ts-ignore — Chrome-specific constraint para tab capture
+      // @ts-ignore — Chrome-specific constraints para tab capture
       mandatory: {
         chromeMediaSource: 'tab',
         chromeMediaSourceId: streamId,
+        suppressLocalAudioPlayback: false,
       },
     },
     video: false,
@@ -53,6 +65,9 @@ async function startCapture(streamId: string, meetingId: string, accessToken: st
 
   const tabSource = audioContext.createMediaStreamSource(tabStream)
   tabSource.connect(destination)
+  // Passthrough: também conecta à saída do AudioContext para que o usuário
+  // continue ouvindo os participantes normalmente enquanto grava
+  tabSource.connect(audioContext.destination)
 
   if (micStream) {
     const micSource = audioContext.createMediaStreamSource(micStream)
@@ -96,10 +111,28 @@ async function startCapture(streamId: string, meetingId: string, accessToken: st
 
   mediaRecorder.start(10_000) // chunk a cada 10s — mais granular, menos chance de perder conteúdo
   console.log('[Lemon.meet offscreen] Gravação iniciada para meeting:', meetingId)
+
+  // Heartbeat: mantém o Service Worker vivo enviando mensagens periódicas.
+  // MV3 mata o SW após ~30s ocioso — cada mensagem recebida o mantém ativo.
+  keepAliveInterval = setInterval(() => {
+    chrome.runtime.sendMessage({ type: 'OFFSCREEN_KEEPALIVE' }).catch(() => {
+      console.warn('[Lemon.meet offscreen] Heartbeat falhou — SW pode ter sido encerrado')
+    })
+    // Garante que o AudioContext não fique suspenso por inatividade
+    if (audioContext?.state === 'suspended') {
+      audioContext.resume().catch(() => {})
+    }
+  }, 20_000) // a cada 20s — bem abaixo do limite de 30s do Chrome
 }
 
 function stopCapture() {
   if (!mediaRecorder || mediaRecorder.state === 'inactive') return
+
+  // Para o heartbeat imediatamente
+  if (keepAliveInterval) {
+    clearInterval(keepAliveInterval)
+    keepAliveInterval = null
+  }
 
   // requestData() dispara ondataavailable com os dados pendentes
   // Aguardamos 800ms para garantir que o handler processe o chunk antes de parar

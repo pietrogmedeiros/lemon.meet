@@ -12,7 +12,7 @@ export interface MeetingSession {
 }
 
 export interface MessageToBackground {
-  type: 'START_RECORDING' | 'STOP_RECORDING' | 'GET_STATE' | 'MEETING_DETECTED' | 'MEETING_ENDED' | 'AUTH_CHANGED' | 'RESET_STATE' | 'OPEN_POPUP'
+  type: 'START_RECORDING' | 'STOP_RECORDING' | 'GET_STATE' | 'MEETING_DETECTED' | 'MEETING_ENDED' | 'AUTH_CHANGED' | 'RESET_STATE' | 'OPEN_POPUP' | 'TOGGLE_RECORDING'
   tabId?: number
   streamId?: string
 }
@@ -50,8 +50,42 @@ chrome.runtime.onMessage.addListener((msg: MessageToBackground, sender, sendResp
     case 'STOP_RECORDING':
       handleStopRecording().then(() => sendResponse({ ok: true })).catch((err) => sendResponse({ ok: false, error: String(err) }))
       return true
+    case 'TOGGLE_RECORDING': {
+      if (recordingState === 'recording') {
+        handleStopRecording().then(() => sendResponse({ ok: true })).catch((err) => sendResponse({ ok: false, error: String(err) }))
+        return true
+      }
+      if (recordingState !== 'idle') { sendResponse({ ok: false, error: 'Aguarde' }); break }
+      const tabId = sender.tab?.id
+      if (!tabId) { sendResponse({ ok: false, error: 'Nenhuma aba encontrada' }); break }
+      // O background tem permissão tabCapture e pode obter o streamId diretamente,
+      // sem precisar do popup aberto. O streamId é repassado ao offscreen doc.
+      chrome.tabCapture.getMediaStreamId({ targetTabId: tabId }, async (streamId) => {
+        if (chrome.runtime.lastError || !streamId) {
+          setState('idle')
+          sendResponse({ ok: false, error: chrome.runtime.lastError?.message ?? 'sem streamId' })
+          return
+        }
+        const stored = await chrome.storage.local.get('micGranted')
+        if (!stored.micGranted) {
+          // Primeira vez: abre janela para solicitar permissão de mic.
+          // Salva o pendingCapture para que request-mic.html dispare a gravação após obter permissão.
+          await chrome.storage.local.set({ pendingCapture: { tabId, streamId } })
+          chrome.windows.create({ url: chrome.runtime.getURL('request-mic.html'), type: 'popup', width: 440, height: 320, focused: true })
+          sendResponse({ ok: true })
+        } else {
+          handleStartRecording(tabId, streamId)
+            .then(() => sendResponse({ ok: true }))
+            .catch((err) => { setState('idle'); sendResponse({ ok: false, error: String(err) }) })
+        }
+      })
+      return true
+    }
     case 'RESET_STATE':
       setState('idle'); sendResponse({ ok: true }); break
+    case 'OFFSCREEN_KEEPALIVE':
+      // O offscreen doc está vivo — apenas confirma para manter o SW ativo
+      sendResponse({ ok: true }); break
     case 'OPEN_POPUP':
       chrome.action.openPopup().catch(() => {}); break
     case 'MEETING_DETECTED':
@@ -64,7 +98,7 @@ chrome.runtime.onMessage.addListener((msg: MessageToBackground, sender, sendResp
 async function setupOffscreenDocument(): Promise<void> {
   const existing = await chrome.runtime.getContexts({ contextTypes: ['OFFSCREEN_DOCUMENT' as chrome.runtime.ContextType] })
   if (existing.length > 0) return
-  await (chrome.offscreen as any).createDocument({ url: 'offscreen.html', reasons: ['USER_MEDIA'], justification: 'Gravar áudio da reunião' })
+  await (chrome.offscreen as any).createDocument({ url: 'offscreen.html', reasons: ['USER_MEDIA', 'AUDIO_PLAYBACK'], justification: 'Gravar áudio da reunião' })
 }
 
 async function closeOffscreenDocument(): Promise<void> {
@@ -134,20 +168,39 @@ async function handleStopRecording(): Promise<void> {
 }
 
 // Restaura estado da sessão se o Service Worker foi reiniciado durante uma gravação
-chrome.storage.local.get(['activeSession', 'recordingStatePersisted']).then((stored) => {
+chrome.storage.local.get(['activeSession', 'recordingStatePersisted']).then(async (stored) => {
   if (stored.recordingStatePersisted === 'recording' && stored.activeSession) {
-    currentSession = stored.activeSession as MeetingSession
-    recordingState = 'recording'
-    console.log('[Lemon.meet] SW reiniciado — sessão restaurada:', currentSession.meetingId)
+    // Verifica se o offscreen doc ainda está vivo antes de restaurar o estado
+    const contexts = await chrome.runtime.getContexts({ contextTypes: ['OFFSCREEN_DOCUMENT' as chrome.runtime.ContextType] })
+    if (contexts.length > 0) {
+      currentSession = stored.activeSession as MeetingSession
+      recordingState = 'recording'
+      console.log('[Lemon.meet] SW reiniciado — sessão restaurada (offscreen ativo):', currentSession.meetingId)
+    } else {
+      // Offscreen doc também morreu junto com o SW — gravação foi perdida
+      console.warn('[Lemon.meet] SW reiniciado — offscreen doc morreu, limpando estado de gravação')
+      chrome.storage.local.remove(['activeSession', 'recordingStatePersisted'])
+    }
   }
 })
 
 // keepAlive: alarm a cada 24s para evitar que o Chrome mate o Service Worker durante gravações
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === 'keepAlive') {
-    // Pinga o documento offscreen para garantir que a gravação ainda está ativa
     if (recordingState === 'recording') {
-      chrome.runtime.sendMessage({ type: 'PING' }).catch(() => {})
+      // Verifica se o offscreen doc ainda está vivo
+      chrome.runtime.getContexts({ contextTypes: ['OFFSCREEN_DOCUMENT' as chrome.runtime.ContextType] }).then((contexts) => {
+        if (contexts.length === 0) {
+          // Offscreen doc morreu — a gravação foi perdida, limpa o estado
+          console.warn('[Lemon.meet] keepAlive: offscreen doc morreu durante gravação — limpando estado')
+          currentSession = null
+          chrome.storage.local.remove(['activeSession', 'recordingStatePersisted'])
+          setState('idle')
+        } else {
+          // Pinga o offscreen doc para manter AudioContext ativo
+          chrome.runtime.sendMessage({ type: 'PING' }).catch(() => {})
+        }
+      })
     }
   }
 })

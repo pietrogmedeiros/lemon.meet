@@ -112,10 +112,17 @@ function DashboardView({
     const micStatus = await navigator.permissions.query({ name: 'microphone' as PermissionName })
 
     if (micStatus.state !== 'granted') {
-      // Abre janela separada para solicitar permissão.
-      // O popup fecha ao perder foco, então usamos uma janela dedicada que
-      // permanece aberta enquanto o Chrome mostra o prompt de permissão.
-      await new Promise<void>((resolve) => {
+      // O popup fecha ao perder foco assim que abre outra janela, destruindo
+      // qualquer Promise em andamento. Solução: obter o streamId AGORA enquanto
+      // o popup ainda tem foco (permissão activeTab), salvar no storage, e
+      // deixar a página request-mic.html disparar o START_RECORDING após obter
+      // a permissão de microfone.
+      chrome.tabCapture.getMediaStreamId({ targetTabId: tabId }, async (streamId) => {
+        if (chrome.runtime.lastError || !streamId) {
+          alert('Erro ao capturar áudio: ' + (chrome.runtime.lastError?.message ?? 'sem streamId'))
+          return
+        }
+        await chrome.storage.local.set({ pendingCapture: { tabId, streamId } })
         chrome.windows.create({
           url: chrome.runtime.getURL('request-mic.html'),
           type: 'popup',
@@ -123,18 +130,12 @@ function DashboardView({
           height: 320,
           focused: true,
         })
-
-        // Aguarda a resposta (granted ou denied) da janela de permissão
-        const listener = (msg: any) => {
-          if (msg.type === 'MIC_PERMISSION_GRANTED' || msg.type === 'MIC_PERMISSION_DENIED') {
-            chrome.runtime.onMessage.removeListener(listener)
-            resolve()
-          }
-        }
-        chrome.runtime.onMessage.addListener(listener)
+        // O popup pode fechar aqui — request-mic.html cuida do resto
       })
+      return
     }
 
+    // Microfone já autorizado — fluxo normal
     chrome.tabCapture.getMediaStreamId({ targetTabId: tabId }, (streamId) => {
       if (chrome.runtime.lastError || !streamId) {
         alert('Erro ao capturar áudio: ' + (chrome.runtime.lastError?.message ?? 'sem streamId'))
@@ -308,6 +309,18 @@ export default function Popup() {
     chrome.runtime.onMessage.addListener(listener)
     return () => chrome.runtime.onMessage.removeListener(listener)
   }, [authed])
+
+  // Fallback local: se o estado ficar em 'processing' por mais de 5s,
+  // força transição para 'idle'. O SW MV3 pode ser morto antes do seu
+  // próprio setTimeout de 3s disparar, deixando o loading travado.
+  useEffect(() => {
+    if (recordingState !== 'processing') return
+    const timer = setTimeout(() => {
+      chrome.runtime.sendMessage({ type: 'RESET_STATE' }).catch(() => {})
+      setRecordingState('idle')
+    }, 5000)
+    return () => clearTimeout(timer)
+  }, [recordingState])
 
   async function handleLogout() {
     await signOut()

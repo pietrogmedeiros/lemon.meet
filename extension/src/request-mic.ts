@@ -15,16 +15,32 @@ btn.addEventListener('click', async () => {
     // Para todas as tracks imediatamente — só precisávamos do grant
     stream.getTracks().forEach(t => t.stop())
 
-    status.textContent = '✅ Microfone autorizado! Fechando...'
+    status.textContent = '✅ Microfone autorizado! Iniciando gravação...'
 
-    // Notifica background/popup que a permissão foi concedida
-    chrome.runtime.sendMessage({ type: 'MIC_PERMISSION_GRANTED' })
+    // Marca mic como autorizado para que fluxos futuros (via botão flutuante)
+    // não precisem abrir esta janela novamente
+    await chrome.storage.local.set({ micGranted: true })
+
+    // Lê o pendingCapture salvo pelo popup (streamId + tabId) e dispara a gravação.
+    // O popup já fechou neste ponto — esta página é a única executando.
+    const stored = await chrome.storage.local.get('pendingCapture')
+    if (stored.pendingCapture) {
+      const { tabId, streamId } = stored.pendingCapture
+      await chrome.storage.local.remove('pendingCapture')
+      chrome.runtime.sendMessage({ type: 'START_RECORDING', tabId, streamId })
+    }
 
     // Fecha a janela após pequeno delay para o usuário ver o feedback
     setTimeout(() => window.close(), 800)
   } catch (err) {
     status.textContent = '❌ Permissão negada. Você pode gravar apenas o áudio dos participantes.'
-    chrome.runtime.sendMessage({ type: 'MIC_PERMISSION_DENIED' })
+    // Tenta gravar mesmo sem mic (só áudio da aba) se houver pendingCapture
+    const stored = await chrome.storage.local.get('pendingCapture')
+    if (stored.pendingCapture) {
+      const { tabId, streamId } = stored.pendingCapture
+      await chrome.storage.local.remove('pendingCapture')
+      chrome.runtime.sendMessage({ type: 'START_RECORDING', tabId, streamId })
+    }
     setTimeout(() => window.close(), 2000)
   }
 })

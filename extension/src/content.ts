@@ -165,7 +165,7 @@ function injectFloatingButton(info: MeetingInfo) {
   const btn = document.getElementById('lemon-meet-toggle')!
   btn.addEventListener('click', () => {
     try {
-      chrome.runtime.sendMessage({ type: 'OPEN_POPUP' })
+      chrome.runtime.sendMessage({ type: 'TOGGLE_RECORDING' })
     } catch { /* contexto invalidado — extensão foi atualizada */ }
   })
 }
@@ -175,19 +175,41 @@ function removeFloatingButton() {
   floatingBtn = null
 }
 
-function updateFloatingButton(recording: boolean) {
+type ButtonState = 'idle' | 'loading' | 'recording'
+
+function updateFloatingButton(state: ButtonState) {
   const badge = document.getElementById('lemon-meet-badge')
-  const btn = document.getElementById('lemon-meet-toggle')
+  const btn = document.getElementById('lemon-meet-toggle') as HTMLButtonElement | null
   if (!badge || !btn) return
 
-  if (recording) {
+  if (state === 'recording') {
     badge.style.display = 'block'
+    badge.textContent = '● Gravando…'
     btn.style.background = '#DC3545'
+    btn.style.opacity = '1'
+    btn.disabled = false
     btn.title = 'Lemon.meet — parar gravação'
+    btn.innerHTML = `<svg width="22" height="22" viewBox="0 0 24 24" fill="white"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>`
+  } else if (state === 'loading') {
+    badge.style.display = 'block'
+    badge.textContent = 'Processando…'
+    btn.style.background = '#2D5A27'
+    btn.style.opacity = '0.7'
+    btn.disabled = true
+    btn.title = 'Lemon.meet — processando'
+    btn.innerHTML = `
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFD700" stroke-width="2.5" stroke-linecap="round">
+        <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83">
+          <animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="0.8s" repeatCount="indefinite"/>
+        </path>
+      </svg>`
   } else {
     badge.style.display = 'none'
     btn.style.background = '#2D5A27'
+    btn.style.opacity = '1'
+    btn.disabled = false
     btn.title = 'Lemon.meet — gravar reunião'
+    btn.innerHTML = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFD700" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3" fill="#FFD700"/></svg>`
   }
 }
 
@@ -195,7 +217,10 @@ function updateFloatingButton(recording: boolean) {
 
 chrome.runtime.onMessage.addListener((msg) => {
   if (msg.type === 'STATE_UPDATE') {
-    updateFloatingButton(msg.state === 'recording')
+    const s = msg.state as string
+    if (s === 'recording') updateFloatingButton('recording')
+    else if (s === 'requesting' || s === 'stopping' || s === 'processing') updateFloatingButton('loading')
+    else updateFloatingButton('idle')
   }
 })
 
