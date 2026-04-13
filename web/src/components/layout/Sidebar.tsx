@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { Home, Video, TrendingUp, LogOut, Settings, ChevronLeft, ChevronRight, Users, CreditCard, Plug, GraduationCap, FileText, Lock } from 'lucide-react'
+import { Home, Video, TrendingUp, LogOut, Settings, ChevronLeft, ChevronRight, Users, CreditCard, Plug, GraduationCap, FileText, Lock, HelpCircle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth, useSubscription } from '@/contexts'
 import { clsx } from 'clsx'
+import { OnboardingModal, useOnboarding } from '@/components/ui/OnboardingModal'
 
 interface MenuItem {
   id: string
@@ -24,6 +25,7 @@ export function Sidebar() {
   const navigate = useNavigate()
   const location = useLocation()
   const [expanded, setExpanded] = useState(false)
+  const { open: onboardingOpen, openModal: openOnboarding, closeModal: closeOnboarding } = useOnboarding()
 
   const isPro = subscription?.plan === 'professional' || subscription?.plan === 'trial'
 
@@ -60,6 +62,7 @@ export function Sidebar() {
   }
 
   return (
+    <>
     <aside
       className={clsx(
         'h-screen bg-white border-r border-[#E8E8E8] flex flex-col sticky top-0 transition-all duration-300 overflow-hidden',
@@ -171,6 +174,26 @@ export function Sidebar() {
 
       {/* Bottom */}
       <div className="shrink-0 border-t border-[#F0F0F0] py-2">
+        {/* Como Usar */}
+        <button
+          onClick={openOnboarding}
+          title={expanded ? undefined : 'Como Usar'}
+          className={clsx(
+            'group relative w-full flex items-center gap-3 py-2.5 transition-all duration-150',
+            'text-[#888] hover:text-[#2D5A27] hover:bg-[#2D5A27]/[0.04]',
+            expanded ? 'px-4' : 'justify-center'
+          )}
+        >
+          <HelpCircle size={18} className="shrink-0" />
+          {expanded && <span className="text-[13.5px] font-medium">Como Usar</span>}
+          {!expanded && (
+            <div className="absolute left-full ml-3 px-2.5 py-1.5 bg-[#1a1a1a] text-white text-xs font-medium rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 shadow-lg">
+              Como Usar
+              <span className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-[#1a1a1a]" />
+            </div>
+          )}
+        </button>
+
         {/* Logout */}
         <button
           onClick={handleLogout}
@@ -208,5 +231,8 @@ export function Sidebar() {
         </button>
       </div>
     </aside>
+
+    <OnboardingModal open={onboardingOpen} onClose={closeOnboarding} />
+    </>
   )
 }
