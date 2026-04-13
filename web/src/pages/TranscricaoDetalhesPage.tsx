@@ -4,8 +4,9 @@ import { MainLayout } from '../components/layout/MainLayout';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
-import { ArrowLeft, Clock, Calendar, Mic, Target, CheckCircle, Mail, BookOpen, Sparkles, X, Copy, Check, Trash2 } from 'lucide-react';
+import { ArrowLeft, Clock, Calendar, Mic, Target, CheckCircle, Mail, BookOpen, Sparkles, X, Copy, Check, Trash2, Lock } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { useSubscription } from '../contexts';
 
 interface TranscriptSegment {
   id: string;
@@ -73,6 +74,94 @@ function StatusBadge({ status }: { status: string }) {
     case 'error': return <Badge variant="danger">Erro</Badge>;
     default: return <Badge variant="secondary">{status}</Badge>;
   }
+}
+
+// ── FollowUpSection — bloqueado no plano Starter ───────────────────────────────
+
+interface FollowUpSectionProps {
+  suggestions: string[];
+  emailLoading: boolean;
+  onGenerateEmail: () => void;
+  copiedIndex: number | null;
+  onCopy: (text: string, idx: number) => void;
+}
+
+function FollowUpSection({ suggestions, emailLoading, onGenerateEmail, copiedIndex, onCopy }: FollowUpSectionProps) {
+  const { subscription } = useSubscription();
+  const isPro = subscription?.plan === 'professional' || subscription?.plan === 'trial';
+
+  return (
+    <div className="relative">
+      <Card className={`p-5 ${!isPro ? 'select-none' : ''}`}>
+        <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+          <h2 className="text-headline-2 text-primary flex items-center gap-2">
+            <Mail className="h-5 w-5" />
+            Mensagens de Follow-up para o Cliente
+            <span className="ml-2 text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">Vendas</span>
+          </h2>
+          {isPro && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={onGenerateEmail}
+              disabled={emailLoading}
+              className="flex items-center gap-2"
+            >
+              {emailLoading ? (
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-r-transparent" />
+              ) : (
+                <Sparkles className="h-4 w-4" />
+              )}
+              {emailLoading ? 'Gerando…' : 'Gerar E-mail Completo'}
+            </Button>
+          )}
+        </div>
+        <div className={`space-y-3 ${!isPro ? 'blur-sm pointer-events-none' : ''}`}>
+          {suggestions.slice(0, 4).map((suggestion, i) => (
+            <div key={i} className="flex items-start gap-3 p-3 rounded-lg bg-primary/5 border border-primary/10 group">
+              <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-white text-xs font-bold flex items-center justify-center mt-0.5">
+                {i + 1}
+              </span>
+              <span className="flex-1 text-sm text-secondary leading-relaxed">{suggestion}</span>
+              {isPro && (
+                <button
+                  onClick={() => onCopy(suggestion, i)}
+                  title="Copiar mensagem"
+                  className={`flex-shrink-0 flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md transition-all ${
+                    copiedIndex === i
+                      ? 'bg-primary text-white'
+                      : 'text-secondary opacity-0 group-hover:opacity-100 hover:bg-primary/10 hover:text-primary'
+                  }`}
+                >
+                  {copiedIndex === i ? (
+                    <><Check className="h-3.5 w-3.5" />Copiado</>
+                  ) : (
+                    <><Copy className="h-3.5 w-3.5" />Copiar</>
+                  )}
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      {/* Overlay de bloqueio para plano Starter */}
+      {!isPro && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center rounded-xl bg-white/60 backdrop-blur-[2px]">
+          <div className="flex flex-col items-center gap-2 px-6 py-4 rounded-xl bg-white shadow-lg border border-[#E8E8E8]">
+            <Lock className="h-6 w-6 text-[#888]" />
+            <p className="text-sm font-semibold text-[#444]">Disponível no plano Professional</p>
+            <a
+              href="/subscription"
+              className="mt-1 text-xs font-medium text-[#2D5A27] underline underline-offset-2 hover:text-[#1a3a17]"
+            >
+              Fazer upgrade
+            </a>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function TranscricaoDetalhesPage() {
@@ -486,54 +575,13 @@ export function TranscricaoDetalhesPage() {
 
         {/* Follow-up Suggestions + Email Generator */}
         {(meeting.insights?.followUpSuggestions ?? []).length > 0 && (
-          <Card className="p-5">
-            <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
-              <h2 className="text-headline-2 text-primary flex items-center gap-2">
-                <Mail className="h-5 w-5" />
-                Mensagens de Follow-up para o Cliente
-                <span className="ml-2 text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">Vendas</span>
-              </h2>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={generateEmail}
-                disabled={emailLoading}
-                className="flex items-center gap-2"
-              >
-                {emailLoading ? (
-                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-r-transparent" />
-                ) : (
-                  <Sparkles className="h-4 w-4" />
-                )}
-                {emailLoading ? 'Gerando…' : 'Gerar E-mail Completo'}
-              </Button>
-            </div>
-            <div className="space-y-3">
-              {(meeting.insights?.followUpSuggestions ?? []).slice(0, 4).map((suggestion, i) => (
-                <div key={i} className="flex items-start gap-3 p-3 rounded-lg bg-primary/5 border border-primary/10 group">
-                  <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-white text-xs font-bold flex items-center justify-center mt-0.5">
-                    {i + 1}
-                  </span>
-                  <span className="flex-1 text-sm text-secondary leading-relaxed">{suggestion}</span>
-                  <button
-                    onClick={() => copySuggestion(suggestion, i)}
-                    title="Copiar mensagem"
-                    className={`flex-shrink-0 flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md transition-all ${
-                      copiedSuggestionIndex === i
-                        ? 'bg-primary text-white'
-                        : 'text-secondary opacity-0 group-hover:opacity-100 hover:bg-primary/10 hover:text-primary'
-                    }`}
-                  >
-                    {copiedSuggestionIndex === i ? (
-                      <><Check className="h-3.5 w-3.5" />Copiado</>
-                    ) : (
-                      <><Copy className="h-3.5 w-3.5" />Copiar</>
-                    )}
-                  </button>
-                </div>
-              ))}
-            </div>
-          </Card>
+          <FollowUpSection
+            suggestions={meeting.insights!.followUpSuggestions}
+            emailLoading={emailLoading}
+            onGenerateEmail={generateEmail}
+            copiedIndex={copiedSuggestionIndex}
+            onCopy={copySuggestion}
+          />
         )}
 
         {/* Email Modal */}

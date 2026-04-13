@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { Home, Video, TrendingUp, LogOut, Settings, ChevronLeft, ChevronRight, Users, CreditCard, Plug, GraduationCap, FileText } from 'lucide-react'
+import { Home, Video, TrendingUp, LogOut, Settings, ChevronLeft, ChevronRight, Users, CreditCard, Plug, GraduationCap, FileText, Lock } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { useAuth } from '@/contexts'
+import { useAuth, useSubscription } from '@/contexts'
 import { clsx } from 'clsx'
 
 interface MenuItem {
@@ -20,9 +20,12 @@ interface MenuGroup {
 export function Sidebar() {
   const { t } = useTranslation()
   const { signOut } = useAuth()
+  const { subscription } = useSubscription()
   const navigate = useNavigate()
   const location = useLocation()
   const [expanded, setExpanded] = useState(false)
+
+  const isPro = subscription?.plan === 'professional' || subscription?.plan === 'trial'
 
   const groups: MenuGroup[] = [
     {
@@ -93,19 +96,23 @@ export function Sidebar() {
               const Icon = item.icon
               const active = isActive(item.path)
 
+              const isLocked = item.id === 'coaching' && !isPro
+
               return (
                 <button
                   key={item.id}
-                  onClick={() => navigate(item.path)}
-                  title={expanded ? undefined : item.label}
+                  onClick={() => { if (!isLocked) navigate(item.path) }}
+                  title={expanded ? undefined : isLocked ? 'Disponível no plano Professional' : item.label}
                   className={clsx(
                     'group relative w-full flex items-center gap-3 transition-all duration-150',
                     expanded ? 'px-4 py-2.5' : 'justify-center py-2.5',
-                    active
-                      ? 'text-[#2D5A27] bg-[#2D5A27]/[0.06]'
-                      : item.id === 'coaching'
-                        ? 'text-[#7A5C00] bg-[#FFD700]/20 hover:bg-[#FFD700]/35'
-                        : 'text-[#555] hover:text-[#2D5A27] hover:bg-[#2D5A27]/[0.04]'
+                    isLocked
+                      ? 'opacity-60 cursor-not-allowed text-[#888]'
+                      : active
+                        ? 'text-[#2D5A27] bg-[#2D5A27]/[0.06]'
+                        : item.id === 'coaching'
+                          ? 'text-[#7A5C00] bg-[#FFD700]/20 hover:bg-[#FFD700]/35'
+                          : 'text-[#555] hover:text-[#2D5A27] hover:bg-[#2D5A27]/[0.04]'
                   )}
                 >
                   {/* Borda esquerda ativa — estilo Stripe */}
@@ -117,17 +124,22 @@ export function Sidebar() {
                     size={18}
                     className={clsx(
                       'shrink-0 transition-colors',
-                      active ? 'text-[#2D5A27]' : item.id === 'coaching' ? 'text-[#7A5C00]' : 'text-[#888] group-hover:text-[#2D5A27]'
+                      isLocked ? 'text-[#aaa]' : active ? 'text-[#2D5A27]' : item.id === 'coaching' ? 'text-[#7A5C00]' : 'text-[#888] group-hover:text-[#2D5A27]'
                     )}
                   />
 
                   {expanded && (
                     <span className={clsx(
-                      'text-[13.5px] leading-5 font-medium truncate',
-                      active ? 'text-[#2D5A27]' : item.id === 'coaching' ? 'text-[#7A5C00] font-semibold' : 'text-[#444]'
+                      'text-[13.5px] leading-5 font-medium truncate flex-1',
+                      isLocked ? 'text-[#aaa]' : active ? 'text-[#2D5A27]' : item.id === 'coaching' ? 'text-[#7A5C00] font-semibold' : 'text-[#444]'
                     )}>
                       {item.label}
                     </span>
+                  )}
+
+                  {/* Cadeado para itens bloqueados */}
+                  {isLocked && (
+                    <Lock size={12} className="shrink-0 text-[#aaa]" />
                   )}
 
                   {/* Dot ativo no collapsed */}
@@ -138,7 +150,15 @@ export function Sidebar() {
                   {/* Tooltip no collapsed */}
                   {!expanded && (
                     <div className="absolute left-full ml-3 px-2.5 py-1.5 bg-[#1a1a1a] text-white text-xs font-medium rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-150 z-50 shadow-lg">
-                      {item.label}
+                      {isLocked ? 'Disponível no plano Professional' : item.label}
+                      <span className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-[#1a1a1a]" />
+                    </div>
+                  )}
+
+                  {/* Tooltip no expanded */ }
+                  {expanded && isLocked && (
+                    <div className="absolute left-full ml-3 px-2.5 py-1.5 bg-[#1a1a1a] text-white text-xs font-medium rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-150 z-50 shadow-lg">
+                      Disponível no plano Professional
                       <span className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-[#1a1a1a]" />
                     </div>
                   )}
