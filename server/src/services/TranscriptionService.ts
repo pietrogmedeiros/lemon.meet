@@ -50,7 +50,8 @@ export class TranscriptionService {
       const verboseResponse = response as any;
 
       // Limiar de probabilidade de não-fala — segmentos acima disso são alucinações do Whisper
-      const NO_SPEECH_THRESHOLD = 0.6;
+      // 0.85 preserva muito mais conteúdo válido; o filtro agressivo (0.6) descartava fala real
+      const NO_SPEECH_THRESHOLD = 0.85;
 
       if (verboseResponse.segments && Array.isArray(verboseResponse.segments)) {
         for (const segment of verboseResponse.segments) {

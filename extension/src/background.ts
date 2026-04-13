@@ -97,6 +97,8 @@ async function handleStartRecording(tabId?: number, streamId?: string): Promise<
   console.log('[Lemon.meet] Meeting criada:', meetingId)
 
   currentSession = { meetingId, tabId, platform: detected?.platform ?? 'google_meet', title: detected?.title ?? 'Reunião sem título', meetLink: detected?.meetLink ?? '', startedAt: Date.now() }
+  // Persiste sessão no storage para sobreviver a reinicializações do Service Worker
+  await chrome.storage.local.set({ activeSession: currentSession, recordingStatePersisted: 'recording' })
 
   await setupOffscreenDocument()
   await chrome.runtime.sendMessage({ type: 'OFFSCREEN_START', streamId, meetingId, accessToken: session.access_token })
@@ -127,8 +129,26 @@ async function handleStopRecording(): Promise<void> {
   setState('processing')
   chrome.runtime.sendMessage<MessageFromBackground>({ type: 'RECORDING_STOPPED', session: currentSession }).catch(() => {})
   currentSession = null
+  await chrome.storage.local.remove(['activeSession', 'recordingStatePersisted'])
   setTimeout(() => setState('idle'), 3000)
 }
 
-chrome.alarms.onAlarm.addListener((alarm) => { if (alarm.name === 'keepAlive') {} })
+// Restaura estado da sessão se o Service Worker foi reiniciado durante uma gravação
+chrome.storage.local.get(['activeSession', 'recordingStatePersisted']).then((stored) => {
+  if (stored.recordingStatePersisted === 'recording' && stored.activeSession) {
+    currentSession = stored.activeSession as MeetingSession
+    recordingState = 'recording'
+    console.log('[Lemon.meet] SW reiniciado — sessão restaurada:', currentSession.meetingId)
+  }
+})
+
+// keepAlive: alarm a cada 24s para evitar que o Chrome mate o Service Worker durante gravações
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === 'keepAlive') {
+    // Pinga o documento offscreen para garantir que a gravação ainda está ativa
+    if (recordingState === 'recording') {
+      chrome.runtime.sendMessage({ type: 'PING' }).catch(() => {})
+    }
+  }
+})
 chrome.alarms.create('keepAlive', { periodInMinutes: 0.4 })

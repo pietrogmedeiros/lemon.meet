@@ -64,38 +64,54 @@ async function startCapture(streamId: string, meetingId: string, accessToken: st
   // 4. Grava o mix resultante
   mediaRecorder = new MediaRecorder(destination.stream, {
     mimeType: 'audio/webm;codecs=opus',
-    audioBitsPerSecond: 64_000,
+    audioBitsPerSecond: 128_000, // 128kbps — qualidade suficiente para Whisper reconhecer fala
   })
+
+  const sendChunk = async (blob: Blob, idx: number) => {
+    const formData = new FormData()
+    formData.append('audio', blob, `chunk-${idx}.webm`)
+    formData.append('chunkIndex', String(idx))
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const res = await fetch(`${API_URL}/api/meetings/${meetingId}/chunk`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${accessToken}` },
+          body: formData,
+        })
+        if (res.ok) return
+        console.warn(`[Lemon.meet offscreen] Chunk ${idx} retornou ${res.status}, tentativa ${attempt + 1}`)
+      } catch (err) {
+        console.error(`[Lemon.meet offscreen] Erro ao enviar chunk ${idx}, tentativa ${attempt + 1}:`, err)
+      }
+      await new Promise(r => setTimeout(r, 2000 * (attempt + 1)))
+    }
+    console.error(`[Lemon.meet offscreen] Chunk ${idx} falhou após 3 tentativas`)
+  }
 
   mediaRecorder.ondataavailable = async (e) => {
     if (e.data.size === 0) return
     const idx = chunkIndex++
-    const formData = new FormData()
-    formData.append('audio', e.data, `chunk-${idx}.webm`)
-    formData.append('chunkIndex', String(idx))
-    try {
-      await fetch(`${API_URL}/api/meetings/${meetingId}/chunk`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${accessToken}` },
-        body: formData,
-      })
-    } catch (err) {
-      console.error('[Lemon.meet offscreen] Erro ao enviar chunk:', err)
-    }
+    await sendChunk(e.data, idx)
   }
 
-  mediaRecorder.start(15_000) // chunk a cada 15s (mais contexto → menos alucinação do Whisper)
+  mediaRecorder.start(10_000) // chunk a cada 10s — mais granular, menos chance de perder conteúdo
   console.log('[Lemon.meet offscreen] Gravação iniciada para meeting:', meetingId)
 }
 
 function stopCapture() {
-  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-    mediaRecorder.requestData() // força envio do último chunk
-    mediaRecorder.stop()
-    mediaRecorder.stream.getTracks().forEach((t) => t.stop())
-  }
-  mediaRecorder = null
-  audioContext?.close()
-  audioContext = null
-  console.log('[Lemon.meet offscreen] Gravação encerrada')
+  if (!mediaRecorder || mediaRecorder.state === 'inactive') return
+
+  // requestData() dispara ondataavailable com os dados pendentes
+  // Aguardamos 800ms para garantir que o handler processe o chunk antes de parar
+  mediaRecorder.requestData()
+  setTimeout(() => {
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+      mediaRecorder.stop()
+      mediaRecorder.stream.getTracks().forEach((t) => t.stop())
+    }
+    mediaRecorder = null
+    audioContext?.close()
+    audioContext = null
+    console.log('[Lemon.meet offscreen] Gravação encerrada')
+  }, 800)
 }
