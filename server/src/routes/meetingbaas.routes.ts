@@ -219,8 +219,42 @@ async function handleBotCompleted(data: Record<string, any>) {
     }
   }
 
-  if (!meeting) {
-    logger.error(`[MeetingBaas] bot.completed: reunião não encontrada para bot_id=${bot_id} event_id=${event_id}`)
+  if (!meeting && event_id) {
+    // Reunião não foi salva no banco (ex: falha no insert) — cria agora com dados básicos
+    logger.warn(`[MeetingBaas] bot.completed: reunião não encontrada, tentando criar a partir do bot_id=${bot_id} event_id=${event_id}`)
+    const { data: calIntegration } = await supabase
+      .from('calendar_integrations')
+      .select('user_id')
+      .limit(1)
+      .maybeSingle()
+    if (calIntegration) {
+      const { randomUUID } = await import('crypto')
+      const newMeetingId = randomUUID()
+      const { data: created, error: createErr } = await supabase.from('meetings').insert({
+        id: newMeetingId,
+        user_id: calIntegration.user_id,
+        title: 'Reunião do Calendário',
+        platform: 'google_meet',
+        source: 'calendar',
+        status: 'processing',
+        baas_bot_id: bot_id,
+        baas_event_uuid: event_id,
+        started_at: data.joined_at ?? new Date().toISOString(),
+        ended_at: data.exited_at ?? new Date().toISOString(),
+      }).select().maybeSingle()
+      if (!createErr && created) {
+        meeting = created
+        logger.info(`[MeetingBaas] bot.completed: reunião criada retroativamente id=${newMeetingId}`)
+      } else {
+        logger.error(`[MeetingBaas] bot.completed: falha ao criar reunião retroativa:`, createErr)
+        return
+      }
+    } else {
+      logger.error(`[MeetingBaas] bot.completed: sem integração de calendário para criar reunião`)
+      return
+    }
+  } else if (!meeting) {
+    logger.error(`[MeetingBaas] bot.completed: reunião não encontrada para bot_id=${bot_id}`)
     return
   }
 
@@ -412,6 +446,7 @@ async function handleCalendarSyncEvents(data: Record<string, any>) {
             event_id: eventId,
             series_id: instance.series_id,
             bot_name: 'Lemon Notetaker',
+            bot_image: 'https://lemon-meet.web.app/lemon-bot-avatar.png',
             recording_mode: 'audio_only',
             transcription_enabled: true,
             transcription_config: { provider: 'gladia' },
@@ -434,7 +469,7 @@ async function handleCalendarSyncEvents(data: Record<string, any>) {
       const platform = meetingUrl.includes('meet.google.com') ? 'google_meet'
         : meetingUrl.includes('zoom.us') ? 'zoom' : 'teams'
 
-      await supabase.from('meetings').insert({
+      const { error: insertError } = await supabase.from('meetings').insert({
         id: meetingId,
         user_id: userId,
         meet_link: meetingUrl,
@@ -447,7 +482,11 @@ async function handleCalendarSyncEvents(data: Record<string, any>) {
         started_at: startTime?.toISOString() ?? new Date().toISOString(),
       })
 
-      logger.info(`[Calendar] Bot agendado com sucesso: event=${eventId} meeting=${meetingId} title="${instance.title}"`)
+      if (insertError) {
+        logger.error(`[Calendar] Erro ao salvar reunião no banco para evento ${eventId}:`, insertError)
+      } else {
+        logger.info(`[Calendar] Bot agendado com sucesso: event=${eventId} meeting=${meetingId} title="${instance.title}"`)
+      }
     } catch (err) {
       logger.error(`[Calendar] Erro ao processar instância ${instance.event_id}:`, err)
     }
