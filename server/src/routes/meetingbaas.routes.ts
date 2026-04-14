@@ -216,11 +216,9 @@ async function handleFailed(data: { bot_id: string; error: string; event_uuid?: 
 
 // ── Calendar: processa eventos alterados no calendário ────────
 async function handleCalendarSyncEvents(data: Record<string, any>) {
-  // O campo pode vir como calendar_id, uuid ou calendar_uuid dependendo da versão da API
   const calendar_id: string | undefined = data.calendar_id ?? data.uuid ?? data.calendar_uuid
-  const affected_event_uuids: string[] | undefined = data.affected_event_uuids
 
-  logger.info(`[Calendar] handleCalendarSyncEvents: calendar_id=${calendar_id} affected=${JSON.stringify(affected_event_uuids)}`)
+  logger.info(`[Calendar] handleCalendarSyncEvents: calendar_id=${calendar_id} data=${JSON.stringify(data)}`)
 
   if (!calendar_id) {
     logger.error(`[Calendar] Payload sem calendar_id: ${JSON.stringify(data)}`)
@@ -241,70 +239,68 @@ async function handleCalendarSyncEvents(data: Record<string, any>) {
 
   const userId = integration.user_id
 
-  // Processa apenas os eventos afetados (mais eficiente)
-  const eventUuids = affected_event_uuids ?? []
-  logger.info(`[Calendar] Webhook recebido: calendar_id=${calendar_id} affected_event_uuids=${JSON.stringify(eventUuids)}`)
-  if (eventUuids.length === 0) {
-    logger.info(`[Calendar] Nenhum event_uuid afetado — nada a processar`)
-    return
+  // Extrai instâncias de eventos do payload
+  // Formato real: data.events[].instances[] ou data.events[] (one_off)
+  interface EventInstance {
+    event_id: string
+    start: string
+    end: string
+    title: string
+    status: string
+    meeting_url?: string
+    bot_scheduled: boolean
   }
 
-  for (const eventUuid of eventUuids) {
+  const instances: EventInstance[] = []
+  const eventGroups: any[] = data.events ?? []
+
+  for (const group of eventGroups) {
+    if (Array.isArray(group.instances)) {
+      // Evento recorrente: tem array de instances
+      instances.push(...group.instances)
+    } else if (group.event_id) {
+      // Evento avulso: o próprio grupo é a instância
+      instances.push(group)
+    }
+  }
+
+  logger.info(`[Calendar] ${instances.length} instância(s) encontrada(s) para processar`)
+
+  const now = new Date()
+
+  for (const instance of instances) {
     try {
-      // Busca detalhes do evento no MeetingBaas — endpoint correto: /calendar_events/{uuid}
-      const res = await fetch(
-        `https://api.meetingbaas.com/calendar_events/${eventUuid}`,
-        { headers: { 'x-meeting-baas-api-key': process.env.MEETINGBAAS_API_KEY! } }
-      )
+      const eventId = instance.event_id
+      const meetingUrl = instance.meeting_url
+      const startTime = instance.start ? new Date(instance.start) : null
+      const endTime = instance.end ? new Date(instance.end) : null
 
-      if (!res.ok) {
-        const errBody = await res.text()
-        logger.warn(`[Calendar] Evento ${eventUuid} não encontrado (status=${res.status}): ${errBody}`)
-        continue
-      }
+      logger.info(`[Calendar] Instância ${eventId}: title="${instance.title}" start="${instance.start}" url="${meetingUrl}" status="${instance.status}" bot_scheduled=${instance.bot_scheduled}`)
 
-      const event = await res.json() as any
-      logger.info(`[Calendar] Evento ${eventUuid}: name="${event.name}" start="${event.start_time}" end="${event.end_time}" url="${event.meeting_url}" deleted=${event.deleted}`)
+      // Ignora eventos sem link, cancelados ou já com bot agendado
+      if (!meetingUrl) { logger.info(`[Calendar] ${eventId} ignorado: sem meeting_url`); continue }
+      if (instance.status !== 'confirmed') { logger.info(`[Calendar] ${eventId} ignorado: status=${instance.status}`); continue }
+      if (instance.bot_scheduled) { logger.info(`[Calendar] ${eventId} ignorado: bot já agendado`); continue }
 
-      const meetingUrl: string | undefined = event.meeting_url
+      // Ignora eventos já encerrados
+      if (endTime && endTime < now) { logger.info(`[Calendar] ${eventId} ignorado: já encerrou`); continue }
 
-      // Ignora eventos sem link de reunião ou deletados
-      if (!meetingUrl || event.deleted) {
-        logger.info(`[Calendar] Evento ${eventUuid} ignorado: sem meeting_url ou deletado`)
-        continue
-      }
-
-      const now = new Date()
-      const startTime = event.start_time ? new Date(event.start_time) : null
-      const endTime = event.end_time ? new Date(event.end_time) : null
-
-      // Ignora eventos que já terminaram
-      if (endTime && endTime < now) {
-        logger.info(`[Calendar] Evento ${eventUuid} ignorado: já terminou às ${event.end_time}`)
-        continue
-      }
-      // Ignora eventos que começam daqui mais de 24h (ainda não precisam de bot agendado)
-      if (startTime && startTime > new Date(now.getTime() + 24 * 60 * 60 * 1000)) {
-        logger.info(`[Calendar] Evento ${eventUuid} ignorado: começa em mais de 24h (${event.start_time})`)
-        continue
-      }
-
-      // Verifica se já existe uma reunião agendada para este evento
+      // Verifica se já existe registro no banco
       const { data: existing } = await supabase
         .from('meetings')
         .select('id')
         .eq('user_id', userId)
-        .eq('baas_event_uuid', eventUuid)
+        .eq('baas_event_uuid', eventId)
         .maybeSingle()
 
       if (existing) {
-        logger.debug(`[Calendar] Evento ${eventUuid} já tem reunião registrada`)
+        logger.info(`[Calendar] ${eventId} já tem reunião registrada`)
         continue
       }
 
-      // Agenda o bot via MeetingBaas — endpoint correto: POST /calendar_events/{uuid}/bot
+      // Agenda o bot via MeetingBaas: POST /calendar_events/{event_id}/bot
       const scheduleRes = await fetch(
-        `https://api.meetingbaas.com/calendar_events/${eventUuid}/bot`,
+        `https://api.meetingbaas.com/calendar_events/${eventId}/bot`,
         {
           method: 'POST',
           headers: {
@@ -323,17 +319,13 @@ async function handleCalendarSyncEvents(data: Record<string, any>) {
 
       const scheduleBody = await scheduleRes.json() as any
       if (!scheduleRes.ok) {
-        logger.warn(`[Calendar] Falha ao agendar bot para evento ${eventUuid}: ${JSON.stringify(scheduleBody)}`)
+        logger.warn(`[Calendar] Falha ao agendar bot para ${eventId}: ${JSON.stringify(scheduleBody)}`)
         continue
       }
 
-      // Resposta é um array de eventos atualizados; o bot não tem bot_id até entrar na reunião
-      const updatedEvent = Array.isArray(scheduleBody) ? scheduleBody[0] : scheduleBody
-
-      // Cria registro da reunião no banco para rastreamento
+      // Salva no banco
       const { randomUUID } = await import('crypto')
       const meetingId = randomUUID()
-      const title = event.name ?? event.title ?? 'Reunião do Calendário'
       const platform = meetingUrl.includes('meet.google.com') ? 'google_meet'
         : meetingUrl.includes('zoom.us') ? 'zoom' : 'teams'
 
@@ -341,18 +333,18 @@ async function handleCalendarSyncEvents(data: Record<string, any>) {
         id: meetingId,
         user_id: userId,
         meet_link: meetingUrl,
-        title,
+        title: instance.title ?? 'Reunião do Calendário',
         platform,
         source: 'calendar',
         status: 'requesting',
-        baas_bot_id: null, // preenchido pelo webhook bot.status_change quando o bot entrar
-        baas_event_uuid: eventUuid,
+        baas_bot_id: null,
+        baas_event_uuid: eventId,
         started_at: startTime?.toISOString() ?? new Date().toISOString(),
       })
 
-      logger.info(`[Calendar] Bot agendado: evento=${eventUuid} meeting=${meetingId} title="${title}" start=${startTime?.toISOString()}`)
+      logger.info(`[Calendar] Bot agendado com sucesso: event=${eventId} meeting=${meetingId} title="${instance.title}"`)
     } catch (err) {
-      logger.error(`[Calendar] Erro ao processar evento ${eventUuid}:`, err)
+      logger.error(`[Calendar] Erro ao processar instância ${instance.event_id}:`, err)
     }
   }
 }
