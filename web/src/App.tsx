@@ -108,6 +108,18 @@ function App() {
           />
           <Route
             path="/integrations"
+            element={<Navigate to="/integrations/permissions" replace />}
+          />
+          <Route
+            path="/integrations/permissions"
+            element={
+              <ProtectedRoute>
+                <IntegrationsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/integrations/webhooks"
             element={
               <ProtectedRoute>
                 <IntegrationsPage />

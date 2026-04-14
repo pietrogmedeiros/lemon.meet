@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Home, Video, TrendingUp, LogOut, Settings, ChevronLeft, ChevronRight, Users, CreditCard, Plug, GraduationCap, FileText, Lock, HelpCircle, CalendarClock } from 'lucide-react'
+import { Home, Video, TrendingUp, LogOut, Settings, ChevronLeft, ChevronRight, Users, CreditCard, Plug, GraduationCap, FileText, Lock, HelpCircle, CalendarClock, Shield, Webhook } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth, useSubscription } from '@/contexts'
@@ -11,6 +11,7 @@ interface MenuItem {
   path: string
   icon: React.ElementType
   label: string
+  children?: { id: string; path: string; icon: React.ElementType; label: string }[]
 }
 
 interface MenuGroup {
@@ -43,16 +44,26 @@ export function Sidebar() {
     {
       section: 'Conta',
       items: [
-        { id: 'team',         path: '/team',         icon: Users,      label: t('nav.team', 'Meu Time') },
-        { id: 'integrations', path: '/integrations', icon: Plug,        label: 'Integrações' },
-        { id: 'subscription', path: '/subscription', icon: CreditCard, label: 'Minha Assinatura' },
-        { id: 'settings',     path: '/settings',     icon: Settings,   label: t('nav.settings', 'Configurações') },
+        { id: 'team',         path: '/team',                    icon: Users,      label: t('nav.team', 'Meu Time') },
+        {
+          id: 'integrations',
+          path: '/integrations/permissions',
+          icon: Plug,
+          label: 'Integrações',
+          children: [
+            { id: 'integrations-permissions', path: '/integrations/permissions', icon: Shield,  label: 'Permissões' },
+            { id: 'integrations-webhooks',    path: '/integrations/webhooks',    icon: Webhook, label: 'Webhook' },
+          ],
+        },
+        { id: 'subscription', path: '/subscription',             icon: CreditCard, label: 'Minha Assinatura' },
+        { id: 'settings',     path: '/settings',                 icon: Settings,   label: t('nav.settings', 'Configurações') },
       ],
     },
   ]
 
   const isActive = (path: string) => {
     if (path === '/meetings') return location.pathname.startsWith('/meetings')
+    if (path === '/integrations/permissions') return location.pathname.startsWith('/integrations')
     return location.pathname === path
   }
 
@@ -103,6 +114,7 @@ export function Sidebar() {
               const isLocked = item.id === 'coaching' && !isPro
 
               return (
+                <>
                 <button
                   key={item.id}
                   onClick={() => { if (!isLocked) navigate(item.path) }}
@@ -167,6 +179,28 @@ export function Sidebar() {
                     </div>
                   )}
                 </button>
+
+                {/* Sub-itens — visíveis apenas quando expandido */}
+                {expanded && item.children && item.children.map(child => {
+                  const childActive = location.pathname === child.path
+                  const ChildIcon = child.icon
+                  return (
+                    <button
+                      key={child.id}
+                      onClick={() => navigate(child.path)}
+                      className={clsx(
+                        'w-full flex items-center gap-2 pl-10 pr-4 py-1.5 text-[12.5px] font-medium transition-all duration-150 rounded-sm',
+                        childActive
+                          ? 'text-[#2D5A27] bg-[#2D5A27]/[0.06]'
+                          : 'text-[#777] hover:text-[#2D5A27] hover:bg-[#2D5A27]/[0.04]'
+                      )}
+                    >
+                      <ChildIcon size={13} className="shrink-0" />
+                      {child.label}
+                    </button>
+                  )
+                })}
+                </>
               )
             })}
           </div>
