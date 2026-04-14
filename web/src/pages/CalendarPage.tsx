@@ -3,7 +3,7 @@ import { MainLayout } from '@/components/layout'
 import { supabase } from '@/lib/supabase'
 import {
   ChevronLeft, ChevronRight, Calendar, ExternalLink,
-  Video, Loader, CalendarOff, RefreshCw
+  Video, Loader, CalendarOff, RefreshCw, X
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
@@ -23,18 +23,19 @@ interface CalendarEvent {
   is_exception: boolean
 }
 
-const PLATFORM_COLORS: Record<string, { bg: string; text: string; border: string }> = {
-  meet:  { bg: 'bg-green-50',  text: 'text-green-700',  border: 'border-green-200' },
-  zoom:  { bg: 'bg-blue-50',   text: 'text-blue-700',   border: 'border-blue-200' },
-  teams: { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200' },
-  other: { bg: 'bg-[#F5F5F5]', text: 'text-[#666666]',  border: 'border-[#E0E0E0]' },
+const PLATFORM_COLORS: Record<string, { bg: string; text: string; border: string; dot: string }> = {
+  meet:  { bg: 'bg-green-50',  text: 'text-green-700',  border: 'border-green-200', dot: 'bg-green-500' },
+  zoom:  { bg: 'bg-blue-50',   text: 'text-blue-700',   border: 'border-blue-200',  dot: 'bg-blue-500' },
+  teams: { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200', dot: 'bg-purple-500' },
+  other: { bg: 'bg-[#F5F5F5]', text: 'text-[#666666]',  border: 'border-[#E0E0E0]', dot: 'bg-[#BBBBBB]' },
 }
 
 const PLATFORM_LABELS: Record<string, string> = {
   meet: 'Meet', zoom: 'Zoom', teams: 'Teams',
 }
 
-const WEEKDAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
+const WEEKDAYS_FULL  = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
+const WEEKDAYS_SHORT = ['D',   'S',   'T',   'Q',   'Q',   'S',   'S'  ]
 const MONTHS = [
   'Janeiro','Fevereiro','Março','Abril','Maio','Junho',
   'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro',
@@ -62,10 +63,9 @@ export function CalendarPage() {
   const [noCalendar, setNoCalendar] = useState(false)
   const [selectedDay, setSelectedDay] = useState<Date | null>(null)
 
-  // Mês atual exibido
   const today = new Date()
   const [viewYear, setViewYear] = useState(today.getFullYear())
-  const [viewMonth, setViewMonth] = useState(today.getMonth()) // 0-based
+  const [viewMonth, setViewMonth] = useState(today.getMonth())
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session: s } }) => setSession(s))
@@ -75,17 +75,13 @@ export function CalendarPage() {
     if (!session) return
     setLoading(true)
     try {
-      // Busca do início ao fim do mês visível (± 1 semana para cobrir células do grid)
       const startOfGrid = new Date(viewYear, viewMonth, 1)
-      startOfGrid.setDate(startOfGrid.getDate() - startOfGrid.getDay()) // domingo inicial
+      startOfGrid.setDate(startOfGrid.getDate() - startOfGrid.getDay())
       const endOfGrid = new Date(viewYear, viewMonth + 1, 0)
-      endOfGrid.setDate(endOfGrid.getDate() + (6 - endOfGrid.getDay())) // sábado final
-
-      const start = startOfGrid.toISOString()
-      const end = endOfGrid.toISOString()
+      endOfGrid.setDate(endOfGrid.getDate() + (6 - endOfGrid.getDay()))
 
       const res = await fetch(
-        `${API}/api/calendar/events?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`,
+        `${API}/api/calendar/events?start=${encodeURIComponent(startOfGrid.toISOString())}&end=${encodeURIComponent(endOfGrid.toISOString())}`,
         { headers: { Authorization: `Bearer ${session.access_token}` } }
       )
       const data = await res.json()
@@ -105,27 +101,23 @@ export function CalendarPage() {
     if (session) loadEvents()
   }, [session, loadEvents])
 
-  // ── Grid do mês ───────────────────────────────────────────
+  // ── Grid cells ────────────────────────────────────────────
   const firstDay = new Date(viewYear, viewMonth, 1)
-  const startOffset = firstDay.getDay() // 0=Dom
+  const startOffset = firstDay.getDay()
   const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate()
 
-  // Células do grid: dias do mês anterior + dias do mês + dias do mês seguinte
-  const cells: (Date | null)[] = []
-  for (let i = 0; i < startOffset; i++) {
-    const d = new Date(viewYear, viewMonth, -startOffset + i + 1)
-    cells.push(d)
-  }
-  for (let d = 1; d <= daysInMonth; d++) {
+  const cells: Date[] = []
+  for (let i = 0; i < startOffset; i++)
+    cells.push(new Date(viewYear, viewMonth, -startOffset + i + 1))
+  for (let d = 1; d <= daysInMonth; d++)
     cells.push(new Date(viewYear, viewMonth, d))
-  }
   const rem = (7 - (cells.length % 7)) % 7
-  for (let i = 1; i <= rem; i++) {
+  for (let i = 1; i <= rem; i++)
     cells.push(new Date(viewYear, viewMonth + 1, i))
-  }
 
   function eventsForDay(date: Date) {
-    return events.filter(e => isSameDay(new Date(e.start_time), date))
+    return events
+      .filter(e => isSameDay(new Date(e.start_time), date))
       .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())
   }
 
@@ -153,7 +145,7 @@ export function CalendarPage() {
   if (!loading && noCalendar) {
     return (
       <MainLayout>
-        <div className="flex flex-col items-center justify-center py-32 gap-5">
+        <div className="flex flex-col items-center justify-center py-24 sm:py-32 gap-5 px-4">
           <div className="w-16 h-16 rounded-2xl bg-[#2D5A27]/10 flex items-center justify-center">
             <CalendarOff size={28} className="text-[#2D5A27]" />
           </div>
@@ -176,15 +168,15 @@ export function CalendarPage() {
 
   return (
     <MainLayout>
-      <div className="space-y-4">
+      <div className="flex flex-col gap-4 h-full">
 
-        {/* Header */}
-        <div className="flex items-center justify-between">
+        {/* ── Header ── */}
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
-            <h1 className="text-xl font-bold text-[#333333]">
+            <h1 className="text-lg sm:text-xl font-bold text-[#333333]">
               {MONTHS[viewMonth]} {viewYear}
             </h1>
-            {loading && <Loader size={16} className="animate-spin text-[#2D5A27]" />}
+            {loading && <Loader size={15} className="animate-spin text-[#2D5A27]" />}
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -218,15 +210,26 @@ export function CalendarPage() {
           </div>
         </div>
 
-        <div className={`flex gap-4 ${selectedDay ? 'grid grid-cols-1 lg:grid-cols-[1fr_300px]' : ''}`}>
+        {/* ── Layout principal: grade + painel ── */}
+        <div className={`
+          flex flex-col gap-4
+          ${selectedDay ? 'lg:grid lg:grid-cols-[1fr_300px] xl:grid-cols-[1fr_340px]' : ''}
+        `}>
 
           {/* ── Grade do calendário ── */}
-          <div className="bg-white border border-[#E0E0E0] rounded-2xl shadow-sm overflow-hidden">
+          <div className="bg-white border border-[#E0E0E0] rounded-2xl shadow-sm overflow-hidden min-w-0">
+
             {/* Cabeçalho dias da semana */}
             <div className="grid grid-cols-7 border-b border-[#F0F0F0]">
-              {WEEKDAYS.map(d => (
-                <div key={d} className="text-center text-[10px] font-semibold text-[#999999] uppercase tracking-wider py-2.5">
-                  {d}
+              {WEEKDAYS_FULL.map((full, i) => (
+                <div key={full} className="text-center py-2 sm:py-2.5">
+                  {/* Mobile: letra única | sm+: abreviação */}
+                  <span className="sm:hidden text-[10px] font-semibold text-[#999999] uppercase">
+                    {WEEKDAYS_SHORT[i]}
+                  </span>
+                  <span className="hidden sm:inline text-[10px] font-semibold text-[#999999] uppercase tracking-wider">
+                    {full}
+                  </span>
                 </div>
               ))}
             </div>
@@ -234,29 +237,30 @@ export function CalendarPage() {
             {/* Células */}
             <div className="grid grid-cols-7">
               {cells.map((date, i) => {
-                if (!date) return <div key={i} />
                 const dayEvents = eventsForDay(date)
                 const current = isCurrentMonth(date)
                 const todayCell = isToday(date)
-                const selected = selectedDay && isSameDay(date, selectedDay)
-                const isLast = i >= cells.length - 7
-                const isBottom = !isLast
+                const selected = selectedDay ? isSameDay(date, selectedDay) : false
+                const isLastRow = i >= cells.length - 7
 
                 return (
                   <div
                     key={i}
                     onClick={() => setSelectedDay(selected ? null : date)}
                     className={`
-                      min-h-[88px] p-2 cursor-pointer transition-colors
-                      ${isBottom ? 'border-b' : ''} border-[#F5F5F5]
+                      cursor-pointer transition-colors select-none
+                      min-h-[52px] sm:min-h-[80px] lg:min-h-[90px]
+                      p-1 sm:p-2
+                      ${!isLastRow ? 'border-b' : ''} border-[#F5F5F5]
                       ${(i % 7) < 6 ? 'border-r' : ''} border-[#F5F5F5]
                       ${selected ? 'bg-[#2D5A27]/5' : 'hover:bg-[#F8F9FA]'}
-                      ${!current ? 'opacity-40' : ''}
+                      ${!current ? 'opacity-35' : ''}
                     `}
                   >
                     {/* Número do dia */}
                     <div className={`
-                      w-7 h-7 rounded-full flex items-center justify-center text-sm font-semibold mb-1.5 mx-auto
+                      w-6 h-6 sm:w-7 sm:h-7 rounded-full flex items-center justify-center
+                      text-xs sm:text-sm font-semibold mb-1 mx-auto
                       ${todayCell
                         ? 'bg-[#2D5A27] text-white'
                         : selected
@@ -266,27 +270,47 @@ export function CalendarPage() {
                       {date.getDate()}
                     </div>
 
-                    {/* Eventos (até 3 visíveis) */}
-                    <div className="space-y-0.5">
+                    {/* Mobile: pontos coloridos */}
+                    {dayEvents.length > 0 && (
+                      <div className="flex sm:hidden justify-center gap-0.5 flex-wrap px-0.5">
+                        {dayEvents.slice(0, 3).map(ev => {
+                          const colors = PLATFORM_COLORS[ev.meeting_platform ?? 'other']
+                          return (
+                            <span
+                              key={ev.event_id}
+                              className={`w-1.5 h-1.5 rounded-full ${colors.dot}`}
+                            />
+                          )
+                        })}
+                        {dayEvents.length > 3 && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#CCCCCC]" />
+                        )}
+                      </div>
+                    )}
+
+                    {/* sm+: pills de evento */}
+                    <div className="hidden sm:flex flex-col gap-0.5">
                       {dayEvents.slice(0, 3).map(ev => {
-                        const platform = ev.meeting_platform ?? 'other'
-                        const colors = PLATFORM_COLORS[platform] ?? PLATFORM_COLORS.other
+                        const colors = PLATFORM_COLORS[ev.meeting_platform ?? 'other']
                         return (
                           <div
                             key={ev.event_id}
                             className={`
-                              rounded px-1 py-0.5 text-[10px] font-medium truncate leading-tight
-                              ${colors.bg} ${colors.text} border ${colors.border}
+                              rounded px-1 py-0.5 leading-tight truncate
+                              text-[10px] font-medium border
+                              ${colors.bg} ${colors.text} ${colors.border}
                             `}
                             title={ev.title}
                           >
-                            {formatTime(ev.start_time)} {ev.title}
+                            {/* Show time only on lg+ to avoid overflow */}
+                            <span className="hidden lg:inline">{formatTime(ev.start_time)} </span>
+                            {ev.title}
                           </div>
                         )
                       })}
                       {dayEvents.length > 3 && (
                         <div className="text-[10px] text-[#999999] font-medium pl-1">
-                          +{dayEvents.length - 3} mais
+                          +{dayEvents.length - 3}
                         </div>
                       )}
                     </div>
@@ -296,37 +320,37 @@ export function CalendarPage() {
             </div>
           </div>
 
-          {/* ── Painel lateral do dia selecionado ── */}
+          {/* ── Painel do dia selecionado ── */}
           {selectedDay && (
-            <div className="bg-white border border-[#E0E0E0] rounded-2xl shadow-sm overflow-hidden self-start">
+            <div className="bg-white border border-[#E0E0E0] rounded-2xl shadow-sm overflow-hidden lg:self-start">
               {/* Cabeçalho */}
               <div className="px-4 py-3 border-b border-[#F0F0F0] flex items-center justify-between">
                 <div>
                   <p className="text-xs font-semibold text-[#999999] uppercase tracking-wider">
-                    {WEEKDAYS[selectedDay.getDay()]}
+                    {WEEKDAYS_FULL[selectedDay.getDay()]}
                   </p>
-                  <p className="text-lg font-bold text-[#333333]">
+                  <p className="text-base sm:text-lg font-bold text-[#333333]">
                     {selectedDay.getDate()} de {MONTHS[selectedDay.getMonth()]}
                   </p>
                 </div>
                 <button
                   onClick={() => setSelectedDay(null)}
-                  className="text-[#BBBBBB] hover:text-[#666666] transition text-lg leading-none"
+                  className="w-7 h-7 flex items-center justify-center rounded-lg text-[#BBBBBB] hover:text-[#666666] hover:bg-[#F5F5F5] transition"
                 >
-                  ×
+                  <X size={14} />
                 </button>
               </div>
 
               {/* Lista de eventos */}
-              <div className="divide-y divide-[#F5F5F5] max-h-[520px] overflow-y-auto">
+              <div className="divide-y divide-[#F5F5F5] max-h-64 sm:max-h-96 lg:max-h-[calc(100vh-260px)] overflow-y-auto">
                 {selectedDayEvents.length === 0 ? (
-                  <div className="flex flex-col items-center py-12 gap-2">
-                    <Calendar size={24} className="text-[#CCCCCC]" />
+                  <div className="flex flex-col items-center py-10 gap-2">
+                    <Calendar size={22} className="text-[#CCCCCC]" />
                     <p className="text-sm text-[#999999]">Nenhum evento</p>
                   </div>
                 ) : selectedDayEvents.map(ev => {
                   const platform = ev.meeting_platform ?? 'other'
-                  const colors = PLATFORM_COLORS[platform] ?? PLATFORM_COLORS.other
+                  const colors = PLATFORM_COLORS[platform]
                   return (
                     <div key={ev.event_id} className="px-4 py-3 space-y-1.5">
                       <div className="flex items-start justify-between gap-2">
@@ -345,7 +369,7 @@ export function CalendarPage() {
                           </a>
                         )}
                       </div>
-                      <div className="flex items-center gap-2 flex-wrap">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         <span className="text-xs text-[#666666]">
                           {formatTime(ev.start_time)} – {formatTime(ev.end_time)}
                         </span>
@@ -357,7 +381,7 @@ export function CalendarPage() {
                         )}
                         {ev.bot_scheduled && (
                           <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-[#2D5A27]/10 text-[#2D5A27] border border-[#2D5A27]/20">
-                            🤖 Bot agendado
+                            🤖 Bot
                           </span>
                         )}
                         {ev.status === 'tentative' && (
@@ -374,19 +398,19 @@ export function CalendarPage() {
           )}
         </div>
 
-        {/* Legenda */}
-        <div className="flex items-center gap-4 px-1">
+        {/* ── Legenda ── */}
+        <div className="flex items-center gap-3 sm:gap-4 px-1 flex-wrap">
           {Object.entries(PLATFORM_LABELS).map(([key, label]) => {
             const colors = PLATFORM_COLORS[key]
             return (
               <div key={key} className="flex items-center gap-1.5">
-                <div className={`w-3 h-3 rounded-sm border ${colors.bg} ${colors.border}`} />
+                <div className={`w-2.5 h-2.5 rounded-sm border ${colors.bg} ${colors.border}`} />
                 <span className="text-xs text-[#999999]">{label}</span>
               </div>
             )
           })}
           <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded-sm bg-[#F5F5F5] border border-[#E0E0E0]" />
+            <div className="w-2.5 h-2.5 rounded-sm bg-[#F5F5F5] border border-[#E0E0E0]" />
             <span className="text-xs text-[#999999]">Sem link</span>
           </div>
         </div>
