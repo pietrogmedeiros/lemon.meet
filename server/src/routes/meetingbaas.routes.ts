@@ -66,30 +66,80 @@ async function handleStatusChange(data: { bot_id: string; status: { code: string
   const meetingStatus = statusMap[code]
   if (!meetingStatus) return // ignora joining_call, in_waiting_room, etc.
 
-  const { error } = await supabase
+  // Tenta atualizar pelo bot_id — funciona para bots manuais (extensão)
+  const { error, count } = await supabase
     .from('meetings')
-    .update({ status: meetingStatus })
+    .update({ status: meetingStatus, baas_bot_id: bot_id })
     .eq('baas_bot_id', bot_id)
+    .select('id', { count: 'exact', head: true })
 
   if (error) {
     logger.error(`[MeetingBaas] Erro ao atualizar status para bot ${bot_id}:`, error)
-  } else {
+    return
+  }
+
+  if ((count ?? 0) > 0) {
     logger.info(`[MeetingBaas] Status → ${meetingStatus} (bot ${bot_id})`)
+    return
+  }
+
+  // Fallback: bots agendados via calendário — busca o event_uuid no MeetingBaas
+  try {
+    const metaRes = await fetch(
+      `https://api.meetingbaas.com/bots/meeting_data?bot_id=${encodeURIComponent(bot_id)}&include_transcripts=false`,
+      { headers: { 'x-meeting-baas-api-key': process.env.MEETINGBAAS_API_KEY! } }
+    )
+    if (!metaRes.ok) return
+
+    const meta = await metaRes.json() as any
+    const eventUuid: string | undefined = meta?.bot_data?.event_uuid
+    if (!eventUuid) return
+
+    const { error: calError, count: calCount } = await supabase
+      .from('meetings')
+      .update({ status: meetingStatus, baas_bot_id: bot_id })
+      .eq('baas_event_uuid', eventUuid)
+      .is('baas_bot_id', null)
+      .select('id', { count: 'exact', head: true })
+
+    if (calError) {
+      logger.error(`[MeetingBaas] Erro ao atualizar status via event_uuid ${eventUuid}:`, calError)
+    } else {
+      logger.info(`[MeetingBaas] Status → ${meetingStatus} (bot ${bot_id}, event ${eventUuid}, rows=${calCount})`)
+    }
+  } catch (err) {
+    logger.error(`[MeetingBaas] Erro ao buscar event_uuid para bot ${bot_id}:`, err)
   }
 }
 
-async function handleComplete(data: BaasCompletePayload) {
-  const { bot_id, transcript } = data
+async function handleComplete(data: BaasCompletePayload & { event_uuid?: string }) {
+  const { bot_id, transcript, event_uuid } = data
 
-  // Busca a reunião pelo bot_id (sem RLS — usa service role)
-  const { data: meeting, error: fetchError } = await supabase
+  // Busca a reunião pelo bot_id (bots manuais) ou event_uuid (bots de calendário)
+  let meeting: any = null
+  const { data: byBotId } = await supabase
     .from('meetings')
     .select('*')
     .eq('baas_bot_id', bot_id)
-    .single()
+    .maybeSingle()
 
-  if (fetchError || !meeting) {
-    logger.error(`[MeetingBaas] Reunião não encontrada para bot_id ${bot_id}`)
+  meeting = byBotId
+
+  if (!meeting && event_uuid) {
+    const { data: byEvent } = await supabase
+      .from('meetings')
+      .select('*')
+      .eq('baas_event_uuid', event_uuid)
+      .maybeSingle()
+    meeting = byEvent
+    // Garante que baas_bot_id fica preenchido para próximas buscas
+    if (meeting) {
+      await supabase.from('meetings').update({ baas_bot_id: bot_id }).eq('id', meeting.id)
+    }
+  }
+
+  if (!meeting) {
+    logger.error(`[MeetingBaas] Reunião não encontrada para bot_id ${bot_id} event_uuid ${event_uuid ?? 'n/a'}`)
     return
   }
 
@@ -152,14 +202,22 @@ async function handleComplete(data: BaasCompletePayload) {
   }
 }
 
-async function handleFailed(data: { bot_id: string; error: string }) {
-  const { bot_id, error } = data
+async function handleFailed(data: { bot_id: string; error: string; event_uuid?: string }) {
+  const { bot_id, error, event_uuid } = data
   logger.warn(`[MeetingBaas] Bot ${bot_id} falhou: ${error}`)
 
-  await supabase
+  const { count } = await supabase
     .from('meetings')
     .update({ status: 'failed' })
     .eq('baas_bot_id', bot_id)
+    .select('id', { count: 'exact', head: true })
+
+  if ((count ?? 0) === 0 && event_uuid) {
+    await supabase
+      .from('meetings')
+      .update({ status: 'failed', baas_bot_id: bot_id })
+      .eq('baas_event_uuid', event_uuid)
+  }
 }
 
 // ── Calendar: processa eventos alterados no calendário ────────
@@ -192,9 +250,9 @@ async function handleCalendarSyncEvents(data: {
 
   for (const eventUuid of eventUuids) {
     try {
-      // Busca detalhes do evento no MeetingBaas
+      // Busca detalhes do evento no MeetingBaas — endpoint correto: /calendar_events/{uuid}
       const res = await fetch(
-        `https://api.meetingbaas.com/calendars/${calendar_id}/events/${eventUuid}`,
+        `https://api.meetingbaas.com/calendar_events/${eventUuid}`,
         { headers: { 'x-meeting-baas-api-key': process.env.MEETINGBAAS_API_KEY! } }
       )
 
@@ -207,8 +265,8 @@ async function handleCalendarSyncEvents(data: {
       const event = await res.json() as any
       const meetingUrl: string | undefined = event.meeting_url
 
-      // Ignora eventos sem link de reunião ou já no passado
-      if (!meetingUrl) continue
+      // Ignora eventos sem link de reunião, deletados ou já no passado
+      if (!meetingUrl || event.deleted) continue
       const startTime = event.start_time ? new Date(event.start_time) : null
       if (startTime && startTime < new Date()) continue
 
@@ -225,9 +283,9 @@ async function handleCalendarSyncEvents(data: {
         continue
       }
 
-      // Agenda a gravação via MeetingBaas para este evento específico
+      // Agenda o bot via MeetingBaas — endpoint correto: POST /calendar_events/{uuid}/bot
       const scheduleRes = await fetch(
-        `https://api.meetingbaas.com/calendars/${calendar_id}/events/${eventUuid}/record`,
+        `https://api.meetingbaas.com/calendar_events/${eventUuid}/bot`,
         {
           method: 'POST',
           headers: {
@@ -237,25 +295,26 @@ async function handleCalendarSyncEvents(data: {
           body: JSON.stringify({
             bot_name: 'Lemon Notetaker',
             recording_mode: 'audio_only',
-            include_transcription: true,
+            speech_to_text: { provider: 'Default' },
+            webhook_url: `${process.env.SERVER_URL ?? 'https://vibe-aiserver-production.up.railway.app'}/api/meetingbaas/webhook`,
+            waiting_room_timeout: 600,
           }),
         }
       )
 
+      const scheduleBody = await scheduleRes.json() as any
       if (!scheduleRes.ok) {
-        logger.warn(`[Calendar] Falha ao agendar gravação para evento ${eventUuid}`)
+        logger.warn(`[Calendar] Falha ao agendar bot para evento ${eventUuid}: ${JSON.stringify(scheduleBody)}`)
         continue
       }
 
-      const scheduleData = await scheduleRes.json() as any
-      const baasBotId: string | undefined = scheduleData.bot_id
-        ? String(scheduleData.bot_id)
-        : undefined
+      // Resposta é um array de eventos atualizados; o bot não tem bot_id até entrar na reunião
+      const updatedEvent = Array.isArray(scheduleBody) ? scheduleBody[0] : scheduleBody
 
       // Cria registro da reunião no banco para rastreamento
       const { randomUUID } = await import('crypto')
       const meetingId = randomUUID()
-      const title = event.title ?? event.summary ?? 'Reunião do Calendário'
+      const title = event.name ?? event.title ?? 'Reunião do Calendário'
       const platform = meetingUrl.includes('meet.google.com') ? 'google_meet'
         : meetingUrl.includes('zoom.us') ? 'zoom' : 'teams'
 
@@ -267,12 +326,12 @@ async function handleCalendarSyncEvents(data: {
         platform,
         source: 'calendar',
         status: 'requesting',
-        baas_bot_id: baasBotId ?? null,
+        baas_bot_id: null, // preenchido pelo webhook bot.status_change quando o bot entrar
         baas_event_uuid: eventUuid,
         started_at: startTime?.toISOString() ?? new Date().toISOString(),
       })
 
-      logger.info(`[Calendar] Gravação agendada: evento=${eventUuid} meeting=${meetingId} title="${title}"`)
+      logger.info(`[Calendar] Bot agendado: evento=${eventUuid} meeting=${meetingId} title="${title}" start=${startTime?.toISOString()}`)
     } catch (err) {
       logger.error(`[Calendar] Erro ao processar evento ${eventUuid}:`, err)
     }
