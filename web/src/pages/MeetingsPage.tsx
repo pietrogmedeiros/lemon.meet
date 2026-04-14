@@ -50,6 +50,7 @@ export function MeetingsPage() {
     { value: 'completed',  label: 'Concluída' },
     { value: 'processing', label: 'Processando' },
     { value: 'recording',  label: 'Gravando' },
+    { value: 'requesting', label: 'Solicitando' },
   ];
 
   const uniqueUsers = useMemo(() => {

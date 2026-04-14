@@ -34,13 +34,24 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
     const userMap = new Map<string, { name: string; avatar_url: string | null }>();
     await Promise.all(
       uniqueUserIds.map(async (uid) => {
-        const { data } = await supabase.auth.admin.getUserById(uid);
-        const name = data.user?.user_metadata?.full_name
-          ?? data.user?.user_metadata?.name
-          ?? data.user?.email
-          ?? uid;
-        const avatar_url = data.user?.user_metadata?.avatar_url ?? null;
-        userMap.set(uid, { name, avatar_url });
+        try {
+          const { data, error } = await supabase.auth.admin.getUserById(uid);
+          if (error || !data?.user) {
+            userMap.set(uid, { name: uid, avatar_url: null });
+            return;
+          }
+          const u = data.user;
+          const name = u.user_metadata?.full_name
+            ?? u.user_metadata?.name
+            ?? u.email
+            ?? uid;
+          const avatar_url = u.user_metadata?.avatar_url
+            ?? u.user_metadata?.picture
+            ?? null;
+          userMap.set(uid, { name, avatar_url });
+        } catch {
+          userMap.set(uid, { name: uid, avatar_url: null });
+        }
       })
     );
 
