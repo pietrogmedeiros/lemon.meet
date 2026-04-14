@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { MainLayout } from '@/components/layout';
 import { Card, Badge } from '@/components/ui';
-import { Video, Clock, Calendar, TrendingUp, CheckCircle, Loader } from 'lucide-react';
+import { Video, Clock, Calendar, TrendingUp, CheckCircle, Loader, ExternalLink } from 'lucide-react';
 import { formatDate } from '@/lib';
 import { fetchMeetings as fetchMeetingsCache, type Meeting } from '@/lib/meetingsCache';
 
@@ -49,6 +49,15 @@ export function DashboardPage() {
     processando: meetings.filter(m => m.status === 'processing' || m.status === 'recording').length,
   };
 
+  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+  const todayEnd   = new Date(); todayEnd.setHours(23, 59, 59, 999);
+  const todayMeetings = meetings
+    .filter(m => {
+      const ts = m.started_at ? new Date(m.started_at) : null;
+      return ts && ts >= todayStart && ts <= todayEnd;
+    })
+    .sort((a, b) => new Date(a.started_at!).getTime() - new Date(b.started_at!).getTime());
+
   return (
     <MainLayout>
       <div className="space-y-6">
@@ -89,6 +98,48 @@ export function DashboardPage() {
           </Card>
         </div>
 
+        {/* Reuniões de Hoje */}
+        {todayMeetings.length > 0 && (
+          <Card>
+            <div className="border-b border-neutral-light dark:border-gray-700 p-6">
+              <h2 className="text-headline-2 text-primary">Hoje</h2>
+            </div>
+            <div className="divide-y divide-neutral-light dark:divide-gray-700">
+              {todayMeetings.map(meeting => (
+                <div key={meeting.id} className="flex items-center justify-between p-4 gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span
+                        onClick={() => navigate(`/meetings/${meeting.id}`)}
+                        className="cursor-pointer font-medium text-primary hover:underline truncate"
+                      >
+                        {meeting.title || 'Reunião sem título'}
+                      </span>
+                      {getStatusBadge(meeting.status)}
+                    </div>
+                    {meeting.started_at && (
+                      <p className="mt-0.5 text-body-small text-secondary">
+                        {new Date(meeting.started_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    )}
+                  </div>
+                  {meeting.meet_link && (
+                    <a
+                      href={meeting.meet_link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-body-small font-medium text-white hover:bg-primary/90 transition-colors shrink-0"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" />
+                      Entrar
+                    </a>
+                  )}
+                </div>
+              ))}
+            </div>
+          </Card>
+        )}
+
         <Card>
           <div className="border-b border-neutral-light dark:border-gray-700 p-6">
             <h2 className="text-headline-2 text-primary">Reuniões Recentes</h2>
@@ -116,7 +167,7 @@ export function DashboardPage() {
                     <div className="flex-1">
                       <div className="flex items-center gap-3">
                         <h3 className="text-headline-2 text-primary">
-                          {meeting.title || meeting.meet_link || 'Reunião sem título'}
+                          {meeting.title || 'Reunião sem título'}
                         </h3>
                         {getStatusBadge(meeting.status)}
                       </div>
@@ -139,7 +190,21 @@ export function DashboardPage() {
                         </div>
                       </div>
                     </div>
-                    <TrendingUp className="h-5 w-5 text-neutral-mid" />
+                    <div className="flex items-center gap-2">
+                      {meeting.meet_link && (
+                        <a
+                          href={meeting.meet_link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={e => e.stopPropagation()}
+                          className="text-secondary hover:text-primary transition-colors"
+                          title="Abrir link da reunião"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                        </a>
+                      )}
+                      <TrendingUp className="h-5 w-5 text-neutral-mid" />
+                    </div>
                   </div>
                 </div>
               ))}

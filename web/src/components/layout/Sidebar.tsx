@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Home, Video, TrendingUp, LogOut, Settings, ChevronLeft, ChevronRight, Users, CreditCard, Plug, GraduationCap, FileText, Lock, HelpCircle } from 'lucide-react'
+import { Home, Video, TrendingUp, LogOut, Settings, ChevronLeft, ChevronRight, Users, CreditCard, Plug, GraduationCap, FileText, Lock, HelpCircle, CalendarClock } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth, useSubscription } from '@/contexts'
@@ -33,6 +33,7 @@ export function Sidebar() {
     {
       items: [
         { id: 'dashboard',    path: '/dashboard',    icon: Home,           label: t('nav.dashboard') },
+        { id: 'upcoming',     path: '/upcoming',     icon: CalendarClock,  label: 'Próximas' },
         { id: 'meetings',     path: '/meetings',     icon: Video,          label: t('nav.meetings') },
         { id: 'insights',     path: '/insights',     icon: TrendingUp,     label: t('nav.insights') },
         { id: 'coaching',     path: '/coaching',     icon: GraduationCap,  label: 'Coaching' },

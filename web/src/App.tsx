@@ -17,6 +17,7 @@ const CheckoutPage            = lazy(() => import('@/pages/CheckoutPage').then(m
 const IntegrationsPage        = lazy(() => import('@/pages/IntegrationsPage').then(m => ({ default: m.IntegrationsPage })))
 const CoachingPage            = lazy(() => import('@/pages/CoachingPage').then(m => ({ default: m.CoachingPage })))
 const RelatorioPage           = lazy(() => import('@/pages/RelatorioPage').then(m => ({ default: m.RelatorioPage })))
+const UpcomingMeetingsPage    = lazy(() => import('@/pages/UpcomingMeetingsPage').then(m => ({ default: m.UpcomingMeetingsPage })))
 
 function App() {
   return (
@@ -108,6 +109,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <IntegrationsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/upcoming"
+            element={
+              <ProtectedRoute>
+                <UpcomingMeetingsPage />
               </ProtectedRoute>
             }
           />

@@ -1,6 +1,7 @@
 import { ReactNode } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '@/contexts'
+import { useMeetingReminders } from '@/lib/useMeetingReminders'
 
 interface ProtectedRouteProps {
   children: ReactNode
@@ -8,6 +9,7 @@ interface ProtectedRouteProps {
 
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const { user, loading } = useAuth()
+  useMeetingReminders()
 
   if (loading) {
     return (
