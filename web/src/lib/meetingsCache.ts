@@ -23,6 +23,9 @@ export interface Meeting {
   duration_seconds: number | null
   insights?: unknown
   created_at: string
+  user_id?: string | null
+  user_name?: string | null
+  user_avatar_url?: string | null
 }
 
 let cache: CacheEntry | null = null

@@ -29,9 +29,30 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
       });
     }
 
+    // Enriquece com nome e avatar de cada membro
+    const uniqueUserIds = [...new Set((meetings ?? []).map(m => m.user_id).filter(Boolean))];
+    const userMap = new Map<string, { name: string; avatar_url: string | null }>();
+    await Promise.all(
+      uniqueUserIds.map(async (uid) => {
+        const { data } = await supabase.auth.admin.getUserById(uid);
+        const name = data.user?.user_metadata?.full_name
+          ?? data.user?.user_metadata?.name
+          ?? data.user?.email
+          ?? uid;
+        const avatar_url = data.user?.user_metadata?.avatar_url ?? null;
+        userMap.set(uid, { name, avatar_url });
+      })
+    );
+
+    const enriched = (meetings ?? []).map(m => ({
+      ...m,
+      user_name: userMap.get(m.user_id)?.name ?? m.user_id,
+      user_avatar_url: userMap.get(m.user_id)?.avatar_url ?? null,
+    }));
+
     return res.json({
       success: true,
-      meetings: meetings || []
+      meetings: enriched
     });
 
   } catch (error) {

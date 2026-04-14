@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { MainLayout } from '@/components/layout';
 import { Card, Badge } from '@/components/ui';
-import { Video, Clock, Calendar, ChevronRight, Search, X } from 'lucide-react';
+import { Video, Clock, Calendar, ChevronRight, Search, X, User } from 'lucide-react';
 import { formatDate, formatTime } from '@/lib';
 import { fetchMeetings as fetchMeetingsCache, type Meeting } from '@/lib/meetingsCache';
 
@@ -14,6 +14,7 @@ export function MeetingsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [userFilter, setUserFilter] = useState<string>('all');
 
   useEffect(() => {
     const load = async () => {
@@ -51,6 +52,19 @@ export function MeetingsPage() {
     { value: 'recording',  label: 'Gravando' },
   ];
 
+  const uniqueUsers = useMemo(() => {
+    const map = new Map<string, { name: string; avatar_url: string | null }>();
+    meetings.forEach(m => {
+      if (m.user_id && !map.has(m.user_id)) {
+        map.set(m.user_id, {
+          name: m.user_name ?? m.user_id,
+          avatar_url: m.user_avatar_url ?? null,
+        });
+      }
+    });
+    return Array.from(map.entries()).map(([id, info]) => ({ id, ...info }));
+  }, [meetings]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return meetings.filter(m => {
@@ -59,9 +73,10 @@ export function MeetingsPage() {
         (m.meet_link ?? '').toLowerCase().includes(q) ||
         (m.platform ?? '').toLowerCase().includes(q);
       const matchesStatus = statusFilter === 'all' || m.status === statusFilter;
-      return matchesSearch && matchesStatus;
+      const matchesUser = userFilter === 'all' || m.user_id === userFilter;
+      return matchesSearch && matchesStatus && matchesUser;
     });
-  }, [meetings, search, statusFilter]);
+  }, [meetings, search, statusFilter, userFilter]);
 
   return (
     <MainLayout>
@@ -113,6 +128,42 @@ export function MeetingsPage() {
               ))}
             </div>
           </div>
+
+          {/* Filtro por usuário (só aparece se houver mais de 1 usuário) */}
+          {uniqueUsers.length > 1 && (
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                onClick={() => setUserFilter('all')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition ${
+                  userFilter === 'all'
+                    ? 'bg-[#2D5A27] text-white border-[#2D5A27]'
+                    : 'bg-white text-[#666666] border-[#E0E0E0] hover:border-[#2D5A27] hover:text-[#2D5A27]'
+                }`}
+              >
+                Todos os usuários
+              </button>
+              {uniqueUsers.map(u => (
+                <button
+                  key={u.id}
+                  onClick={() => setUserFilter(u.id)}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold border transition ${
+                    userFilter === u.id
+                      ? 'bg-[#2D5A27] text-white border-[#2D5A27]'
+                      : 'bg-white text-[#666666] border-[#E0E0E0] hover:border-[#2D5A27] hover:text-[#2D5A27]'
+                  }`}
+                >
+                  {u.avatar_url ? (
+                    <img src={u.avatar_url} alt={u.name} className="w-4 h-4 rounded-full object-cover flex-shrink-0" referrerPolicy="no-referrer" />
+                  ) : (
+                    <div className="w-4 h-4 rounded-full bg-current/20 flex items-center justify-center flex-shrink-0">
+                      <User className="w-2.5 h-2.5" />
+                    </div>
+                  )}
+                  {u.name}
+                </button>
+              ))}
+            </div>
+          )}
         )}
 
         {isLoading ? (
@@ -148,7 +199,25 @@ export function MeetingsPage() {
                       {meeting.title || meeting.meet_link || 'Reunião sem título'}
                     </h3>
                   </div>
-                  <ChevronRight className="h-4 w-4 text-neutral-mid group-hover:text-primary transition-colors flex-shrink-0 mt-0.5" />
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {uniqueUsers.length > 1 && (
+                      <div title={meeting.user_name ?? undefined}>
+                        {meeting.user_avatar_url ? (
+                          <img
+                            src={meeting.user_avatar_url}
+                            alt={meeting.user_name ?? 'Usuário'}
+                            className="w-6 h-6 rounded-full object-cover ring-1 ring-neutral-light"
+                            referrerPolicy="no-referrer"
+                          />
+                        ) : (
+                          <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center ring-1 ring-neutral-light">
+                            <User className="w-3.5 h-3.5 text-primary" />
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    <ChevronRight className="h-4 w-4 text-neutral-mid group-hover:text-primary transition-colors" />
+                  </div>
                 </div>
 
                 <div className="mb-3">{getStatusBadge(meeting.status)}</div>
