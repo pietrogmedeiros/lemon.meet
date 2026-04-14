@@ -95,11 +95,13 @@ export function IntegrationsPage() {
 
   const handleConnectCalendar = async () => {
     const headers = await getAuthHeader();
-    // Redireciona para o servidor que inicia o OAuth
-    const res = await fetch(`${apiUrl}/api/calendar/connect`, { headers, redirect: 'manual' });
-    // O servidor retorna 302 → seguimos o redirect manualmente
-    const location = res.headers.get('location') || res.url;
-    if (location) window.location.href = location;
+    const res = await fetch(`${apiUrl}/api/calendar/connect`, { headers });
+    if (!res.ok) {
+      setCalendarMessage({ type: 'error', text: 'Erro ao iniciar conexão. Tente novamente.' });
+      return;
+    }
+    const { url } = await res.json();
+    if (url) window.location.href = url;
   };
 
   const handleDisconnectCalendar = async () => {

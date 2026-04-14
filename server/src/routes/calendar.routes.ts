@@ -49,7 +49,9 @@ router.get('/connect', authMiddleware, async (req: AuthRequest, res: Response) =
     state,
   })
 
-  return res.redirect(`${GOOGLE_AUTH_URL}?${params}`)
+  // Retorna a URL em vez de redirecionar — o frontend não consegue
+  // ler o header Location de uma resposta 302 via fetch() por CORS
+  return res.json({ url: `${GOOGLE_AUTH_URL}?${params}` })
 })
 
 // ── GET /api/calendar/oauth/callback ─────────────────────────
