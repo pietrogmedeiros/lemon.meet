@@ -258,16 +258,19 @@ async function handleCalendarSyncEvents(data: Record<string, any>) {
   }
 
   const instancesWithSeries: Array<EventInstance & { series_id?: string }> = []
-  const eventGroups: EventGroup[] = data.events ?? []
+
+  // calendar.events_synced → data.events[] contém os grupos
+  // calendar.event_created/updated → data já é o grupo (sem wrapper events[])
+  const eventGroups: EventGroup[] = Array.isArray(data.events)
+    ? data.events
+    : (data.instances ? [data] : [])
 
   for (const group of eventGroups) {
     if (Array.isArray(group.instances)) {
-      // Evento recorrente: tem array de instances
       for (const inst of group.instances) {
         instancesWithSeries.push({ ...inst, series_id: group.series_id })
       }
     } else if (group.event_id) {
-      // Evento avulso: o próprio grupo é a instância
       instancesWithSeries.push({ ...(group as EventInstance), series_id: group.series_id })
     }
   }
