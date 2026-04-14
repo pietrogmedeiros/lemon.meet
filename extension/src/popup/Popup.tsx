@@ -84,65 +84,30 @@ function DashboardView({
 }) {
   function handleToggle() {
     if (state === 'idle') {
-      // O popup foi aberto pelo usuário na aba do Meet → tem activeTab
-      // Obtemos o streamId aqui (popup tem permissão, service worker não)
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         const tab = tabs[0]
-        if (!tab?.id) {
-          // Tenta encontrar aba do Meet em qualquer janela
-          chrome.tabs.query({}, (allTabs) => {
-            const meetTab = allTabs.find(t => t.url?.includes('meet.google.com'))
-            if (!meetTab?.id) {
-              alert('Abra o popup estando na aba do Google Meet.')
-              return
-            }
-            captureTab(meetTab.id)
-          })
+        if (tab?.id) {
+          chrome.runtime.sendMessage({ type: 'START_RECORDING', tabId: tab.id })
           return
         }
-        captureTab(tab.id)
+        // Fallback: procura aba de reunião em qualquer janela
+        chrome.tabs.query({}, (allTabs) => {
+          const meetTab = allTabs.find(t =>
+            t.url?.includes('meet.google.com') ||
+            t.url?.includes('zoom.us') ||
+            t.url?.includes('teams.microsoft.com') ||
+            t.url?.includes('teams.live.com')
+          )
+          if (!meetTab?.id) {
+            alert('Abra o popup estando na aba da reunião.')
+            return
+          }
+          chrome.runtime.sendMessage({ type: 'START_RECORDING', tabId: meetTab.id })
+        })
       })
     } else if (state === 'recording') {
       chrome.runtime.sendMessage({ type: 'STOP_RECORDING' })
     }
-  }
-
-  async function captureTab(tabId: number) {
-    // Verifica se microfone já está autorizado
-    const micStatus = await navigator.permissions.query({ name: 'microphone' as PermissionName })
-
-    if (micStatus.state !== 'granted') {
-      // O popup fecha ao perder foco assim que abre outra janela, destruindo
-      // qualquer Promise em andamento. Solução: obter o streamId AGORA enquanto
-      // o popup ainda tem foco (permissão activeTab), salvar no storage, e
-      // deixar a página request-mic.html disparar o START_RECORDING após obter
-      // a permissão de microfone.
-      chrome.tabCapture.getMediaStreamId({ targetTabId: tabId }, async (streamId) => {
-        if (chrome.runtime.lastError || !streamId) {
-          alert('Erro ao capturar áudio: ' + (chrome.runtime.lastError?.message ?? 'sem streamId'))
-          return
-        }
-        await chrome.storage.local.set({ pendingCapture: { tabId, streamId } })
-        chrome.windows.create({
-          url: chrome.runtime.getURL('request-mic.html'),
-          type: 'popup',
-          width: 440,
-          height: 320,
-          focused: true,
-        })
-        // O popup pode fechar aqui — request-mic.html cuida do resto
-      })
-      return
-    }
-
-    // Microfone já autorizado — fluxo normal
-    chrome.tabCapture.getMediaStreamId({ targetTabId: tabId }, (streamId) => {
-      if (chrome.runtime.lastError || !streamId) {
-        alert('Erro ao capturar áudio: ' + (chrome.runtime.lastError?.message ?? 'sem streamId'))
-        return
-      }
-      chrome.runtime.sendMessage({ type: 'START_RECORDING', tabId, streamId })
-    })
   }
 
   const isRecording = state === 'recording'

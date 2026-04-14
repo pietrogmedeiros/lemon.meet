@@ -9,34 +9,17 @@
 
 import { Router, type Response } from 'express'
 import type express from 'express'
-import multer from 'multer'
-import * as fs from 'fs'
-import * as path from 'path'
 import { randomUUID } from 'crypto'
 import { authMiddleware, type AuthRequest } from '../middleware/auth.middleware.js'
 import { supabase } from '../config/supabase.js'
 import { logger } from '../utils/logger.js'
-import { transcriptionService } from '../services/TranscriptionService.js'
-import { insightsService } from '../services/InsightsService.js'
-import { fireWebhookForMeeting } from './integrations.routes.js'
+import { meetingBaasService } from '../services/MeetingBaasService.js'
 
 const router: express.Router = Router()
 
-// Multer: salva chunks em disco temporário
-const upload = multer({
-  dest: path.join(process.cwd(), 'temp', 'chunks'),
-  limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB por chunk
-  fileFilter: (_req, file, cb) => {
-    if (file.mimetype.startsWith('audio/')) {
-      cb(null, true)
-    } else {
-      cb(new Error('Only audio files are accepted'))
-    }
-  },
-})
-
 // ── POST /api/meetings/start ──────────────────────────────────
-// Criado pela extensão quando o usuário clica em "iniciar gravação"
+// Extensão chama este endpoint ao iniciar a gravação.
+// O servidor cria a reunião no banco e envia o bot via MeetingBaas.
 router.post('/start', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const { meetLink, title, platform } = req.body
@@ -55,7 +38,7 @@ router.post('/start', authMiddleware, async (req: AuthRequest, res: Response) =>
       title: title ?? null,
       platform: platform ?? 'google_meet',
       source: 'extension',
-      status: 'recording',
+      status: 'requesting',
       started_at: new Date().toISOString(),
     })
 
@@ -64,8 +47,19 @@ router.post('/start', authMiddleware, async (req: AuthRequest, res: Response) =>
       return res.status(500).json({ success: false, message: 'Error creating meeting' })
     }
 
-    logger.info(`Meeting started via extension: ${meetingId} by user ${userId}`)
+    // Envia o bot para a reunião via MeetingBaas
+    let baasBotId: string
+    try {
+      baasBotId = await meetingBaasService.sendBot(meetLink, meetingId)
+    } catch (err) {
+      logger.error('Error sending MeetingBaas bot:', err)
+      await supabase.from('meetings').update({ status: 'failed' }).eq('id', meetingId)
+      return res.status(502).json({ success: false, message: 'Failed to send bot to meeting' })
+    }
 
+    await supabase.from('meetings').update({ baas_bot_id: baasBotId }).eq('id', meetingId)
+
+    logger.info(`Meeting started via MeetingBaas: ${meetingId} bot=${baasBotId} user=${userId}`)
     return res.status(201).json({ success: true, meetingId })
   } catch (err) {
     logger.error('Unexpected error in POST /meetings/start:', err)
@@ -73,80 +67,10 @@ router.post('/start', authMiddleware, async (req: AuthRequest, res: Response) =>
   }
 })
 
-// ── POST /api/meetings/:id/chunk ──────────────────────────────
-// Recebe um chunk de áudio WebM da extensão e transcreve em background
-router.post(
-  '/:id/chunk',
-  authMiddleware,
-  upload.single('audio'),
-  async (req: AuthRequest, res: Response) => {
-    const { id } = req.params
-    const userId = req.user!.id
-    const chunkIndex = parseInt(req.body.chunkIndex ?? '0', 10)
 
-    if (!req.file) {
-      return res.status(400).json({ success: false, message: 'No audio file received' })
-    }
-
-    // Verifica ownership da reunião
-    const { data: meeting, error: fetchError } = await supabase
-      .from('meetings')
-      .select('id, status')
-      .eq('id', id)
-      .eq('user_id', userId)
-      .single()
-
-    if (fetchError || !meeting) {
-      fs.unlinkSync(req.file.path) // limpa arquivo órfão
-      return res.status(404).json({ success: false, message: 'Meeting not found' })
-    }
-
-    // Aceita o chunk imediatamente — transcrição acontece em background
-    res.json({ success: true, chunkIndex })
-
-    // Transcreve chunk em background
-    setImmediate(async () => {
-      const filePath = req.file!.path
-      try {
-        const segments = await transcriptionService.transcribeAudio(filePath)
-
-        if (segments.length === 0) return
-
-        // Cada chunk tem 15s. startSeconds/endSeconds são relativos ao início do chunk.
-        const CHUNK_SECONDS = 15
-        const offsetSeconds = chunkIndex * CHUNK_SECONDS
-
-        const rows = segments.map((seg, i) => ({
-          meeting_id: id,
-          text: seg.text.trim(),
-          start_seconds: offsetSeconds + (seg.startSeconds ?? 0),
-          end_seconds: offsetSeconds + (seg.endSeconds ?? (seg.startSeconds ?? 0) + (seg.duration ?? CHUNK_SECONDS)),
-          speaker: null,
-          sequence: chunkIndex * 1000 + i,
-          chunk_index: chunkIndex,
-        }))
-
-        const { error: insertError } = await supabase
-          .from('transcript_segments')
-          .insert(rows)
-
-        if (insertError) {
-          logger.error(`Error saving segments for meeting ${id}:`, insertError)
-        } else {
-          logger.info(`Saved ${rows.length} segments for meeting ${id} chunk ${chunkIndex}`)
-        }
-      } catch (err) {
-        logger.error(`Error transcribing chunk ${chunkIndex} for meeting ${id}:`, err)
-      } finally {
-        // Remove arquivo temporário
-        if (fs.existsSync(filePath)) fs.unlinkSync(filePath)
-      }
-    })
-  }
-)
 
 // ── POST /api/meetings/:id/stop ───────────────────────────────
-// Finaliza a reunião e dispara geração de insights
+// Remove o bot da reunião. O webhook do MeetingBaas processa o transcript.
 router.post('/:id/stop', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params
@@ -156,7 +80,7 @@ router.post('/:id/stop', authMiddleware, async (req: AuthRequest, res: Response)
     // Verifica ownership
     const { data: meeting, error: fetchError } = await supabase
       .from('meetings')
-      .select('*')
+      .select('id, baas_bot_id, status')
       .eq('id', id)
       .eq('user_id', userId)
       .single()
@@ -165,52 +89,27 @@ router.post('/:id/stop', authMiddleware, async (req: AuthRequest, res: Response)
       return res.status(404).json({ success: false, message: 'Meeting not found' })
     }
 
-    // Atualiza status e duração
+    // Remove o bot do MeetingBaas — isso dispara o webhook complete
+    if (meeting.baas_bot_id) {
+      try {
+        await meetingBaasService.removeBot(meeting.baas_bot_id)
+      } catch (err) {
+        logger.warn(`Could not remove bot ${meeting.baas_bot_id}:`, err)
+        // Continua mesmo se falhar — o bot pode já ter saído da reunião
+      }
+    }
+
     await supabase.from('meetings').update({
       status: 'processing',
       ended_at: new Date().toISOString(),
       duration_seconds: durationSeconds ?? null,
     }).eq('id', id)
 
-    res.json({ success: true, message: 'Meeting stopped, processing transcript' })
+    return res.json({ success: true, message: 'Meeting stopped' })
 
-    // Gera insights em background após reunião terminar
-    setImmediate(async () => {
-      try {
-        // Busca todos os segmentos em ordem
-        const { data: segments } = await supabase
-          .from('transcript_segments')
-          .select('text, sequence')
-          .eq('meeting_id', id)
-          .order('sequence', { ascending: true })
+    // Processamento do transcript acontece via webhook do MeetingBaas
+    // em /api/meetingbaas/webhook (meetingbaas.routes.ts)
 
-        if (!segments || segments.length === 0) {
-          await supabase.from('meetings').update({ status: 'completed' }).eq('id', id)
-          return
-        }
-
-        const fullTranscript = segments.map((s: any) => s.text).join(' ')
-
-        // Salva transcrição completa na coluna transcript
-        await supabase.from('meetings').update({ transcript: fullTranscript }).eq('id', id)
-
-        // Gera insights com GPT-4o
-        const insights = await insightsService.generateInsights(fullTranscript, id)
-
-        await supabase.from('meetings').update({
-          insights,
-          status: 'completed',
-        }).eq('id', id)
-
-        // Dispara webhook do usuário (se configurado e ativo)
-        await fireWebhookForMeeting(meeting.user_id, { ...meeting, id }, insights)
-
-        logger.info(`Meeting ${id} fully processed`)
-      } catch (err) {
-        logger.error(`Error processing meeting ${id} after stop:`, err)
-        await supabase.from('meetings').update({ status: 'error' }).eq('id', id)
-      }
-    })
   } catch (err) {
     logger.error('Unexpected error in POST /meetings/:id/stop:', err)
     return res.status(500).json({ success: false, message: 'Internal server error' })

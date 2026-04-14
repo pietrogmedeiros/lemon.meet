@@ -11,6 +11,8 @@ import teamsRouter from './routes/teams.routes.js'
 import subscriptionRouter, { stripeWebhookHandler } from './routes/subscription.routes.js'
 import integrationsRouter from './routes/integrations.routes.js'
 import coachingRouter from './routes/coaching.routes.js'
+import meetingBaasRouter from './routes/meetingbaas.routes.js'
+import calendarRouter from './routes/calendar.routes.js'
 
 // Load environment variables
 dotenv.config()
@@ -73,6 +75,8 @@ app.use('/api/teams', teamsRouter)
 app.use('/api/subscription', subscriptionRouter)
 app.use('/api/integrations', integrationsRouter)
 app.use('/api/coaching', coachingRouter)
+app.use('/api/meetingbaas', meetingBaasRouter)
+app.use('/api/calendar', calendarRouter)
 
 // 404 handler
 app.use((req, res) => {

@@ -29,13 +29,11 @@
   ],
 
   "permissions": [
-    "tabCapture",
     "storage",
     "tabs",
     "activeTab",
     "scripting",
-    "alarms",
-    "offscreen"
+    "alarms"
   ],
 
   "host_permissions": [

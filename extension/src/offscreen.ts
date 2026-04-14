@@ -1,8 +1,7 @@
-// ============================================================
-// offscreen.ts — Documento offscreen da extensão Lemon.meet
-// Responsável por gravar áudio via getUserMedia + MediaRecorder
-// Mistura tab audio (participantes remotos) + microfone (voz local)
-// ============================================================
+// offscreen.ts — Não utilizado após integração com MeetingBaas.
+// Mantido como entry point vazio para compatibilidade com o build (vite.config.ts).
+export {}
+
 
 const API_URL = 'https://vibe-aiserver-production.up.railway.app'
 
