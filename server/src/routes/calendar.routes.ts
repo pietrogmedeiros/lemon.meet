@@ -51,6 +51,8 @@ router.get('/connect', authMiddleware, async (req: AuthRequest, res: Response) =
 
   // Retorna a URL em vez de redirecionar — o frontend não consegue
   // ler o header Location de uma resposta 302 via fetch() por CORS
+  // Cache-Control: no-store evita que Express retorne 304 (ETag hit) para o mesmo user
+  res.set('Cache-Control', 'no-store')
   return res.json({ url: `${GOOGLE_AUTH_URL}?${params}` })
 })
 
@@ -101,9 +103,15 @@ router.get('/oauth/callback', async (req: Request, res: Response) => {
     })
 
     const tokenData = await tokenRes.json() as any
-    if (!tokenRes.ok || !tokenData.refresh_token) {
-      logger.error('[Calendar OAuth] Erro ao obter refresh_token:', tokenData)
+    logger.info(`[Calendar OAuth] Google token response status=${tokenRes.status} has_refresh=${!!tokenData.refresh_token} error=${tokenData.error ?? 'none'}`)
+    if (!tokenRes.ok) {
+      logger.error('[Calendar OAuth] Google recusou o code:', JSON.stringify(tokenData))
       return res.redirect(`${frontendUrl}/integrations?calendar=error`)
+    }
+    if (!tokenData.refresh_token) {
+      // Google não emite refresh_token para apps já autorizados — revogar em accounts.google.com e tentar de novo
+      logger.error('[Calendar OAuth] refresh_token ausente — o usuário deve revogar o acesso em accounts.google.com e tentar novamente')
+      return res.redirect(`${frontendUrl}/integrations?calendar=error&reason=no_refresh_token`)
     }
     refreshToken = tokenData.refresh_token
   } catch (err) {
@@ -129,8 +137,9 @@ router.get('/oauth/callback', async (req: Request, res: Response) => {
     })
 
     const baasData = await baasRes.json() as any
+    logger.info(`[Calendar OAuth] MeetingBaas response status=${baasRes.status} body=${JSON.stringify(baasData)}`)
     if (!baasRes.ok || !baasData.calendar?.uuid) {
-      logger.error('[Calendar OAuth] Erro ao registrar no MeetingBaas:', baasData)
+      logger.error('[Calendar OAuth] Erro ao registrar no MeetingBaas:', JSON.stringify(baasData))
       return res.redirect(`${frontendUrl}/integrations?calendar=error`)
     }
     baasCalendarId = baasData.calendar.uuid
