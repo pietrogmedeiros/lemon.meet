@@ -1,44 +1,45 @@
 import { useEffect, useState } from 'react'
-import { X, Chrome, MousePointerClick, Mic, StopCircle, ExternalLink } from 'lucide-react'
+import { X, Calendar, Bot, FileText, Lightbulb, ExternalLink } from 'lucide-react'
 
 const STORAGE_KEY = 'lemon_onboarding_seen'
 
 const steps = [
   {
-    icon: Chrome,
+    icon: Calendar,
     color: '#4285F4',
     bg: '#EBF3FF',
     number: '1',
-    title: 'Instale a extensão no Chrome',
-    description: 'Baixe e instale a extensão Lemon.meet gratuitamente na Chrome Web Store.',
+    title: 'Conecte seu Google Calendar',
+    description: 'Vá em Integrações → Permissões e conecte sua conta Google. O Lemon.meet vai ler seus eventos e preparar o bot automaticamente.',
     action: {
-      label: 'Instalar extensão',
-      href: 'https://chromewebstore.google.com/detail/lemonmeet/meedmcpknakneklnhabddnjkkiemjogd?authuser=0&hl=pt-BR',
+      label: 'Ir para Integrações',
+      href: '/integrations/permissions',
+      internal: true,
     },
   },
   {
-    icon: MousePointerClick,
+    icon: Bot,
     color: '#2D5A27',
     bg: '#F0F7EE',
     number: '2',
-    title: 'Entre na reunião e clique no botão verde',
-    description: 'Ao entrar no Google Meet, um botão verde 🍋 aparece na tela. Clique nele para começar a gravar.',
+    title: 'O bot entra sozinho na reunião',
+    description: 'Quando seu evento começar, o "Lemon Notetaker" entra automaticamente no Google Meet, Zoom ou Teams — sem você precisar fazer nada.',
   },
   {
-    icon: Mic,
+    icon: FileText,
     color: '#B8860B',
     bg: '#FFFBEA',
     number: '3',
-    title: 'Permita o acesso ao microfone',
-    description: 'Na primeira vez, o Chrome pedirá permissão para usar o microfone. Clique em "Permitir" para gravar sua voz junto com os participantes.',
+    title: 'Transcrição gerada automaticamente',
+    description: 'Após a reunião, a transcrição completa é processada com identificação de quem falou. Acesse tudo em "Reuniões".',
   },
   {
-    icon: StopCircle,
-    color: '#DC3545',
-    bg: '#FFF0F1',
+    icon: Lightbulb,
+    color: '#7C3AED',
+    bg: '#F5F0FF',
     number: '4',
-    title: 'Encerre a gravação',
-    description: 'Quando a reunião terminar, clique novamente no botão (agora vermelho) para parar. Os insights serão gerados automaticamente.',
+    title: 'Insights e resumo inteligente',
+    description: 'O Lemon.meet gera pontos-chave, itens de ação, sentimento da reunião e sugestões de follow-up — disponíveis em "Insights".',
   },
 ]
 
@@ -68,7 +69,7 @@ export function OnboardingModal({ open, onClose }: OnboardingModalProps) {
             </div>
             <div>
               <h2 className="text-[16px] font-bold text-[#1a1a1a] leading-tight">Como usar o Lemon.meet</h2>
-              <p className="text-[12px] text-[#888] mt-0.5">Siga os 4 passos abaixo para começar</p>
+              <p className="text-[12px] text-[#888] mt-0.5">4 passos para gravar reuniões automaticamente</p>
             </div>
           </div>
           <button
@@ -107,16 +108,28 @@ export function OnboardingModal({ open, onClose }: OnboardingModalProps) {
                   </div>
                   <p className="text-[13px] text-[#666] leading-relaxed">{step.description}</p>
                   {step.action && (
-                    <a
-                      href={step.action.href}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-1.5 mt-2.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-colors"
-                      style={{ background: step.bg, color: step.color }}
-                    >
-                      <ExternalLink size={12} />
-                      {step.action.label}
-                    </a>
+                    step.action.internal ? (
+                      <a
+                        href={step.action.href}
+                        onClick={onClose}
+                        className="inline-flex items-center gap-1.5 mt-2.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-colors"
+                        style={{ background: step.bg, color: step.color }}
+                      >
+                        <ExternalLink size={12} />
+                        {step.action.label}
+                      </a>
+                    ) : (
+                      <a
+                        href={step.action.href}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1.5 mt-2.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-colors"
+                        style={{ background: step.bg, color: step.color }}
+                      >
+                        <ExternalLink size={12} />
+                        {step.action.label}
+                      </a>
+                    )
                   )}
                 </div>
               </div>
