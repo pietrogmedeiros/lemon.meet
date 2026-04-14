@@ -121,19 +121,19 @@ router.get('/oauth/callback', async (req: Request, res: Response) => {
         'x-meeting-baas-api-key': process.env.MEETINGBAAS_API_KEY!,
       },
       body: JSON.stringify({
-        provider: 'google',
-        refresh_token: refreshToken,
-        client_id: clientId,
-        client_secret: clientSecret,
+        platform: 'Google',
+        oauth_refresh_token: refreshToken,
+        oauth_client_id: clientId,
+        oauth_client_secret: clientSecret,
       }),
     })
 
     const baasData = await baasRes.json() as any
-    if (!baasRes.ok || !baasData.id) {
+    if (!baasRes.ok || !baasData.calendar?.uuid) {
       logger.error('[Calendar OAuth] Erro ao registrar no MeetingBaas:', baasData)
       return res.redirect(`${frontendUrl}/integrations?calendar=error`)
     }
-    baasCalendarId = baasData.id
+    baasCalendarId = baasData.calendar.uuid
   } catch (err) {
     logger.error('[Calendar OAuth] Erro ao chamar MeetingBaas:', err)
     return res.redirect(`${frontendUrl}/integrations?calendar=error`)
