@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Home, Video, TrendingUp, LogOut, Settings, ChevronLeft, ChevronRight, Users, CreditCard, Plug, GraduationCap, FileText, Lock, HelpCircle, CalendarClock, Shield, Webhook, ChevronDown } from 'lucide-react'
+import { Home, Video, TrendingUp, LogOut, Settings, ChevronLeft, ChevronRight, Users, CreditCard, Plug, GraduationCap, FileText, Lock, HelpCircle, CalendarClock, Shield, Webhook, ChevronDown, Calendar } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth, useSubscription } from '@/contexts'
@@ -42,6 +42,7 @@ export function Sidebar() {
         { id: 'insights',     path: '/insights',     icon: TrendingUp,     label: t('nav.insights') },
         { id: 'coaching',     path: '/coaching',     icon: GraduationCap,  label: 'Coaching' },
         { id: 'relatorio',    path: '/relatorio',    icon: FileText,       label: 'Relatório Semanal' },
+        { id: 'calendar',     path: '/calendar',     icon: Calendar,       label: 'Calendário' },
       ],
     },
     {

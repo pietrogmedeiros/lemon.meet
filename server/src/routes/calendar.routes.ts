@@ -170,6 +170,49 @@ router.get('/oauth/callback', async (req: Request, res: Response) => {
   return res.redirect(`${frontendUrl}/integrations?calendar=success`)
 })
 
+// ── GET /api/calendar/events ──────────────────────────────────
+// Retorna os eventos do mês para o usuário autenticado
+router.get('/events', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id
+    const { start, end } = req.query as Record<string, string>
+
+    const { data: integration } = await supabase
+      .from('calendar_integrations')
+      .select('baas_calendar_id')
+      .eq('user_id', userId)
+      .eq('status', 'active')
+      .maybeSingle()
+
+    if (!integration?.baas_calendar_id) {
+      return res.json({ success: true, events: [], noCalendar: true })
+    }
+
+    const params = new URLSearchParams({
+      limit: '250',
+      show_cancelled: 'false',
+    })
+    if (start) params.set('start_date', start)
+    if (end) params.set('end_date', end)
+
+    const baasRes = await fetch(
+      `${BAAS_API_URL}/v2/calendars/${integration.baas_calendar_id}/events?${params}`,
+      { headers: { 'x-meeting-baas-api-key': process.env.MEETINGBAAS_API_KEY! } }
+    )
+
+    if (!baasRes.ok) {
+      logger.error(`[Calendar Events] MeetingBaaS error ${baasRes.status}`)
+      return res.status(502).json({ success: false, message: 'Erro ao buscar eventos' })
+    }
+
+    const baasData = await baasRes.json() as any
+    return res.json({ success: true, events: baasData.data ?? [] })
+  } catch (err) {
+    logger.error('Error in GET /calendar/events:', err)
+    return res.status(500).json({ success: false, message: 'Internal server error' })
+  }
+})
+
 // ── GET /api/calendar/status ──────────────────────────────────
 router.get('/status', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {

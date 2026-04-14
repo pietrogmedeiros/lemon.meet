@@ -20,6 +20,7 @@ const RelatorioPage           = lazy(() => import('@/pages/RelatorioPage').then(
 const UpcomingMeetingsPage    = lazy(() => import('@/pages/UpcomingMeetingsPage').then(m => ({ default: m.UpcomingMeetingsPage })))
 const PrivacyPolicyPage       = lazy(() => import('@/pages/PrivacyPolicyPage').then(m => ({ default: m.PrivacyPolicyPage })))
 const TermosAppPage           = lazy(() => import('@/pages/TermosAppPage').then(m => ({ default: m.TermosAppPage })))
+const CalendarPage            = lazy(() => import('@/pages/CalendarPage').then(m => ({ default: m.CalendarPage })))
 
 function App() {
   return (
@@ -131,6 +132,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <UpcomingMeetingsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/calendar"
+            element={
+              <ProtectedRoute>
+                <CalendarPage />
               </ProtectedRoute>
             }
           />
