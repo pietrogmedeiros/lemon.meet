@@ -29,31 +29,29 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
       });
     }
 
-    // Enriquece com nome e avatar de cada membro
+    // Enriquece com nome e avatar de cada membro (uma única chamada)
     const uniqueUserIds = [...new Set((meetings ?? []).map(m => m.user_id).filter(Boolean))];
     const userMap = new Map<string, { name: string; avatar_url: string | null }>();
-    await Promise.all(
-      uniqueUserIds.map(async (uid) => {
-        try {
-          const { data, error } = await supabase.auth.admin.getUserById(uid);
-          if (error || !data?.user) {
-            userMap.set(uid, { name: uid, avatar_url: null });
-            return;
-          }
-          const u = data.user;
+    try {
+      const { data: listData, error: listError } = await supabase.auth.admin.listUsers({ perPage: 1000 });
+      if (listError) {
+        logger.error('Error listing users for enrichment:', listError);
+      } else {
+        for (const u of listData.users) {
+          if (!uniqueUserIds.includes(u.id)) continue;
           const name = u.user_metadata?.full_name
             ?? u.user_metadata?.name
             ?? u.email
-            ?? uid;
+            ?? u.id;
           const avatar_url = u.user_metadata?.avatar_url
             ?? u.user_metadata?.picture
             ?? null;
-          userMap.set(uid, { name, avatar_url });
-        } catch {
-          userMap.set(uid, { name: uid, avatar_url: null });
+          userMap.set(u.id, { name, avatar_url });
         }
-      })
-    );
+      }
+    } catch (err) {
+      logger.error('Unexpected error enriching users:', err);
+    }
 
     const enriched = (meetings ?? []).map(m => ({
       ...m,
