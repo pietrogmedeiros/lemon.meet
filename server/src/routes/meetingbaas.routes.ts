@@ -276,16 +276,17 @@ async function handleBotCompleted(data: Record<string, any>) {
 
     if (Array.isArray(transcriptionData)) {
       rawTranscription = transcriptionData
+    } else if (transcriptionData?.result?.utterances && Array.isArray(transcriptionData.result.utterances)) {
+      // MeetingBaaS Gladia format: { bot_id, provider, result: { utterances: [...] } }
+      rawTranscription = transcriptionData.result.utterances
     } else if (transcriptionData?.transcription && Array.isArray(transcriptionData.transcription)) {
       rawTranscription = transcriptionData.transcription
-    } else if (transcriptionData?.words && Array.isArray(transcriptionData.words)) {
-      rawTranscription = transcriptionData.words
     } else if (transcriptionData?.utterances && Array.isArray(transcriptionData.utterances)) {
       rawTranscription = transcriptionData.utterances
-    } else if (transcriptionData?.results?.transcription?.full_transcription) {
-      // Gladia v2 nested format
-      const utterances = transcriptionData?.results?.transcription?.utterances
-      rawTranscription = Array.isArray(utterances) ? utterances : []
+    } else if (transcriptionData?.words && Array.isArray(transcriptionData.words)) {
+      rawTranscription = transcriptionData.words
+    } else if (transcriptionData?.results?.transcription?.utterances) {
+      rawTranscription = transcriptionData.results.transcription.utterances
     } else {
       logger.warn(`[MeetingBaas] Formato de transcrição desconhecido para meeting ${meetingId}:`, JSON.stringify(transcriptionData).slice(0, 500))
       rawTranscription = []
