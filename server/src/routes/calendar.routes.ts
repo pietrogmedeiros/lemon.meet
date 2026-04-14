@@ -119,30 +119,31 @@ router.get('/oauth/callback', async (req: Request, res: Response) => {
     return res.redirect(`${frontendUrl}/integrations?calendar=error`)
   }
 
-  // Registra o calendário no MeetingBaas
+  // Registra o calendário no MeetingBaas (API v2)
   let baasCalendarId: string
   try {
-    const baasRes = await fetch(`${BAAS_API_URL}/calendars`, {
+    const baasRes = await fetch(`${BAAS_API_URL}/v2/calendars`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'x-meeting-baas-api-key': process.env.MEETINGBAAS_API_KEY!,
       },
       body: JSON.stringify({
-        platform: 'Google',
+        calendar_platform: 'google',
         oauth_refresh_token: refreshToken,
         oauth_client_id: clientId,
         oauth_client_secret: clientSecret,
+        raw_calendar_id: 'primary',
       }),
     })
 
     const baasData = await baasRes.json() as any
     logger.info(`[Calendar OAuth] MeetingBaas response status=${baasRes.status} body=${JSON.stringify(baasData)}`)
-    if (!baasRes.ok || !baasData.calendar?.uuid) {
+    if (!baasRes.ok || !baasData.data?.calendar_id) {
       logger.error('[Calendar OAuth] Erro ao registrar no MeetingBaas:', JSON.stringify(baasData))
       return res.redirect(`${frontendUrl}/integrations?calendar=error`)
     }
-    baasCalendarId = baasData.calendar.uuid
+    baasCalendarId = baasData.data.calendar_id
   } catch (err) {
     logger.error('[Calendar OAuth] Erro ao chamar MeetingBaas:', err)
     return res.redirect(`${frontendUrl}/integrations?calendar=error`)
@@ -201,8 +202,8 @@ router.delete('/disconnect', authMiddleware, async (req: AuthRequest, res: Respo
       .single()
 
     if (integration?.baas_calendar_id) {
-      // Remove calendário do MeetingBaas
-      await fetch(`${BAAS_API_URL}/calendars/${integration.baas_calendar_id}`, {
+      // Remove calendário do MeetingBaas (API v2)
+      await fetch(`${BAAS_API_URL}/v2/calendars/${integration.baas_calendar_id}`, {
         method: 'DELETE',
         headers: { 'x-meeting-baas-api-key': process.env.MEETINGBAAS_API_KEY! },
       }).catch(err => logger.warn('[Calendar] Erro ao remover calendário do MeetingBaas:', err))
