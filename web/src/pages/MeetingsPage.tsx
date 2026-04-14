@@ -90,6 +90,7 @@ export function MeetingsPage() {
 
         {/* ── Busca + filtro de status ── */}
         {!isLoading && meetings.length > 0 && (
+          <>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             {/* Campo de busca */}
             <div className="relative flex-1">
@@ -164,6 +165,7 @@ export function MeetingsPage() {
               ))}
             </div>
           )}
+          </>
         )}
 
         {isLoading ? (
