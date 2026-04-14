@@ -244,9 +244,11 @@ async function handleCalendarSyncEvents(data: {
 
   // Processa apenas os eventos afetados (mais eficiente)
   const eventUuids = affected_event_uuids ?? []
-  if (eventUuids.length === 0) return
-
-  logger.info(`[Calendar] ${eventUuids.length} evento(s) afetado(s) no calendário ${calendar_id}`)
+  logger.info(`[Calendar] Webhook recebido: calendar_id=${calendar_id} affected_event_uuids=${JSON.stringify(eventUuids)}`)
+  if (eventUuids.length === 0) {
+    logger.info(`[Calendar] Nenhum event_uuid afetado — nada a processar`)
+    return
+  }
 
   for (const eventUuid of eventUuids) {
     try {
@@ -257,18 +259,36 @@ async function handleCalendarSyncEvents(data: {
       )
 
       if (!res.ok) {
-        // Evento pode ter sido deletado
-        logger.debug(`[Calendar] Evento ${eventUuid} não encontrado (pode ter sido cancelado)`)
+        const errBody = await res.text()
+        logger.warn(`[Calendar] Evento ${eventUuid} não encontrado (status=${res.status}): ${errBody}`)
         continue
       }
 
       const event = await res.json() as any
+      logger.info(`[Calendar] Evento ${eventUuid}: name="${event.name}" start="${event.start_time}" end="${event.end_time}" url="${event.meeting_url}" deleted=${event.deleted}`)
+
       const meetingUrl: string | undefined = event.meeting_url
 
-      // Ignora eventos sem link de reunião, deletados ou já no passado
-      if (!meetingUrl || event.deleted) continue
+      // Ignora eventos sem link de reunião ou deletados
+      if (!meetingUrl || event.deleted) {
+        logger.info(`[Calendar] Evento ${eventUuid} ignorado: sem meeting_url ou deletado`)
+        continue
+      }
+
+      const now = new Date()
       const startTime = event.start_time ? new Date(event.start_time) : null
-      if (startTime && startTime < new Date()) continue
+      const endTime = event.end_time ? new Date(event.end_time) : null
+
+      // Ignora eventos que já terminaram
+      if (endTime && endTime < now) {
+        logger.info(`[Calendar] Evento ${eventUuid} ignorado: já terminou às ${event.end_time}`)
+        continue
+      }
+      // Ignora eventos que começam daqui mais de 24h (ainda não precisam de bot agendado)
+      if (startTime && startTime > new Date(now.getTime() + 24 * 60 * 60 * 1000)) {
+        logger.info(`[Calendar] Evento ${eventUuid} ignorado: começa em mais de 24h (${event.start_time})`)
+        continue
+      }
 
       // Verifica se já existe uma reunião agendada para este evento
       const { data: existing } = await supabase
