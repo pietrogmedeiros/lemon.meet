@@ -189,7 +189,7 @@ export function Sidebar() {
                       key={child.id}
                       onClick={() => navigate(child.path)}
                       className={clsx(
-                        'w-full flex items-center gap-2 pl-10 pr-4 py-1.5 text-[12.5px] font-medium transition-all duration-150 rounded-sm',
+                        'w-full flex items-center justify-center gap-2 px-4 py-1.5 text-[12.5px] font-medium transition-all duration-150 rounded-sm',
                         childActive
                           ? 'text-[#2D5A27] bg-[#2D5A27]/[0.06]'
                           : 'text-[#777] hover:text-[#2D5A27] hover:bg-[#2D5A27]/[0.04]'
