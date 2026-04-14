@@ -7,12 +7,12 @@
 // DELETE /api/calendar/disconnect     → remove integração
 // ============================================================
 
-import { Router, type Request, type Response } from 'express'
+import { Router, type Router as RouterType, type Request, type Response } from 'express'
 import { authMiddleware, type AuthRequest } from '../middleware/auth.middleware.js'
 import { supabase } from '../config/supabase.js'
 import { logger } from '../utils/logger.js'
 
-const router = Router()
+const router: RouterType = Router()
 
 const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth'
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token'

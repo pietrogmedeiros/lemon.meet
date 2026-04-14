@@ -7,14 +7,14 @@
 //   • failed            → marca reunião como falha
 // ============================================================
 
-import { Router, type Request, type Response } from 'express'
+import { Router, type Router as RouterType, type Request, type Response } from 'express'
 import { supabase } from '../config/supabase.js'
 import { logger } from '../utils/logger.js'
 import { meetingBaasService, type BaasCompletePayload } from '../services/MeetingBaasService.js'
 import { insightsService } from '../services/InsightsService.js'
 import { fireWebhookForMeeting } from './integrations.routes.js'
 
-const router = Router()
+const router: RouterType = Router()
 
 // ── POST /api/meetingbaas/webhook ─────────────────────────────
 router.post('/webhook', async (req: Request, res: Response) => {

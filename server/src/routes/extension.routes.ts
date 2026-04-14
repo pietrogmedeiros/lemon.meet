@@ -14,6 +14,7 @@ import { authMiddleware, type AuthRequest } from '../middleware/auth.middleware.
 import { supabase } from '../config/supabase.js'
 import { logger } from '../utils/logger.js'
 import { meetingBaasService } from '../services/MeetingBaasService.js'
+import { insightsService } from '../services/InsightsService.js'
 
 const router: express.Router = Router()
 
