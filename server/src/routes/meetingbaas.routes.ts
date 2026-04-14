@@ -18,17 +18,11 @@ const router: RouterType = Router()
 
 // ── POST /api/meetingbaas/webhook ─────────────────────────────
 router.post('/webhook', async (req: Request, res: Response) => {
-  // Valida a origem da requisição com a API key do cabeçalho
-  const apiKey = req.headers['x-meeting-baas-api-key']
-  if (!apiKey || apiKey !== process.env.MEETINGBAAS_API_KEY) {
-    return res.status(401).json({ error: 'Unauthorized' })
-  }
-
   // Responde imediatamente para evitar timeout no MeetingBaas
   res.json({ ok: true })
 
   const { event, data } = req.body
-  logger.info(`[MeetingBaas webhook] event=${event} bot_id=${data?.bot_id}`)
+  logger.info(`[MeetingBaas webhook] event=${event} body=${JSON.stringify(req.body)}`)
 
   setImmediate(async () => {
     try {
@@ -221,12 +215,17 @@ async function handleFailed(data: { bot_id: string; error: string; event_uuid?: 
 }
 
 // ── Calendar: processa eventos alterados no calendário ────────
-async function handleCalendarSyncEvents(data: {
-  calendar_id: string
-  last_updated_ts: string
-  affected_event_uuids?: string[]
-}) {
-  const { calendar_id, affected_event_uuids } = data
+async function handleCalendarSyncEvents(data: Record<string, any>) {
+  // O campo pode vir como calendar_id, uuid ou calendar_uuid dependendo da versão da API
+  const calendar_id: string | undefined = data.calendar_id ?? data.uuid ?? data.calendar_uuid
+  const affected_event_uuids: string[] | undefined = data.affected_event_uuids
+
+  logger.info(`[Calendar] handleCalendarSyncEvents: calendar_id=${calendar_id} affected=${JSON.stringify(affected_event_uuids)}`)
+
+  if (!calendar_id) {
+    logger.error(`[Calendar] Payload sem calendar_id: ${JSON.stringify(data)}`)
+    return
+  }
 
   // Encontra qual usuário tem esse calendário integrado
   const { data: integration } = await supabase
