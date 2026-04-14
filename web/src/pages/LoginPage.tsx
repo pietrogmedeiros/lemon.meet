@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useSearchParams, useNavigate } from 'react-router-dom'
+import { useSearchParams, useNavigate, Link } from 'react-router-dom'
 import { Button } from '@/components/ui'
 import { Mail, Lock } from 'lucide-react'
 import { useAuth } from '@/contexts'
@@ -156,7 +156,10 @@ export function LoginPage() {
           </Button>
 
           <p className="text-body-small text-secondary mt-6 text-center">
-            Ao entrar, você concorda com nossos Termos de Uso
+            Ao entrar, você concorda com nossos{' '}
+            <Link to="/termos-app" className="underline hover:text-primary transition-colors">Termos de Uso</Link>
+            {' '}e{' '}
+            <Link to="/privacy-policy" className="underline hover:text-primary transition-colors">Política de Privacidade</Link>
           </p>
         </div>
       </div>

@@ -18,6 +18,8 @@ const IntegrationsPage        = lazy(() => import('@/pages/IntegrationsPage').th
 const CoachingPage            = lazy(() => import('@/pages/CoachingPage').then(m => ({ default: m.CoachingPage })))
 const RelatorioPage           = lazy(() => import('@/pages/RelatorioPage').then(m => ({ default: m.RelatorioPage })))
 const UpcomingMeetingsPage    = lazy(() => import('@/pages/UpcomingMeetingsPage').then(m => ({ default: m.UpcomingMeetingsPage })))
+const PrivacyPolicyPage       = lazy(() => import('@/pages/PrivacyPolicyPage').then(m => ({ default: m.PrivacyPolicyPage })))
+const TermosAppPage           = lazy(() => import('@/pages/TermosAppPage').then(m => ({ default: m.TermosAppPage })))
 
 function App() {
   return (
@@ -120,6 +122,8 @@ function App() {
               </ProtectedRoute>
             }
           />
+          <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+          <Route path="/termos-app" element={<TermosAppPage />} />
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
