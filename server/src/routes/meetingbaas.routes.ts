@@ -298,9 +298,10 @@ async function handleCalendarSyncEvents(data: Record<string, any>) {
         continue
       }
 
-      // Agenda o bot via MeetingBaas: POST /calendar_events/{event_id}/bot
+      // Agenda o bot via MeetingBaaS v2: POST /v2/calendars/{calendar_id}/bots
+      const webhookUrl = `${process.env.SERVER_URL ?? 'https://vibe-aiserver-production.up.railway.app'}/api/meetingbaas/webhook`
       const scheduleRes = await fetch(
-        `https://api.meetingbaas.com/calendar_events/${eventId}/bot`,
+        `https://api.meetingbaas.com/v2/calendars/${calendar_id}/bots`,
         {
           method: 'POST',
           headers: {
@@ -308,11 +309,14 @@ async function handleCalendarSyncEvents(data: Record<string, any>) {
             'x-meeting-baas-api-key': process.env.MEETINGBAAS_API_KEY!,
           },
           body: JSON.stringify({
+            event_id: eventId,
             bot_name: 'Lemon Notetaker',
             recording_mode: 'audio_only',
-            speech_to_text: { provider: 'Default' },
-            webhook_url: `${process.env.SERVER_URL ?? 'https://vibe-aiserver-production.up.railway.app'}/api/meetingbaas/webhook`,
-            waiting_room_timeout: 600,
+            transcription_enabled: true,
+            transcription_config: { provider: 'Default' },
+            callback_enabled: true,
+            callback_config: { url: webhookUrl },
+            timeout_config: { waiting_room_timeout: 600 },
           }),
         }
       )
