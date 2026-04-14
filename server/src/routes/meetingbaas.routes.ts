@@ -271,8 +271,27 @@ async function handleBotCompleted(data: Record<string, any>) {
   let rawTranscription: any[]
   try {
     const res = await fetch(transcriptionUrl)
-    rawTranscription = await res.json() as any[]
-    logger.info(`[MeetingBaas] Transcrição baixada: ${rawTranscription.length} entradas para meeting ${meetingId}`)
+    const transcriptionData = await res.json()
+    logger.info(`[MeetingBaas] Transcrição baixada para meeting ${meetingId}, tipo: ${typeof transcriptionData}, isArray: ${Array.isArray(transcriptionData)}`)
+
+    if (Array.isArray(transcriptionData)) {
+      rawTranscription = transcriptionData
+    } else if (transcriptionData?.transcription && Array.isArray(transcriptionData.transcription)) {
+      rawTranscription = transcriptionData.transcription
+    } else if (transcriptionData?.words && Array.isArray(transcriptionData.words)) {
+      rawTranscription = transcriptionData.words
+    } else if (transcriptionData?.utterances && Array.isArray(transcriptionData.utterances)) {
+      rawTranscription = transcriptionData.utterances
+    } else if (transcriptionData?.results?.transcription?.full_transcription) {
+      // Gladia v2 nested format
+      const utterances = transcriptionData?.results?.transcription?.utterances
+      rawTranscription = Array.isArray(utterances) ? utterances : []
+    } else {
+      logger.warn(`[MeetingBaas] Formato de transcrição desconhecido para meeting ${meetingId}:`, JSON.stringify(transcriptionData).slice(0, 500))
+      rawTranscription = []
+    }
+
+    logger.info(`[MeetingBaas] ${rawTranscription.length} entradas de transcrição para meeting ${meetingId}`)
   } catch (err) {
     logger.error(`[MeetingBaas] Erro ao baixar transcrição para meeting ${meetingId}:`, err)
     await supabase.from('meetings').update({ status: 'completed', ended_at: data.exited_at ?? new Date().toISOString() }).eq('id', meetingId)
