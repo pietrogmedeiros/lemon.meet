@@ -5,19 +5,20 @@ import { meetBotService } from '../services/MeetBotService.js';
 import { supabase } from '../config/supabase.js';
 import { logger } from '../utils/logger.js';
 import { randomUUID as uuidv4 } from 'crypto';
+import { getAccessibleMemberIds } from '../utils/teamAccess.js';
 
 const router: express.Router = Router();
 
-// GET /api/meetings - Lista reuniões do usuário
+// GET /api/meetings - Lista reuniões do usuário (admins veem todos do time)
 router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.id;
+    const memberIds = await getAccessibleMemberIds(userId);
 
-    // Busca reuniões do usuário
     const { data: meetings, error } = await supabase
       .from('meetings')
       .select('*')
-      .eq('user_id', userId)
+      .in('user_id', memberIds)
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -168,13 +169,14 @@ router.get('/:id/insights', authMiddleware, async (req: AuthRequest, res: Respon
     const { id } = req.params;
     const userId = req.user!.id;
     const { generate } = req.query; // ?generate=true para forçar geração
+    const memberIds = await getAccessibleMemberIds(userId);
 
-    // Verifica se a reunião existe e pertence ao usuário
+    // Verifica se a reunião existe e o usuário tem acesso (próprio ou admin do time)
     const { data: meeting, error } = await supabase
       .from('meetings')
       .select('*')
       .eq('id', id)
-      .eq('user_id', userId)
+      .in('user_id', memberIds)
       .single();
 
     if (error || !meeting) {
@@ -242,13 +244,14 @@ router.get('/:id/transcript', authMiddleware, async (req: AuthRequest, res: Resp
   try {
     const { id } = req.params;
     const userId = req.user!.id;
+    const memberIds = await getAccessibleMemberIds(userId);
 
-    // Verifica se a reunião existe e pertence ao usuário
+    // Verifica se a reunião existe e o usuário tem acesso (próprio ou admin do time)
     const { data: meeting, error } = await supabase
       .from('meetings')
       .select('transcript, status')
       .eq('id', id)
-      .eq('user_id', userId)
+      .in('user_id', memberIds)
       .single();
 
     if (error || !meeting) {

@@ -15,6 +15,7 @@ import { supabase } from '../config/supabase.js'
 import { logger } from '../utils/logger.js'
 import { meetingBaasService } from '../services/MeetingBaasService.js'
 import { insightsService } from '../services/InsightsService.js'
+import { getAccessibleMemberIds } from '../utils/teamAccess.js'
 
 const router: express.Router = Router()
 
@@ -123,13 +124,14 @@ router.get('/:id/segments', authMiddleware, async (req: AuthRequest, res: Respon
   try {
     const { id } = req.params
     const userId = req.user!.id
+    const memberIds = await getAccessibleMemberIds(userId)
 
-    // Verifica ownership
+    // Verifica acesso (próprio ou admin do time)
     const { data: meeting, error: fetchError } = await supabase
       .from('meetings')
       .select('id')
       .eq('id', id)
-      .eq('user_id', userId)
+      .in('user_id', memberIds)
       .single()
 
     if (fetchError || !meeting) {
@@ -154,16 +156,17 @@ router.get('/:id/segments', authMiddleware, async (req: AuthRequest, res: Respon
 })
 
 // ── GET /api/meetings ─────────────────────────────────────────
-// Lista todas as reuniões do usuário
+// Lista todas as reuniões do usuário (admins veem todos do time)
 router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.id
     const limit = parseInt(req.query.limit as string ?? '50', 10)
+    const memberIds = await getAccessibleMemberIds(userId)
 
     const { data, error } = await supabase
       .from('meetings')
-      .select('id, title, platform, status, meet_link, started_at, ended_at, duration_seconds, insights, created_at')
-      .eq('user_id', userId)
+      .select('id, title, platform, status, meet_link, started_at, ended_at, duration_seconds, insights, created_at, user_id')
+      .in('user_id', memberIds)
       .order('created_at', { ascending: false })
       .limit(limit)
 
@@ -185,12 +188,13 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params
     const userId = req.user!.id
+    const memberIds = await getAccessibleMemberIds(userId)
 
     const { data: meeting, error } = await supabase
       .from('meetings')
       .select('*')
       .eq('id', id)
-      .eq('user_id', userId)
+      .in('user_id', memberIds)
       .single()
 
     if (error || !meeting) {
@@ -256,12 +260,13 @@ router.post('/:id/follow-up-email', authMiddleware, async (req: AuthRequest, res
   try {
     const { id } = req.params
     const userId = req.user!.id
+    const memberIds = await getAccessibleMemberIds(userId)
 
     const { data: meeting, error } = await supabase
       .from('meetings')
       .select('title, insights')
       .eq('id', id)
-      .eq('user_id', userId)
+      .in('user_id', memberIds)
       .single()
 
     if (error || !meeting) {
@@ -290,13 +295,14 @@ router.get('/:id/briefing', authMiddleware, async (req: AuthRequest, res: Respon
   try {
     const { id } = req.params
     const userId = req.user!.id
+    const memberIds = await getAccessibleMemberIds(userId)
 
     // Busca a reunião atual
     const { data: current, error: currentError } = await supabase
       .from('meetings')
       .select('title, created_at')
       .eq('id', id)
-      .eq('user_id', userId)
+      .in('user_id', memberIds)
       .single()
 
     if (currentError || !current) {
@@ -342,13 +348,14 @@ router.get('/:id/action-items', authMiddleware, async (req: AuthRequest, res: Re
   try {
     const { id } = req.params
     const userId = req.user!.id
+    const memberIds = await getAccessibleMemberIds(userId)
 
-    // Verifica ownership
+    // Verifica acesso (próprio ou admin do time)
     const { data: meeting, error: meetingError } = await supabase
       .from('meetings')
       .select('id')
       .eq('id', id)
-      .eq('user_id', userId)
+      .in('user_id', memberIds)
       .single()
 
     if (meetingError || !meeting) {
