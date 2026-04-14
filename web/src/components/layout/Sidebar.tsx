@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Home, Video, TrendingUp, LogOut, Settings, ChevronLeft, ChevronRight, Users, CreditCard, Plug, GraduationCap, FileText, Lock, HelpCircle, CalendarClock, Shield, Webhook } from 'lucide-react'
+import { Home, Video, TrendingUp, LogOut, Settings, ChevronLeft, ChevronRight, Users, CreditCard, Plug, GraduationCap, FileText, Lock, HelpCircle, CalendarClock, Shield, Webhook, ChevronDown } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth, useSubscription } from '@/contexts'
@@ -26,7 +26,10 @@ export function Sidebar() {
   const navigate = useNavigate()
   const location = useLocation()
   const [expanded, setExpanded] = useState(false)
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({ integrations: true })
   const { open: onboardingOpen, openModal: openOnboarding, closeModal: closeOnboarding } = useOnboarding()
+
+  const toggleGroup = (id: string) => setOpenGroups(prev => ({ ...prev, [id]: !prev[id] }))
 
   const isPro = subscription?.plan === 'professional' || subscription?.plan === 'trial'
 
@@ -112,12 +115,19 @@ export function Sidebar() {
               const active = isActive(item.path)
 
               const isLocked = item.id === 'coaching' && !isPro
+              const hasChildren = !!item.children?.length
+              const childrenOpen = hasChildren && (openGroups[item.id] ?? true)
+              const handleItemClick = () => {
+                if (isLocked) return
+                if (hasChildren && expanded) { toggleGroup(item.id); return }
+                navigate(item.path)
+              }
 
               return (
                 <>
                 <button
                   key={item.id}
-                  onClick={() => { if (!isLocked) navigate(item.path) }}
+                  onClick={handleItemClick}
                   title={expanded ? undefined : isLocked ? 'Disponível no plano Professional' : item.label}
                   className={clsx(
                     'group relative w-full flex items-center gap-3 transition-all duration-150',
@@ -153,6 +163,17 @@ export function Sidebar() {
                     </span>
                   )}
 
+                  {/* Chevron para itens com filhos */}
+                  {expanded && hasChildren && (
+                    <ChevronDown
+                      size={14}
+                      className={clsx(
+                        'shrink-0 transition-transform duration-200 text-[#aaa]',
+                        childrenOpen && 'rotate-180'
+                      )}
+                    />
+                  )}
+
                   {/* Cadeado para itens bloqueados */}
                   {isLocked && (
                     <Lock size={12} className="shrink-0 text-[#aaa]" />
@@ -180,8 +201,8 @@ export function Sidebar() {
                   )}
                 </button>
 
-                {/* Sub-itens — visíveis apenas quando expandido */}
-                {expanded && item.children && item.children.map(child => {
+                {/* Sub-itens — visíveis apenas quando expandido e grupo aberto */}
+                {expanded && childrenOpen && item.children && item.children.map(child => {
                   const childActive = location.pathname === child.path
                   const ChildIcon = child.icon
                   return (
