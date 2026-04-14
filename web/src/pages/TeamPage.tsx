@@ -76,6 +76,9 @@ export function TeamPage() {
   // Remover membro
   const [removingEmail, setRemovingEmail] = useState<string | null>(null)
 
+  // Alterar papel
+  const [promotingMember, setPromotingMember] = useState<string | null>(null)
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session: s } }) => setSession(s))
   }, [])
@@ -148,6 +151,24 @@ export function TeamPage() {
     } catch (err: any) {
       setInviteError(err.message ?? 'Erro ao enviar convite.')
       setInviteStatus('error')
+    }
+  }
+
+  const handleRoleChange = async (memberId: string, newRole: 'admin' | 'member') => {
+    if (!team) return
+    setPromotingMember(memberId)
+    try {
+      const data = await apiFetch(
+        `/api/teams/${team.id}/members/${memberId}/role`,
+        session,
+        { method: 'PATCH', body: JSON.stringify({ role: newRole }) }
+      )
+      if (!data.success) throw new Error(data.message)
+      await loadTeam()
+    } catch (err: any) {
+      alert(err.message ?? 'Erro ao alterar papel.')
+    } finally {
+      setPromotingMember(null)
     }
   }
 
@@ -359,7 +380,25 @@ export function TeamPage() {
                           <Clock size={11} /> Pendente
                         </span>
                       )}
-                      {isOwner && m.role !== 'admin' && (
+                      {isOwner && m.user_id !== team.owner_id && (
+                        <button
+                          onClick={() => handleRoleChange(m.id, m.role === 'admin' ? 'member' : 'admin')}
+                          disabled={promotingMember === m.id}
+                          title={m.role === 'admin' ? 'Remover Admin' : 'Tornar Admin'}
+                          className={`w-8 h-8 rounded-lg flex items-center justify-center transition ${
+                            m.role === 'admin'
+                              ? 'text-amber-500 hover:text-amber-700 hover:bg-amber-50'
+                              : 'text-[#999999] hover:text-amber-500 hover:bg-amber-50'
+                          }`}
+                        >
+                          {promotingMember === m.id ? (
+                            <Loader size={14} className="animate-spin" />
+                          ) : (
+                            <Crown size={14} />
+                          )}
+                        </button>
+                      )}
+                      {isOwner && m.user_id !== team.owner_id && m.role !== 'admin' && (
                         <button
                           onClick={() => handleRemove(m.invited_email)}
                           disabled={removingEmail === m.invited_email}

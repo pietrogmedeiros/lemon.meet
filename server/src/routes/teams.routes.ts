@@ -325,6 +325,61 @@ router.get('/:id/meetings', authMiddleware, async (req: AuthRequest, res: Respon
   }
 })
 
+// ── PATCH /api/teams/:id/members/:memberId/role ───────────────
+router.patch('/:id/members/:memberId/role', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id
+    const { id: teamId, memberId } = req.params
+    const { role } = req.body
+
+    if (role !== 'admin' && role !== 'member') {
+      return res.status(400).json({ success: false, message: 'role deve ser admin ou member' })
+    }
+
+    // Só o owner pode alterar papéis
+    const { data: team } = await supabase
+      .from('teams')
+      .select('id, owner_id')
+      .eq('id', teamId)
+      .eq('owner_id', userId)
+      .single()
+
+    if (!team) {
+      return res.status(403).json({ success: false, message: 'Sem permissão' })
+    }
+
+    // Busca o membro alvo
+    const { data: targetMember } = await supabase
+      .from('team_members')
+      .select('id, user_id, role')
+      .eq('id', memberId)
+      .eq('team_id', teamId)
+      .maybeSingle()
+
+    if (!targetMember) {
+      return res.status(404).json({ success: false, message: 'Membro não encontrado' })
+    }
+
+    // Owner não pode alterar o próprio papel
+    if (targetMember.user_id === userId) {
+      return res.status(400).json({ success: false, message: 'Não é possível alterar o próprio papel.' })
+    }
+
+    const { error } = await supabase
+      .from('team_members')
+      .update({ role })
+      .eq('id', memberId)
+
+    if (error) throw error
+
+    logger.info(`Role of member ${memberId} changed to ${role} by owner ${userId}`)
+    return res.json({ success: true })
+  } catch (err) {
+    logger.error('Error changing member role:', err)
+    return res.status(500).json({ success: false, message: 'Internal server error' })
+  }
+})
+
 // ── POST /api/teams/accept-invite ────────────────────────────
 // Chamado pelo frontend após login para ativar convites pendentes
 router.post('/accept-invite', authMiddleware, async (req: AuthRequest, res: Response) => {
