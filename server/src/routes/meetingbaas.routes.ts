@@ -271,7 +271,7 @@ async function handleBotCompleted(data: Record<string, any>) {
   let rawTranscription: any[]
   try {
     const res = await fetch(transcriptionUrl)
-    const transcriptionData = await res.json()
+    const transcriptionData: any = await res.json()
     logger.info(`[MeetingBaas] Transcrição baixada para meeting ${meetingId}, tipo: ${typeof transcriptionData}, isArray: ${Array.isArray(transcriptionData)}`)
 
     if (Array.isArray(transcriptionData)) {
@@ -282,9 +282,9 @@ async function handleBotCompleted(data: Record<string, any>) {
       rawTranscription = transcriptionData.words
     } else if (transcriptionData?.utterances && Array.isArray(transcriptionData.utterances)) {
       rawTranscription = transcriptionData.utterances
-    } else if ((transcriptionData as any)?.results?.transcription?.full_transcription) {
+    } else if (transcriptionData?.results?.transcription?.full_transcription) {
       // Gladia v2 nested format
-      const utterances = (transcriptionData as any)?.results?.transcription?.utterances
+      const utterances = transcriptionData?.results?.transcription?.utterances
       rawTranscription = Array.isArray(utterances) ? utterances : []
     } else {
       logger.warn(`[MeetingBaas] Formato de transcrição desconhecido para meeting ${meetingId}:`, JSON.stringify(transcriptionData).slice(0, 500))
