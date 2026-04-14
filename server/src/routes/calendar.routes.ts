@@ -1,9 +1,10 @@
 // ============================================================
-// calendar.routes.ts — Integração de Calendário via MeetingBaas
+// calendar.routes.ts — Integração de Calendário via Google Calendar API direta
 //
-// GET  /api/calendar/connect          → inicia OAuth Google
-// GET  /api/calendar/oauth/callback   → recebe code do Google, registra no MeetingBaas
-// GET  /api/calendar/status           → retorna integração ativa do usuário
+// GET    /api/calendar/connect        → inicia OAuth Google
+// GET    /api/calendar/oauth/callback → recebe code, salva tokens no Supabase
+// GET    /api/calendar/events         → busca eventos (Google direto ou fallback MeetingBaaS)
+// GET    /api/calendar/status         → retorna integração ativa do usuário
 // DELETE /api/calendar/disconnect     → remove integração
 // ============================================================
 
@@ -14,18 +15,71 @@ import { logger } from '../utils/logger.js'
 
 const router: RouterType = Router()
 
-const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth'
+const GOOGLE_AUTH_URL  = 'https://accounts.google.com/o/oauth2/v2/auth'
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token'
-const BAAS_API_URL = 'https://api.meetingbaas.com'
+const GCAL_EVENTS_URL  = 'https://www.googleapis.com/calendar/v3/calendars/primary/events'
+const BAAS_API_URL     = 'https://api.meetingbaas.com'
 
-const SCOPES = [
-  'https://www.googleapis.com/auth/calendar.readonly',
-  'https://www.googleapis.com/auth/calendar.events.readonly',
-].join(' ')
+const SCOPES = 'https://www.googleapis.com/auth/calendar.events'
+
+// ── Helpers ───────────────────────────────────────────────────
+
+function extractMeetingUrl(item: any): string | null {
+  const entryPoints: any[] = item.conferenceData?.entryPoints ?? []
+  const videoEntry = entryPoints.find((e: any) => e.entryPointType === 'video')
+  if (videoEntry?.uri) return videoEntry.uri
+  const text = `${item.location ?? ''} ${item.description ?? ''}`
+  const urlMatch = text.match(/https:\/\/[^\s"<>()]+(?:zoom\.us|teams\.microsoft\.com|meet\.google\.com)[^\s"<>()]*/i)
+  return urlMatch?.[0] ?? null
+}
+
+function detectPlatform(item: any): 'meet' | 'zoom' | 'teams' | null {
+  const url = extractMeetingUrl(item) ?? ''
+  if (url.includes('meet.google.com') || item.conferenceData) return 'meet'
+  if (url.includes('zoom.us')) return 'zoom'
+  if (url.includes('teams.microsoft.com')) return 'teams'
+  return null
+}
+
+async function refreshAccessToken(userId: string, refreshToken: string): Promise<string> {
+  const tokenRes = await fetch(GOOGLE_TOKEN_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'refresh_token',
+      refresh_token: refreshToken,
+      client_id: process.env.GOOGLE_CALENDAR_CLIENT_ID!,
+      client_secret: process.env.GOOGLE_CALENDAR_CLIENT_SECRET!,
+    }),
+  })
+  const data = await tokenRes.json() as any
+  if (!tokenRes.ok || !data.access_token) {
+    throw new Error(`Token refresh failed: ${JSON.stringify(data)}`)
+  }
+  const expiresAt = new Date(Date.now() + data.expires_in * 1000).toISOString()
+  await supabase
+    .from('calendar_integrations')
+    .update({ access_token: data.access_token, token_expires_at: expiresAt })
+    .eq('user_id', userId)
+  return data.access_token
+}
+
+async function getValidAccessToken(userId: string, integration: {
+  refresh_token: string
+  access_token: string | null
+  token_expires_at: string | null
+}): Promise<string> {
+  const expiredOrMissing =
+    !integration.access_token ||
+    !integration.token_expires_at ||
+    new Date(integration.token_expires_at) <= new Date(Date.now() + 60_000)
+  if (expiredOrMissing) {
+    return refreshAccessToken(userId, integration.refresh_token)
+  }
+  return integration.access_token!
+}
 
 // ── GET /api/calendar/connect ─────────────────────────────────
-// Redireciona o usuário para a tela de autorização do Google.
-// O user_id é passado via state para recuperar após o callback.
 router.get('/connect', authMiddleware, async (req: AuthRequest, res: Response) => {
   const userId = req.user!.id
   const clientId = process.env.GOOGLE_CALENDAR_CLIENT_ID
@@ -36,29 +90,22 @@ router.get('/connect', authMiddleware, async (req: AuthRequest, res: Response) =
     return res.status(500).json({ success: false, message: 'Google Calendar não configurado' })
   }
 
-  // Codifica o userId no state para recuperar no callback (sem sessão server-side)
   const state = Buffer.from(JSON.stringify({ userId })).toString('base64url')
-
   const params = new URLSearchParams({
     client_id: clientId,
     redirect_uri: redirectUri,
     response_type: 'code',
     scope: SCOPES,
-    access_type: 'offline',   // necessário para obter refresh_token
-    prompt: 'consent',         // força exibir tela de consentimento para garantir refresh_token
+    access_type: 'offline',
+    prompt: 'consent',
     state,
   })
 
-  // Retorna a URL em vez de redirecionar — o frontend não consegue
-  // ler o header Location de uma resposta 302 via fetch() por CORS
-  // Cache-Control: no-store evita que Express retorne 304 (ETag hit) para o mesmo user
   res.set('Cache-Control', 'no-store')
   return res.json({ url: `${GOOGLE_AUTH_URL}?${params}` })
 })
 
 // ── GET /api/calendar/oauth/callback ─────────────────────────
-// Google redireciona para cá após o usuário autorizar.
-// Troca o code por tokens e registra o calendário no MeetingBaas.
 router.get('/oauth/callback', async (req: Request, res: Response) => {
   const frontendUrl = process.env.FRONTEND_URL ?? 'https://lemon-meet.web.app'
   const { code, state, error } = req.query as Record<string, string>
@@ -67,12 +114,10 @@ router.get('/oauth/callback', async (req: Request, res: Response) => {
     logger.warn(`[Calendar OAuth] Usuário negou acesso: ${error}`)
     return res.redirect(`${frontendUrl}/integrations?calendar=denied`)
   }
-
   if (!code || !state) {
     return res.redirect(`${frontendUrl}/integrations?calendar=error`)
   }
 
-  // Decodifica userId do state
   let userId: string
   try {
     const decoded = JSON.parse(Buffer.from(state, 'base64url').toString())
@@ -82,13 +127,14 @@ router.get('/oauth/callback', async (req: Request, res: Response) => {
     return res.redirect(`${frontendUrl}/integrations?calendar=error`)
   }
 
-  const clientId = process.env.GOOGLE_CALENDAR_CLIENT_ID!
+  const clientId     = process.env.GOOGLE_CALENDAR_CLIENT_ID!
   const clientSecret = process.env.GOOGLE_CALENDAR_CLIENT_SECRET!
-  const serverUrl = process.env.SERVER_URL ?? 'https://vibe-aiserver-production.up.railway.app'
-  const redirectUri = `${serverUrl}/api/calendar/oauth/callback`
+  const serverUrl    = process.env.SERVER_URL ?? 'https://vibe-aiserver-production.up.railway.app'
+  const redirectUri  = `${serverUrl}/api/calendar/oauth/callback`
 
-  // Troca o code pelo refresh_token
+  let accessToken: string
   let refreshToken: string
+  let expiresIn: number
   try {
     const tokenRes = await fetch(GOOGLE_TOKEN_URL, {
       method: 'POST',
@@ -101,64 +147,37 @@ router.get('/oauth/callback', async (req: Request, res: Response) => {
         grant_type: 'authorization_code',
       }),
     })
-
     const tokenData = await tokenRes.json() as any
-    logger.info(`[Calendar OAuth] Google token response status=${tokenRes.status} has_refresh=${!!tokenData.refresh_token} error=${tokenData.error ?? 'none'}`)
+    logger.info(`[Calendar OAuth] Google token status=${tokenRes.status} has_refresh=${!!tokenData.refresh_token}`)
     if (!tokenRes.ok) {
       logger.error('[Calendar OAuth] Google recusou o code:', JSON.stringify(tokenData))
       return res.redirect(`${frontendUrl}/integrations?calendar=error`)
     }
     if (!tokenData.refresh_token) {
-      // Google não emite refresh_token para apps já autorizados — revogar em accounts.google.com e tentar de novo
-      logger.error('[Calendar OAuth] refresh_token ausente — o usuário deve revogar o acesso em accounts.google.com e tentar novamente')
+      logger.error('[Calendar OAuth] refresh_token ausente — revogar acesso em accounts.google.com e tentar novamente')
       return res.redirect(`${frontendUrl}/integrations?calendar=error&reason=no_refresh_token`)
     }
+    accessToken  = tokenData.access_token
     refreshToken = tokenData.refresh_token
+    expiresIn    = tokenData.expires_in ?? 3600
   } catch (err) {
     logger.error('[Calendar OAuth] Erro na troca de token:', err)
     return res.redirect(`${frontendUrl}/integrations?calendar=error`)
   }
 
-  // Registra o calendário no MeetingBaas (API v2)
-  let baasCalendarId: string
-  try {
-    const baasRes = await fetch(`${BAAS_API_URL}/v2/calendars`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-meeting-baas-api-key': process.env.MEETINGBAAS_API_KEY!,
-      },
-      body: JSON.stringify({
-        calendar_platform: 'google',
-        oauth_refresh_token: refreshToken,
-        oauth_client_id: clientId,
-        oauth_client_secret: clientSecret,
-        raw_calendar_id: 'primary',
-      }),
-    })
+  const tokenExpiresAt = new Date(Date.now() + expiresIn * 1000).toISOString()
 
-    const baasData = await baasRes.json() as any
-    logger.info(`[Calendar OAuth] MeetingBaas response status=${baasRes.status} body=${JSON.stringify(baasData)}`)
-    if (!baasRes.ok || !baasData.data?.calendar_id) {
-      logger.error('[Calendar OAuth] Erro ao registrar no MeetingBaas:', JSON.stringify(baasData))
-      return res.redirect(`${frontendUrl}/integrations?calendar=error`)
-    }
-    baasCalendarId = baasData.data.calendar_id
-  } catch (err) {
-    logger.error('[Calendar OAuth] Erro ao chamar MeetingBaas:', err)
-    return res.redirect(`${frontendUrl}/integrations?calendar=error`)
-  }
-
-  // Salva a integração no banco (upsert por user_id)
   const { error: dbError } = await supabase
     .from('calendar_integrations')
     .upsert({
-      user_id: userId,
-      provider: 'google',
-      baas_calendar_id: baasCalendarId,
-      // refresh_token não é salvo no banco por segurança — MeetingBaas gerencia o acesso
-      status: 'active',
-      connected_at: new Date().toISOString(),
+      user_id:          userId,
+      provider:         'google',
+      baas_calendar_id: null,
+      refresh_token:    refreshToken,
+      access_token:     accessToken,
+      token_expires_at: tokenExpiresAt,
+      status:           'active',
+      connected_at:     new Date().toISOString(),
     }, { onConflict: 'user_id' })
 
   if (dbError) {
@@ -166,12 +185,11 @@ router.get('/oauth/callback', async (req: Request, res: Response) => {
     return res.redirect(`${frontendUrl}/integrations?calendar=error`)
   }
 
-  logger.info(`[Calendar] Integração criada para user ${userId}, baas_calendar_id=${baasCalendarId}`)
+  logger.info(`[Calendar] Integração direta criada para user ${userId}`)
   return res.redirect(`${frontendUrl}/integrations?calendar=success`)
 })
 
 // ── GET /api/calendar/events ──────────────────────────────────
-// Retorna os eventos do mês para o usuário autenticado
 router.get('/events', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.id
@@ -179,34 +197,77 @@ router.get('/events', authMiddleware, async (req: AuthRequest, res: Response) =>
 
     const { data: integration } = await supabase
       .from('calendar_integrations')
-      .select('baas_calendar_id')
+      .select('refresh_token, access_token, token_expires_at, baas_calendar_id')
       .eq('user_id', userId)
       .eq('status', 'active')
       .maybeSingle()
 
-    if (!integration?.baas_calendar_id) {
+    if (!integration) {
       return res.json({ success: true, events: [], noCalendar: true })
     }
 
-    const params = new URLSearchParams({
-      limit: '250',
-      show_cancelled: 'false',
-    })
-    if (start) params.set('start_date', start)
-    if (end) params.set('end_date', end)
+    // ── Fluxo novo: Google Calendar direto ───────────────────
+    if (integration.refresh_token) {
+      let accessToken: string
+      try {
+        accessToken = await getValidAccessToken(userId, integration as any)
+      } catch (err) {
+        logger.error('[Calendar Events] Falha ao renovar token:', err)
+        return res.status(401).json({ success: false, message: 'Token expirado, reconecte o calendário' })
+      }
 
-    const baasRes = await fetch(
-      `${BAAS_API_URL}/v2/calendars/${integration.baas_calendar_id}/events?${params}`,
-      { headers: { 'x-meeting-baas-api-key': process.env.MEETINGBAAS_API_KEY! } }
-    )
+      const params = new URLSearchParams({ maxResults: '250', singleEvents: 'true', orderBy: 'startTime' })
+      if (start) params.set('timeMin', start)
+      if (end)   params.set('timeMax', end)
 
-    if (!baasRes.ok) {
-      logger.error(`[Calendar Events] MeetingBaaS error ${baasRes.status}`)
-      return res.status(502).json({ success: false, message: 'Erro ao buscar eventos' })
+      const gcalRes = await fetch(`${GCAL_EVENTS_URL}?${params}`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      })
+
+      if (!gcalRes.ok) {
+        logger.error(`[Calendar Events] Google API error ${gcalRes.status}`)
+        return res.status(502).json({ success: false, message: 'Erro ao buscar eventos no Google' })
+      }
+
+      const gcalData = await gcalRes.json() as any
+      const events = (gcalData.items ?? [])
+        .filter((item: any) => item.status !== 'cancelled')
+        .map((item: any) => ({
+          event_id:         item.id,
+          series_id:        item.recurringEventId ?? item.id,
+          event_type:       item.recurringEventId ? 'recurring' : 'one_off',
+          title:            item.summary ?? 'Sem título',
+          start_time:       item.start?.dateTime ?? item.start?.date,
+          end_time:         item.end?.dateTime   ?? item.end?.date,
+          status:           'confirmed',
+          meeting_url:      extractMeetingUrl(item),
+          meeting_platform: detectPlatform(item),
+          bot_scheduled:    false,
+          is_exception:     !!(item.recurringEventId && item.recurringEventId !== item.id),
+        }))
+
+      return res.json({ success: true, events })
     }
 
-    const baasData = await baasRes.json() as any
-    return res.json({ success: true, events: baasData.data ?? [] })
+    // ── Fallback: integração antiga via MeetingBaaS ───────────
+    if (integration.baas_calendar_id) {
+      const params = new URLSearchParams({ limit: '250', show_cancelled: 'false' })
+      if (start) params.set('start_date', start)
+      if (end)   params.set('end_date', end)
+
+      const baasRes = await fetch(
+        `${BAAS_API_URL}/v2/calendars/${integration.baas_calendar_id}/events?${params}`,
+        { headers: { 'x-meeting-baas-api-key': process.env.MEETINGBAAS_API_KEY! } }
+      )
+      if (!baasRes.ok) {
+        logger.error(`[Calendar Events] MeetingBaaS error ${baasRes.status}`)
+        return res.status(502).json({ success: false, message: 'Erro ao buscar eventos' })
+      }
+      const baasData = await baasRes.json() as any
+      return res.json({ success: true, events: baasData.data ?? [] })
+    }
+
+    return res.json({ success: true, events: [], noCalendar: true })
   } catch (err) {
     logger.error('Error in GET /calendar/events:', err)
     return res.status(500).json({ success: false, message: 'Internal server error' })
@@ -219,13 +280,21 @@ router.get('/status', authMiddleware, async (req: AuthRequest, res: Response) =>
     const userId = req.user!.id
     const { data, error } = await supabase
       .from('calendar_integrations')
-      .select('provider, status, connected_at, baas_calendar_id')
+      .select('provider, status, connected_at, baas_calendar_id, refresh_token')
       .eq('user_id', userId)
       .maybeSingle()
 
     if (error) return res.status(500).json({ success: false, message: 'Erro ao buscar integração' })
 
-    return res.json({ success: true, integration: data ?? null })
+    const integration = data ? {
+      provider:         data.provider,
+      status:           data.status,
+      connected_at:     data.connected_at,
+      has_direct_token: !!data.refresh_token,
+      baas_calendar_id: data.baas_calendar_id,
+    } : null
+
+    return res.json({ success: true, integration })
   } catch (err) {
     logger.error('Error in GET /calendar/status:', err)
     return res.status(500).json({ success: false, message: 'Internal server error' })
@@ -237,7 +306,6 @@ router.delete('/disconnect', authMiddleware, async (req: AuthRequest, res: Respo
   try {
     const userId = req.user!.id
 
-    // Busca o baas_calendar_id para remover do MeetingBaas
     const { data: integration } = await supabase
       .from('calendar_integrations')
       .select('baas_calendar_id')
@@ -245,11 +313,10 @@ router.delete('/disconnect', authMiddleware, async (req: AuthRequest, res: Respo
       .single()
 
     if (integration?.baas_calendar_id) {
-      // Remove calendário do MeetingBaas (API v2)
       await fetch(`${BAAS_API_URL}/v2/calendars/${integration.baas_calendar_id}`, {
         method: 'DELETE',
         headers: { 'x-meeting-baas-api-key': process.env.MEETINGBAAS_API_KEY! },
-      }).catch(err => logger.warn('[Calendar] Erro ao remover calendário do MeetingBaas:', err))
+      }).catch(err => logger.warn('[Calendar] Erro ao remover do MeetingBaaS:', err))
     }
 
     await supabase.from('calendar_integrations').delete().eq('user_id', userId)
