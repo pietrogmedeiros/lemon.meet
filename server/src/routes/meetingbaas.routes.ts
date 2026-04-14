@@ -67,18 +67,18 @@ async function handleStatusChange(data: { bot_id: string; status: { code: string
   if (!meetingStatus) return // ignora joining_call, in_waiting_room, etc.
 
   // Tenta atualizar pelo bot_id — funciona para bots manuais (extensão)
-  const { error, count } = await supabase
+  const { data: updated, error } = await supabase
     .from('meetings')
     .update({ status: meetingStatus, baas_bot_id: bot_id })
     .eq('baas_bot_id', bot_id)
-    .select('id', { count: 'exact', head: true })
+    .select('id')
 
   if (error) {
     logger.error(`[MeetingBaas] Erro ao atualizar status para bot ${bot_id}:`, error)
     return
   }
 
-  if ((count ?? 0) > 0) {
+  if (updated && updated.length > 0) {
     logger.info(`[MeetingBaas] Status → ${meetingStatus} (bot ${bot_id})`)
     return
   }
@@ -95,17 +95,17 @@ async function handleStatusChange(data: { bot_id: string; status: { code: string
     const eventUuid: string | undefined = meta?.bot_data?.event_uuid
     if (!eventUuid) return
 
-    const { error: calError, count: calCount } = await supabase
+    const { data: calUpdated, error: calError } = await supabase
       .from('meetings')
       .update({ status: meetingStatus, baas_bot_id: bot_id })
       .eq('baas_event_uuid', eventUuid)
       .is('baas_bot_id', null)
-      .select('id', { count: 'exact', head: true })
+      .select('id')
 
     if (calError) {
       logger.error(`[MeetingBaas] Erro ao atualizar status via event_uuid ${eventUuid}:`, calError)
     } else {
-      logger.info(`[MeetingBaas] Status → ${meetingStatus} (bot ${bot_id}, event ${eventUuid}, rows=${calCount})`)
+      logger.info(`[MeetingBaas] Status → ${meetingStatus} (bot ${bot_id}, event ${eventUuid}, rows=${calUpdated?.length ?? 0})`)
     }
   } catch (err) {
     logger.error(`[MeetingBaas] Erro ao buscar event_uuid para bot ${bot_id}:`, err)
@@ -206,13 +206,13 @@ async function handleFailed(data: { bot_id: string; error: string; event_uuid?: 
   const { bot_id, error, event_uuid } = data
   logger.warn(`[MeetingBaas] Bot ${bot_id} falhou: ${error}`)
 
-  const { count } = await supabase
+  const { data: failedUpdated } = await supabase
     .from('meetings')
     .update({ status: 'failed' })
     .eq('baas_bot_id', bot_id)
-    .select('id', { count: 'exact', head: true })
+    .select('id')
 
-  if ((count ?? 0) === 0 && event_uuid) {
+  if ((!failedUpdated || failedUpdated.length === 0) && event_uuid) {
     await supabase
       .from('meetings')
       .update({ status: 'failed', baas_bot_id: bot_id })
