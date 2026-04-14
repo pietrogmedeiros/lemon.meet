@@ -32,7 +32,7 @@ router.post('/webhook', async (req: Request, res: Response) => {
         await handleComplete(data as BaasCompletePayload)
       } else if (event === 'failed') {
         await handleFailed(data)
-      } else if (event === 'calendar.sync_events' || event === 'calendar.events_synced') {
+      } else if (event === 'calendar.sync_events' || event === 'calendar.events_synced' || event === 'calendar.event_created' || event === 'calendar.event_updated') {
         await handleCalendarSyncEvents(data)
       }
     } catch (err) {
@@ -251,18 +251,28 @@ async function handleCalendarSyncEvents(data: Record<string, any>) {
     bot_scheduled: boolean
   }
 
-  const instances: EventInstance[] = []
-  const eventGroups: any[] = data.events ?? []
+  interface EventGroup {
+    series_id?: string
+    instances?: EventInstance[]
+    event_id?: string
+  }
+
+  const instancesWithSeries: Array<EventInstance & { series_id?: string }> = []
+  const eventGroups: EventGroup[] = data.events ?? []
 
   for (const group of eventGroups) {
     if (Array.isArray(group.instances)) {
       // Evento recorrente: tem array de instances
-      instances.push(...group.instances)
+      for (const inst of group.instances) {
+        instancesWithSeries.push({ ...inst, series_id: group.series_id })
+      }
     } else if (group.event_id) {
       // Evento avulso: o próprio grupo é a instância
-      instances.push(group)
+      instancesWithSeries.push({ ...(group as EventInstance), series_id: group.series_id })
     }
   }
+
+  const instances = instancesWithSeries
 
   logger.info(`[Calendar] ${instances.length} instância(s) encontrada(s) para processar`)
 
@@ -310,10 +320,11 @@ async function handleCalendarSyncEvents(data: Record<string, any>) {
           },
           body: JSON.stringify({
             event_id: eventId,
+            series_id: instance.series_id,
             bot_name: 'Lemon Notetaker',
             recording_mode: 'audio_only',
             transcription_enabled: true,
-            transcription_config: { provider: 'Default' },
+            transcription_config: { provider: 'gladia' },
             callback_enabled: true,
             callback_config: { url: webhookUrl },
             timeout_config: { waiting_room_timeout: 600 },
