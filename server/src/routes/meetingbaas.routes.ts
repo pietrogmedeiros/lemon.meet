@@ -30,6 +30,8 @@ router.post('/webhook', async (req: Request, res: Response) => {
         await handleStatusChange(data)
       } else if (event === 'complete') {
         await handleComplete(data as BaasCompletePayload)
+      } else if (event === 'bot.completed') {
+        await handleBotCompleted(data)
       } else if (event === 'failed') {
         await handleFailed(data)
       } else if (event === 'calendar.sync_events' || event === 'calendar.events_synced' || event === 'calendar.event_created' || event === 'calendar.event_updated') {
@@ -190,6 +192,91 @@ async function handleComplete(data: BaasCompletePayload & { event_uuid?: string 
     await fireWebhookForMeeting(meeting.user_id, meeting, insights)
 
     logger.info(`[MeetingBaas] Meeting ${meetingId} finalizada com sucesso`)
+  } catch (err) {
+    logger.error(`[MeetingBaas] Erro ao gerar insights para meeting ${meetingId}:`, err)
+    await supabase.from('meetings').update({ status: 'completed' }).eq('id', meetingId)
+  }
+}
+
+// ── Handler para bot.completed (API v2) ───────────────────────
+// Payload v2: { bot_id, event_id, transcription (URL), diarization (URL), speakers, ... }
+async function handleBotCompleted(data: Record<string, any>) {
+  const bot_id: string = data.bot_id
+  const event_id: string | undefined = data.event_id
+
+  logger.info(`[MeetingBaas] bot.completed bot_id=${bot_id} event_id=${event_id}`)
+
+  // Localiza reunião pelo bot_id ou event_id
+  let meeting: any = null
+  const { data: byBotId } = await supabase.from('meetings').select('*').eq('baas_bot_id', bot_id).maybeSingle()
+  meeting = byBotId
+
+  if (!meeting && event_id) {
+    const { data: byEvent } = await supabase.from('meetings').select('*').eq('baas_event_uuid', event_id).maybeSingle()
+    meeting = byEvent
+    if (meeting) {
+      await supabase.from('meetings').update({ baas_bot_id: bot_id }).eq('id', meeting.id)
+    }
+  }
+
+  if (!meeting) {
+    logger.error(`[MeetingBaas] bot.completed: reunião não encontrada para bot_id=${bot_id} event_id=${event_id}`)
+    return
+  }
+
+  const meetingId = meeting.id
+
+  // Busca a transcrição via URL (formato v2)
+  const transcriptionUrl: string | undefined = data.transcription
+  if (!transcriptionUrl) {
+    logger.warn(`[MeetingBaas] bot.completed: sem URL de transcrição para meeting ${meetingId}`)
+    await supabase.from('meetings').update({ status: 'completed', ended_at: data.exited_at ?? new Date().toISOString() }).eq('id', meetingId)
+    return
+  }
+
+  let rawTranscription: any[]
+  try {
+    const res = await fetch(transcriptionUrl)
+    rawTranscription = await res.json() as any[]
+    logger.info(`[MeetingBaas] Transcrição baixada: ${rawTranscription.length} entradas para meeting ${meetingId}`)
+  } catch (err) {
+    logger.error(`[MeetingBaas] Erro ao baixar transcrição para meeting ${meetingId}:`, err)
+    await supabase.from('meetings').update({ status: 'completed', ended_at: data.exited_at ?? new Date().toISOString() }).eq('id', meetingId)
+    return
+  }
+
+  // Converte formato v2 Gladia → segmentos
+  // Gladia retorna array de { time_begin, time_end, speaker, transcription }
+  const segments = rawTranscription.map((entry: any, i: number) => ({
+    meeting_id: meetingId,
+    text: entry.transcription ?? entry.text ?? '',
+    start_seconds: entry.time_begin ?? entry.start ?? 0,
+    end_seconds: entry.time_end ?? entry.end ?? 0,
+    speaker: entry.speaker ?? null,
+    sequence: i,
+    chunk_index: 0,
+  })).filter((s: any) => s.text.trim().length > 0)
+
+  const fullTranscript = segments.map((s: any) =>
+    s.speaker ? `${s.speaker}: ${s.text}` : s.text
+  ).join('\n')
+
+  if (segments.length > 0) {
+    const { error: insertError } = await supabase.from('transcript_segments').insert(segments)
+    if (insertError) logger.error(`[MeetingBaas] Erro ao salvar segmentos:`, insertError)
+  }
+
+  await supabase.from('meetings').update({
+    transcript: fullTranscript,
+    ended_at: data.exited_at ?? new Date().toISOString(),
+    status: 'processing',
+  }).eq('id', meetingId)
+
+  try {
+    const insights = await insightsService.generateInsights(fullTranscript, meetingId)
+    await supabase.from('meetings').update({ insights, status: 'completed' }).eq('id', meetingId)
+    await fireWebhookForMeeting(meeting.user_id, meeting, insights)
+    logger.info(`[MeetingBaas] bot.completed: meeting ${meetingId} finalizada com sucesso`)
   } catch (err) {
     logger.error(`[MeetingBaas] Erro ao gerar insights para meeting ${meetingId}:`, err)
     await supabase.from('meetings').update({ status: 'completed' }).eq('id', meetingId)
