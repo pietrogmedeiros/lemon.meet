@@ -82,7 +82,7 @@ async function handleStatusChange(data: { bot_id: string; status: { code: string
   // Fallback: bots agendados via calendário — busca o event_uuid no MeetingBaas
   try {
     const metaRes = await fetch(
-      `https://api.meetingbaas.com/bots/meeting_data?bot_id=${encodeURIComponent(bot_id)}&include_transcripts=false`,
+      `https://api.meetingbaas.com/v2/bots/${encodeURIComponent(bot_id)}`,
       { headers: { 'x-meeting-baas-api-key': process.env.MEETINGBAAS_API_KEY! } }
     )
     if (!metaRes.ok) return

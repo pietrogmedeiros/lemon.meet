@@ -49,7 +49,7 @@ export class MeetingBaasService {
    * Envia o bot para uma reunião. Retorna o bot_id do MeetingBaas.
    */
   async sendBot(meetingUrl: string, meetingId: string): Promise<string> {
-    const response = await fetch(`${BAAS_API_URL}/bots`, {
+    const response = await fetch(`${BAAS_API_URL}/v2/bots`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -59,10 +59,12 @@ export class MeetingBaasService {
         meeting_url: meetingUrl,
         bot_name: BOT_NAME,
         recording_mode: 'audio_only',
-        speech_to_text: { provider: 'Default' },
-        webhook_url: this.webhookUrl,
-        automatic_leave: { waiting_room_timeout: 600 },
-        deduplication_key: meetingId,
+        transcription_enabled: true,
+        transcription_config: { provider: 'gladia' },
+        callback_enabled: true,
+        callback_config: { url: this.webhookUrl },
+        timeout_config: { waiting_room_timeout: 600 },
+        extra: { deduplication_key: meetingId },
       }),
     })
 
@@ -71,8 +73,8 @@ export class MeetingBaasService {
       throw new Error(`MeetingBaas API error ${response.status}: ${body}`)
     }
 
-    const data = await response.json() as { bot_id: string | number }
-    const botId = String(data.bot_id)
+    const data = await response.json() as { success: boolean; data: { bot_id: string } }
+    const botId = String(data.data.bot_id)
     logger.info(`[MeetingBaas] Bot ${botId} criado para meeting ${meetingId}`)
     return botId
   }
@@ -81,8 +83,8 @@ export class MeetingBaasService {
    * Remove o bot de uma reunião em andamento.
    */
   async removeBot(botId: string): Promise<void> {
-    const response = await fetch(`${BAAS_API_URL}/bots/${botId}`, {
-      method: 'DELETE',
+    const response = await fetch(`${BAAS_API_URL}/v2/bots/${botId}/leave`, {
+      method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'x-meeting-baas-api-key': this.apiKey,
