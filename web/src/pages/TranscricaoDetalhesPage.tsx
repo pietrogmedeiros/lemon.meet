@@ -4,7 +4,7 @@ import { MainLayout } from '../components/layout/MainLayout';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
-import { ArrowLeft, Clock, Calendar, Mic, Target, CheckCircle, Mail, BookOpen, Sparkles, X, Copy, Check, Trash2, Lock } from 'lucide-react';
+import { ArrowLeft, Clock, Calendar, Mic, Target, CheckCircle, Mail, BookOpen, Sparkles, X, Copy, Check, Trash2, Lock, Users } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useSubscription } from '../contexts';
 
@@ -52,6 +52,7 @@ interface Meeting {
   insights: MeetingInsights | null;
   transcript: string | null;
   created_at: string;
+  participant_emails?: string[] | null;
 }
 
 interface ActionItem {
@@ -482,6 +483,25 @@ export function TranscricaoDetalhesPage() {
                 </span>
               )}
             </div>
+            {meeting.participant_emails && meeting.participant_emails.length > 0 && (
+              <div className="mt-2 flex items-start gap-2 flex-wrap">
+                <span className="flex items-center gap-1 text-xs text-secondary flex-shrink-0 mt-0.5">
+                  <Users className="h-3.5 w-3.5" />
+                  Participantes:
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {meeting.participant_emails.map((email) => (
+                    <span
+                      key={email}
+                      className="inline-flex items-center gap-1 text-xs bg-neutral-100 text-secondary px-2 py-0.5 rounded-full"
+                    >
+                      <Mail className="h-3 w-3" />
+                      {email}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
           {/* Pipedrive sync button */}
           {pipedriveConnected && meeting.status === 'completed' && meeting.insights && (

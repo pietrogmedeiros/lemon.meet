@@ -289,6 +289,19 @@ router.post('/:id/follow-up-email', authMiddleware, async (req: AuthRequest, res
   }
 })
 
+// ── Helper: extrai palavras-chave do título para identificar o cliente ────────
+function extractClientKeywords(title: string | null): string[] {
+  if (!title) return []
+  // Padrão "Empresa A <> Empresa B" ou "Empresa A - Empresa B"
+  const separatorPattern = /\s*(<>|vs\.?|–|—|-)\s*/i
+  const parts = title.split(separatorPattern)
+    .map(p => p.trim())
+    .filter(p => p.length > 2 && !/^(<>|vs\.?|–|—|-)$/.test(p))
+  if (parts.length >= 2) return parts
+  // Fallback: palavras com mais de 3 caracteres
+  return title.split(/\s+/).filter(w => w.length > 3)
+}
+
 // ── GET /api/meetings/:id/briefing ────────────────────────────
 // Gera briefing pré-reunião com base no histórico do usuário
 router.get('/:id/briefing', authMiddleware, async (req: AuthRequest, res: Response) => {
@@ -309,7 +322,7 @@ router.get('/:id/briefing', authMiddleware, async (req: AuthRequest, res: Respon
       return res.status(404).json({ success: false, message: 'Meeting not found' })
     }
 
-    // Busca as 3 reuniões anteriores concluídas com insights
+    // Busca as últimas 10 reuniões anteriores concluídas com insights
     const { data: past } = await supabase
       .from('meetings')
       .select('title, insights')
@@ -318,21 +331,30 @@ router.get('/:id/briefing', authMiddleware, async (req: AuthRequest, res: Respon
       .not('insights', 'is', null)
       .lt('created_at', current.created_at)
       .order('created_at', { ascending: false })
-      .limit(3)
+      .limit(10)
 
     if (!past || past.length === 0) {
       return res.json({ success: true, briefing: null })
     }
 
-    const validPast = past.filter((m: any) => m.insights?.executiveContext)
+    // Filtra apenas reuniões com o mesmo cliente (por similaridade de título)
+    const currentKeywords = extractClientKeywords(current.title)
+    const sameclientPast = currentKeywords.length > 0
+      ? past.filter((m: any) => {
+          if (!m.insights?.executiveContext) return false
+          const pastTitle = (m.title ?? '').toLowerCase()
+          return currentKeywords.some(kw => pastTitle.includes(kw.toLowerCase()))
+        })
+      : past.filter((m: any) => m.insights?.executiveContext)
 
-    if (validPast.length === 0) {
+    // Só gera briefing se houver histórico do mesmo cliente
+    if (sameclientPast.length === 0) {
       return res.json({ success: true, briefing: null })
     }
 
     const briefing = await insightsService.generateBriefing(
       current.title ?? 'Reunião',
-      validPast as any
+      sameclientPast.slice(0, 3) as any
     )
 
     return res.json({ success: true, briefing })

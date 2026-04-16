@@ -206,18 +206,24 @@ export class CalendarCronService {
       return
     }
 
+    // Extrai emails dos participantes do evento do calendário
+    const participantEmails: string[] = (item.attendees ?? [])
+      .map((a: any) => a.email as string)
+      .filter((e: string) => Boolean(e))
+
     // Persiste a reunião no banco
     const platform = detectPlatformFromUrl(meetingUrl)
     const { error: insertError } = await supabase.from('meetings').insert({
-      id:              meetingId,
-      user_id:         userId,
-      meet_link:       meetingUrl,
+      id:                meetingId,
+      user_id:           userId,
+      meet_link:         meetingUrl,
       title,
       platform,
-      source:          'calendar',
-      status:          'requesting',
-      baas_bot_id:     baasBotId,
-      baas_event_uuid: eventId,
+      source:            'calendar',
+      status:            'requesting',
+      baas_bot_id:       baasBotId,
+      baas_event_uuid:   eventId,
+      participant_emails: participantEmails.length > 0 ? participantEmails : null,
       started_at:      startedAt ?? new Date().toISOString(),
     })
 
