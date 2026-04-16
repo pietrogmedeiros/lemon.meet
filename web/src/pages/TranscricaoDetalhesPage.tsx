@@ -460,7 +460,7 @@ export function TranscricaoDetalhesPage() {
               ) : pipedriveSynced ? (
                 <CheckCircle className="h-4 w-4" />
               ) : (
-                <img src="/pipedrive.png" alt="Pipedrive" className="w-4 h-4 object-contain" />
+                <img src="/pipedrivep.png" alt="Pipedrive" className="w-4 h-4 object-contain" />
               )}
               {pipedriveSynced ? 'Enviado!' : 'Enviar para Pipedrive'}
             </button>

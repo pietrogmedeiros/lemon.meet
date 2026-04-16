@@ -428,7 +428,7 @@ export function IntegrationsPage() {
         <Card className="p-6">
           <div className="flex items-center gap-3 mb-5">
             <div className="w-10 h-10 rounded-xl bg-[#2D5A27]/10 flex items-center justify-center flex-shrink-0">
-              <img src="/pipedrive.png" alt="Pipedrive" className="w-6 h-6 object-contain" />
+              <img src="/pipedrivep.png" alt="Pipedrive" className="w-6 h-6 object-contain" />
             </div>
             <div>
               <h2 className="text-[16px] font-semibold text-[#1a1a1a]">Pipedrive</h2>
@@ -453,7 +453,7 @@ export function IntegrationsPage() {
             <div className="space-y-4">
               <div className="flex items-center gap-3 p-3 bg-[#F8F9FA] border border-[#E0E0E0] rounded-lg">
                 <div className="w-8 h-8 rounded-full bg-white border border-[#E0E0E0] flex items-center justify-center flex-shrink-0">
-                  <img src="/pipedrive.png" alt="Pipedrive" className="w-5 h-5 object-contain" />
+                  <img src="/pipedrivep.png" alt="Pipedrive" className="w-5 h-5 object-contain" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-[13px] font-medium text-[#1a1a1a]">Pipedrive</p>
@@ -491,7 +491,7 @@ export function IntegrationsPage() {
                 onClick={handleConnectPipedrive}
                 className="flex items-center gap-2"
               >
-                <img src="/pipedrive.png" alt="Pipedrive" className="w-4 h-4 object-contain" />
+                <img src="/pipedrivep.png" alt="Pipedrive" className="w-4 h-4 object-contain" />
                 Conectar Pipedrive
               </Button>
             </div>
