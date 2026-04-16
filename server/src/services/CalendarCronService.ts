@@ -140,15 +140,21 @@ export class CalendarCronService {
     if (item.status === 'cancelled') return
 
     // Checa duplicata pelo event_id do Google Calendar
-    const { data: existing } = await supabase
+    // Usa .limit(1) para evitar erro do maybeSingle() com múltiplas linhas
+    const { data: existingRows, error: checkError } = await supabase
       .from('meetings')
       .select('id, status')
       .eq('user_id', userId)
       .eq('baas_event_uuid', eventId)
-      .maybeSingle()
+      .limit(1)
 
-    if (existing) {
-      logger.info(`[CalendarCron] Evento ${eventId} já tem reunião ${existing.id} (${existing.status}) — ignorando`)
+    if (checkError) {
+      logger.error(`[CalendarCron] Erro ao verificar duplicata para evento ${eventId}:`, checkError)
+      return
+    }
+
+    if (existingRows && existingRows.length > 0) {
+      logger.info(`[CalendarCron] Evento ${eventId} já tem reunião ${existingRows[0].id} (${existingRows[0].status}) — ignorando`)
       return
     }
 
