@@ -80,6 +80,42 @@ export class MeetingBaasService {
   }
 
   /**
+   * Agenda o bot para entrar na reunião em um horário específico.
+   * Retorna o bot_id do MeetingBaas.
+   */
+  async scheduleBotAt(meetingUrl: string, meetingId: string, joinAt: Date): Promise<string> {
+    const response = await fetch(`${BAAS_API_URL}/v2/bots/scheduled`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-meeting-baas-api-key': this.apiKey,
+      },
+      body: JSON.stringify({
+        meeting_url: meetingUrl,
+        bot_name: BOT_NAME,
+        recording_mode: 'audio_only',
+        transcription_enabled: true,
+        transcription_config: { provider: 'gladia' },
+        callback_enabled: true,
+        callback_config: { url: this.webhookUrl },
+        timeout_config: { waiting_room_timeout: 600 },
+        join_at: joinAt.toISOString(),
+        extra: { deduplication_key: meetingId },
+      }),
+    })
+
+    if (!response.ok) {
+      const body = await response.text()
+      throw new Error(`MeetingBaas API error ${response.status}: ${body}`)
+    }
+
+    const data = await response.json() as { success: boolean; data: { bot_id: string } }
+    const botId = String(data.data.bot_id)
+    logger.info(`[MeetingBaas] Bot ${botId} agendado para meeting ${meetingId} às ${joinAt.toISOString()}`)
+    return botId
+  }
+
+  /**
    * Remove o bot de uma reunião em andamento.
    */
   async removeBot(botId: string): Promise<void> {

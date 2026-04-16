@@ -20,9 +20,9 @@ import {
   GCAL_EVENTS_URL,
 } from '../utils/calendarTokens.js'
 
-// Busca eventos que começam entre agora e agora + 15 minutos
-const LOOKAHEAD_MS  = 15 * 60 * 1000
-// Ainda envia bot para eventos que já iniciaram há no máximo 5 minutos
+// Agenda bots para eventos que começam nos próximos 30 minutos
+const LOOKAHEAD_MS  = 30 * 60 * 1000
+// Ainda envia bot imediato para eventos que já iniciaram há no máximo 5 minutos
 const LOOKBEHIND_MS = 5  * 60 * 1000
 // Intervalo entre cada rodada do cron
 const INTERVAL_MS   = 3  * 60 * 1000
@@ -152,11 +152,18 @@ export class CalendarCronService {
       return
     }
 
-    // Envia o bot via MeetingBaas
+    // Envia ou agenda o bot via MeetingBaas
     const meetingId = randomUUID()
+    const now = new Date()
+    const startTime = item.start?.dateTime ? new Date(item.start.dateTime) : null
+    // Usa bot agendado se a reunião começa daqui mais de 2 minutos
+    const useScheduled = startTime !== null && startTime.getTime() - now.getTime() > 2 * 60 * 1000
+
     let baasBotId: string
     try {
-      baasBotId = await meetingBaasService.sendBot(meetingUrl, meetingId)
+      baasBotId = useScheduled
+        ? await meetingBaasService.scheduleBotAt(meetingUrl, meetingId, startTime!)
+        : await meetingBaasService.sendBot(meetingUrl, meetingId)
     } catch (err) {
       logger.error(`[CalendarCron] Falha ao enviar bot para evento ${eventId}:`, err)
       return
