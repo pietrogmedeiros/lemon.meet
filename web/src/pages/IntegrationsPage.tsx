@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { MainLayout } from '../components/layout/MainLayout';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import { Webhook, CheckCircle, XCircle, Trash2, Zap, AlertCircle, Link2Off, Shield, LayoutGrid } from 'lucide-react';
+import { Webhook, CheckCircle, XCircle, Trash2, Zap, AlertCircle, Link2Off, Shield, LayoutGrid, HardDrive } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 interface WebhookConfig {
@@ -57,6 +57,13 @@ export function IntegrationsPage() {
   const [hubspotLoading, setHubspotLoading] = useState(true);
   const [hubspotDisconnecting, setHubspotDisconnecting] = useState(false);
   const [hubspotMessage, setHubspotMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Google Drive state
+  const [gdriveConnected, setGdriveConnected] = useState(false);
+  const [gdriveConnectedAt, setGdriveConnectedAt] = useState<string | null>(null);
+  const [gdriveLoading, setGdriveLoading] = useState(true);
+  const [gdriveDisconnecting, setGdriveDisconnecting] = useState(false);
+  const [gdriveMessage, setGdriveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const getAuthHeader = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -129,6 +136,68 @@ export function IntegrationsPage() {
   }, [getAuthHeader]);
 
   useEffect(() => { loadHubspot(); }, [loadHubspot]);
+
+  // ── Google Drive ─────────────────────────────────────────────
+  const loadGdrive = useCallback(async () => {
+    setGdriveLoading(true);
+    try {
+      const headers = await getAuthHeader();
+      const res = await fetch(`${apiUrl}/api/gdrive/status`, { headers });
+      if (res.ok) {
+        const data = await res.json();
+        setGdriveConnected(data.connected);
+        setGdriveConnectedAt(data.connectedAt ?? null);
+      }
+    } catch {}
+    finally { setGdriveLoading(false); }
+  }, [getAuthHeader]);
+
+  useEffect(() => { loadGdrive(); }, [loadGdrive]);
+
+  // Lê parâmetro ?gdrive= da URL para mostrar feedback pós-OAuth
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const gdParam = params.get('gdrive');
+    if (gdParam === 'success') {
+      setGdriveMessage({ type: 'success', text: 'Google Drive conectado! Os insights serão salvos automaticamente.' });
+      loadGdrive();
+      window.history.replaceState({}, '', window.location.pathname);
+    } else if (gdParam === 'denied') {
+      setGdriveMessage({ type: 'error', text: 'Autorização negada. Tente novamente.' });
+      window.history.replaceState({}, '', window.location.pathname);
+    } else if (gdParam === 'error') {
+      setGdriveMessage({ type: 'error', text: 'Erro ao conectar o Google Drive. Tente novamente.' });
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, [loadGdrive]);
+
+  const handleConnectGdrive = async () => {
+    const headers = await getAuthHeader();
+    const res = await fetch(`${apiUrl}/api/gdrive/connect`, { headers });
+    if (!res.ok) {
+      setGdriveMessage({ type: 'error', text: 'Erro ao iniciar conexão. Tente novamente.' });
+      return;
+    }
+    const { url } = await res.json();
+    if (url) window.location.href = url;
+  };
+
+  const handleDisconnectGdrive = async () => {
+    if (!window.confirm('Desconectar o Google Drive? Os arquivos já salvos não serão removidos.')) return;
+    setGdriveDisconnecting(true);
+    try {
+      const headers = await getAuthHeader();
+      await fetch(`${apiUrl}/api/gdrive/disconnect`, { method: 'DELETE', headers });
+      setGdriveConnected(false);
+      setGdriveConnectedAt(null);
+      setGdriveMessage({ type: 'success', text: 'Google Drive desconectado.' });
+    } catch {
+      setGdriveMessage({ type: 'error', text: 'Erro ao desconectar. Tente novamente.' });
+    } finally {
+      setGdriveDisconnecting(false);
+      setTimeout(() => setGdriveMessage(null), 5000);
+    }
+  };
 
   // Lê parâmetro ?hubspot= da URL para mostrar feedback pós-OAuth
   useEffect(() => {
@@ -498,6 +567,93 @@ export function IntegrationsPage() {
                 ? <CheckCircle className="h-4 w-4 flex-shrink-0" />
                 : <XCircle className="h-4 w-4 flex-shrink-0" />}
               {calendarMessage.text}
+            </div>
+          )}
+        </Card>
+        )}
+
+        {/* Google Drive Integration Card */}
+        {activeTab === 'permissions' && (
+        <Card className="p-6">
+          <div className="flex items-center gap-3 mb-5">
+            <div className="w-10 h-10 rounded-xl bg-[#1a73e8]/10 flex items-center justify-center flex-shrink-0">
+              <HardDrive className="h-5 w-5 text-[#1a73e8]" />
+            </div>
+            <div>
+              <h2 className="text-[16px] font-semibold text-[#1a1a1a]">Google Drive</h2>
+              <p className="text-[13px] text-[#666]">
+                Salva automaticamente os insights de cada reunião em uma pasta no seu Drive.
+              </p>
+            </div>
+            {gdriveConnected && (
+              <span className="ml-auto flex-shrink-0 inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-[#1a73e8]/10 text-[#1a73e8]">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#1a73e8]" />
+                Conectado
+              </span>
+            )}
+          </div>
+
+          {gdriveLoading ? (
+            <div className="flex items-center gap-2 text-sm text-[#999] py-4">
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-[#1a73e8] border-r-transparent" />
+              Carregando…
+            </div>
+          ) : gdriveConnected ? (
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 p-3 bg-[#F8F9FA] border border-[#E0E0E0] rounded-lg">
+                <div className="w-8 h-8 rounded-full bg-white border border-[#E0E0E0] flex items-center justify-center flex-shrink-0">
+                  <HardDrive className="h-4 w-4 text-[#1a73e8]" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[13px] font-medium text-[#1a1a1a]">Google Drive</p>
+                  {gdriveConnectedAt && (
+                    <p className="text-[11px] text-[#888]">
+                      Conectado em {new Date(gdriveConnectedAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}
+                    </p>
+                  )}
+                </div>
+                <button
+                  onClick={handleDisconnectGdrive}
+                  disabled={gdriveDisconnecting}
+                  className="flex items-center gap-1.5 text-[12px] text-[#888] hover:text-[#DC3545] transition-colors"
+                  title="Desconectar Google Drive"
+                >
+                  {gdriveDisconnecting
+                    ? <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-r-transparent" />
+                    : <Link2Off className="h-3.5 w-3.5" />
+                  }
+                  Desconectar
+                </button>
+              </div>
+              <p className="text-[12px] text-[#888]">
+                ✓ Ao final de cada reunião, um arquivo com os insights é salvo automaticamente na pasta <strong>Lemon.meet-insights</strong> do seu Drive.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <p className="text-[13px] text-[#555]">
+                Nenhum Google Drive conectado. Conecte para que os insights de cada reunião sejam salvos automaticamente na pasta <strong>Lemon.meet-insights</strong>.
+              </p>
+              <Button
+                onClick={handleConnectGdrive}
+                className="flex items-center gap-2"
+              >
+                <HardDrive className="h-4 w-4" />
+                Conectar Google Drive
+              </Button>
+            </div>
+          )}
+
+          {gdriveMessage && (
+            <div className={`mt-4 flex items-center gap-2 text-[13px] px-3 py-2.5 rounded-lg ${
+              gdriveMessage.type === 'success'
+                ? 'bg-[#1a73e8]/8 text-[#1a73e8]'
+                : 'bg-[#DC3545]/8 text-[#DC3545]'
+            }`}>
+              {gdriveMessage.type === 'success'
+                ? <CheckCircle className="h-4 w-4 flex-shrink-0" />
+                : <XCircle className="h-4 w-4 flex-shrink-0" />}
+              {gdriveMessage.text}
             </div>
           )}
         </Card>

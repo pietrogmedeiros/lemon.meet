@@ -15,6 +15,7 @@ import meetingBaasRouter from './routes/meetingbaas.routes.js'
 import calendarRouter from './routes/calendar.routes.js'
 import pipedriveRouter from './routes/pipedrive.routes.js'
 import hubspotRouter from './routes/hubspot.routes.js'
+import gdriveRouter from './routes/gdrive.routes.js'
 import { calendarCronService } from './services/CalendarCronService.js'
 
 // Load environment variables
@@ -82,6 +83,7 @@ app.use('/api/meetingbaas', meetingBaasRouter)
 app.use('/api/calendar', calendarRouter)
 app.use('/api/pipedrive', pipedriveRouter)
 app.use('/api/hubspot', hubspotRouter)
+app.use('/api/gdrive', gdriveRouter)
 
 // 404 handler
 app.use((req, res) => {

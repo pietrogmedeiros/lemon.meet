@@ -13,6 +13,7 @@ import { logger } from '../utils/logger.js'
 import { meetingBaasService, type BaasCompletePayload } from '../services/MeetingBaasService.js'
 import { insightsService } from '../services/InsightsService.js'
 import { fireWebhookForMeeting } from './integrations.routes.js'
+import { gdriveService } from '../services/GDriveService.js'
 
 const router: RouterType = Router()
 
@@ -190,6 +191,9 @@ async function handleComplete(data: BaasCompletePayload & { event_uuid?: string 
 
     // Dispara webhook do usuário (se configurado e ativo)
     await fireWebhookForMeeting(meeting.user_id, meeting, insights)
+
+    // Salva no Google Drive (se conectado)
+    await gdriveService.saveInsightsToFolder(meeting.user_id, meeting, insights)
 
     logger.info(`[MeetingBaas] Meeting ${meetingId} finalizada com sucesso`)
   } catch (err) {
