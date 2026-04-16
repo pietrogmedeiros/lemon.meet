@@ -23,7 +23,9 @@ const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file'
 const CLIENT_ID     = process.env.GOOGLE_CALENDAR_CLIENT_ID!
 const CLIENT_SECRET = process.env.GOOGLE_CALENDAR_CLIENT_SECRET!
 const FRONTEND_URL  = process.env.FRONTEND_URL  ?? 'https://lemon-meet.web.app'
-const SERVER_URL    = process.env.SERVER_URL     ?? 'https://vibe-aiserver-production.up.railway.app'
+const SERVER_URL    = process.env.RAILWAY_PUBLIC_DOMAIN
+  ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
+  : (process.env.SERVER_URL ?? 'https://vibe-aiserver-production.up.railway.app')
 const REDIRECT_URI  = `${SERVER_URL}/api/gdrive/oauth/callback`
 
 // ── GET /api/gdrive/connect ───────────────────────────────────
