@@ -120,6 +120,14 @@ function App() {
             }
           />
           <Route
+            path="/integrations/apps"
+            element={
+              <ProtectedRoute>
+                <IntegrationsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/integrations/webhooks"
             element={
               <ProtectedRoute>

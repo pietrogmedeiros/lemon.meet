@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { MainLayout } from '../components/layout/MainLayout';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import { Webhook, CheckCircle, XCircle, Trash2, Zap, AlertCircle, Link2Off, Shield } from 'lucide-react';
+import { Webhook, CheckCircle, XCircle, Trash2, Zap, AlertCircle, Link2Off, Shield, LayoutGrid } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 interface WebhookConfig {
@@ -26,7 +26,7 @@ const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 export function IntegrationsPage() {
   const location = useLocation();
   const navigate = useNavigate();
-  const activeTab: 'permissions' | 'webhooks' = location.pathname.includes('webhooks') ? 'webhooks' : 'permissions';
+  const activeTab: 'permissions' | 'apps' | 'webhooks' = location.pathname.includes('webhooks') ? 'webhooks' : location.pathname.includes('apps') ? 'apps' : 'permissions';
   const [webhook, setWebhook] = useState<WebhookConfig | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [urlInput, setUrlInput] = useState('');
@@ -391,6 +391,17 @@ export function IntegrationsPage() {
             Permissões
           </button>
           <button
+            onClick={() => navigate('/integrations/apps')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              activeTab === 'apps'
+                ? 'bg-white text-[#2D5A27] shadow-sm'
+                : 'text-[#666] hover:text-[#333]'
+            }`}
+          >
+            <LayoutGrid className="h-4 w-4" />
+            Apps
+          </button>
+          <button
             onClick={() => navigate('/integrations/webhooks')}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
               activeTab === 'webhooks'
@@ -493,7 +504,7 @@ export function IntegrationsPage() {
         )}
 
         {/* Pipedrive Integration Card */}
-        {activeTab === 'permissions' && (
+        {activeTab === 'apps' && (
         <Card className="p-6">
           <div className="flex items-center gap-3 mb-5">
             <div className="w-10 h-10 rounded-xl bg-[#2D5A27]/10 flex items-center justify-center flex-shrink-0">
@@ -582,7 +593,7 @@ export function IntegrationsPage() {
         )}
 
         {/* HubSpot Integration Card */}
-        {activeTab === 'permissions' && (
+        {activeTab === 'apps' && (
         <Card className="p-6">
           <div className="flex items-center gap-3 mb-5">
             <div className="w-10 h-10 rounded-xl bg-[#FF7A59]/10 flex items-center justify-center flex-shrink-0">
