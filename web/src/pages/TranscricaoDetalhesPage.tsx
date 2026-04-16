@@ -192,6 +192,11 @@ export function TranscricaoDetalhesPage() {
   const [pipedriveSyncing, setPipedriveSyncing] = useState(false);
   const [pipedriveSynced, setPipedriveSynced] = useState(false);
 
+  // HubSpot state
+  const [hubspotConnected, setHubspotConnected] = useState(false);
+  const [hubspotSyncing, setHubspotSyncing] = useState(false);
+  const [hubspotSynced, setHubspotSynced] = useState(false);
+
   const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
   const getAuthHeader = useCallback(async () => {
@@ -290,6 +295,21 @@ export function TranscricaoDetalhesPage() {
     check();
   }, [apiUrl, getAuthHeader]);
 
+  // Check if HubSpot is connected
+  useEffect(() => {
+    const check = async () => {
+      try {
+        const headers = await getAuthHeader();
+        const res = await fetch(`${apiUrl}/api/hubspot/status`, { headers });
+        if (res.ok) {
+          const data = await res.json();
+          setHubspotConnected(data.connected);
+        }
+      } catch {}
+    };
+    check();
+  }, [apiUrl, getAuthHeader]);
+
   const handleSyncPipedrive = async () => {
     if (!id || pipedriveSyncing) return;
     setPipedriveSyncing(true);
@@ -307,6 +327,26 @@ export function TranscricaoDetalhesPage() {
       // Silent fail
     } finally {
       setPipedriveSyncing(false);
+    }
+  };
+
+  const handleSyncHubspot = async () => {
+    if (!id || hubspotSyncing) return;
+    setHubspotSyncing(true);
+    try {
+      const headers = await getAuthHeader();
+      const res = await fetch(`${apiUrl}/api/hubspot/sync/${id}`, {
+        method: 'POST',
+        headers,
+      });
+      if (res.ok) {
+        setHubspotSynced(true);
+        setTimeout(() => setHubspotSynced(false), 4000);
+      }
+    } catch {
+      // Silent fail
+    } finally {
+      setHubspotSyncing(false);
     }
   };
 
@@ -463,6 +503,28 @@ export function TranscricaoDetalhesPage() {
                 <img src="/pipedrivep.png" alt="Pipedrive" className="w-4 h-4 object-contain" />
               )}
               {pipedriveSynced ? 'Enviado!' : 'Enviar para Pipedrive'}
+            </button>
+          )}
+          {/* HubSpot sync button */}
+          {hubspotConnected && meeting.status === 'completed' && meeting.insights && (
+            <button
+              onClick={handleSyncHubspot}
+              disabled={hubspotSyncing || hubspotSynced}
+              className={`flex items-center gap-2 text-[13px] font-medium px-3 py-2 rounded-lg border transition-all mt-1 ${
+                hubspotSynced
+                  ? 'border-[#FF7A59] text-[#FF7A59] bg-[#FF7A59]/8'
+                  : 'border-[#E0E0E0] text-[#555] hover:border-[#FF7A59] hover:text-[#FF7A59] bg-white'
+              }`}
+              title="Enviar resumo e deal para o HubSpot"
+            >
+              {hubspotSyncing ? (
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-r-transparent" />
+              ) : hubspotSynced ? (
+                <CheckCircle className="h-4 w-4" />
+              ) : (
+                <img src="/hubspot.webp" alt="HubSpot" className="w-4 h-4 object-contain" />
+              )}
+              {hubspotSynced ? 'Enviado!' : 'Enviar para HubSpot'}
             </button>
           )}
         </div>

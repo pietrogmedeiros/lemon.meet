@@ -51,6 +51,13 @@ export function IntegrationsPage() {
   const [pipedriveDisconnecting, setPipedriveDisconnecting] = useState(false);
   const [pipedriveMessage, setPipedriveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  // HubSpot state
+  const [hubspotConnected, setHubspotConnected] = useState(false);
+  const [hubspotConnectedAt, setHubspotConnectedAt] = useState<string | null>(null);
+  const [hubspotLoading, setHubspotLoading] = useState(true);
+  const [hubspotDisconnecting, setHubspotDisconnecting] = useState(false);
+  const [hubspotMessage, setHubspotMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
   const getAuthHeader = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession();
     return { Authorization: `Bearer ${session?.access_token}` };
@@ -105,6 +112,68 @@ export function IntegrationsPage() {
   }, [getAuthHeader]);
 
   useEffect(() => { loadPipedrive(); }, [loadPipedrive]);
+
+  // ── HubSpot ────────────────────────────────────────────────
+  const loadHubspot = useCallback(async () => {
+    setHubspotLoading(true);
+    try {
+      const headers = await getAuthHeader();
+      const res = await fetch(`${apiUrl}/api/hubspot/status`, { headers });
+      if (res.ok) {
+        const data = await res.json();
+        setHubspotConnected(data.connected);
+        setHubspotConnectedAt(data.connectedAt ?? null);
+      }
+    } catch {}
+    finally { setHubspotLoading(false); }
+  }, [getAuthHeader]);
+
+  useEffect(() => { loadHubspot(); }, [loadHubspot]);
+
+  // Lê parâmetro ?hubspot= da URL para mostrar feedback pós-OAuth
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const hsParam = params.get('hubspot');
+    if (hsParam === 'success') {
+      setHubspotMessage({ type: 'success', text: 'HubSpot conectado com sucesso!' });
+      loadHubspot();
+      window.history.replaceState({}, '', window.location.pathname);
+    } else if (hsParam === 'denied') {
+      setHubspotMessage({ type: 'error', text: 'Autorização negada. Tente novamente.' });
+      window.history.replaceState({}, '', window.location.pathname);
+    } else if (hsParam === 'error') {
+      setHubspotMessage({ type: 'error', text: 'Erro ao conectar o HubSpot. Tente novamente.' });
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, [loadHubspot]);
+
+  const handleConnectHubspot = async () => {
+    const headers = await getAuthHeader();
+    const res = await fetch(`${apiUrl}/api/hubspot/connect`, { headers });
+    if (!res.ok) {
+      setHubspotMessage({ type: 'error', text: 'Erro ao iniciar conexão. Tente novamente.' });
+      return;
+    }
+    const { url } = await res.json();
+    if (url) window.location.href = url;
+  };
+
+  const handleDisconnectHubspot = async () => {
+    if (!window.confirm('Desconectar o HubSpot? O histórico de reuniões enviadas não será removido do HubSpot.')) return;
+    setHubspotDisconnecting(true);
+    try {
+      const headers = await getAuthHeader();
+      await fetch(`${apiUrl}/api/hubspot/disconnect`, { method: 'DELETE', headers });
+      setHubspotConnected(false);
+      setHubspotConnectedAt(null);
+      setHubspotMessage({ type: 'success', text: 'HubSpot desconectado.' });
+    } catch {
+      setHubspotMessage({ type: 'error', text: 'Erro ao desconectar. Tente novamente.' });
+    } finally {
+      setHubspotDisconnecting(false);
+      setTimeout(() => setHubspotMessage(null), 5000);
+    }
+  };
 
   // Lê parâmetro ?pipedrive= da URL para mostrar feedback pós-OAuth
   useEffect(() => {
@@ -507,6 +576,92 @@ export function IntegrationsPage() {
                 ? <CheckCircle className="h-4 w-4 flex-shrink-0" />
                 : <XCircle className="h-4 w-4 flex-shrink-0" />}
               {pipedriveMessage.text}
+            </div>
+          )}
+        </Card>
+        )}
+
+        {/* HubSpot Integration Card */}
+        {activeTab === 'permissions' && (
+        <Card className="p-6">
+          <div className="flex items-center gap-3 mb-5">
+            <div className="w-10 h-10 rounded-xl bg-[#FF7A59]/10 flex items-center justify-center flex-shrink-0">
+              <img src="/hubspot.webp" alt="HubSpot" className="w-6 h-6 object-contain" />
+            </div>
+            <div>
+              <h2 className="text-[16px] font-semibold text-[#1a1a1a]">HubSpot</h2>
+              <p className="text-[13px] text-[#666]">
+                Envie resumos de reuniões e crie deals de follow-up direto no seu CRM.
+              </p>
+            </div>
+            {hubspotConnected && (
+              <span className="ml-auto flex-shrink-0 inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-[#FF7A59]/10 text-[#FF7A59]">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#FF7A59]" />
+                Conectado
+              </span>
+            )}
+          </div>
+
+          {hubspotLoading ? (
+            <div className="flex items-center gap-2 text-sm text-[#999] py-4">
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-[#FF7A59] border-r-transparent" />
+              Carregando…
+            </div>
+          ) : hubspotConnected ? (
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 p-3 bg-[#F8F9FA] border border-[#E0E0E0] rounded-lg">
+                <div className="w-8 h-8 rounded-full bg-white border border-[#E0E0E0] flex items-center justify-center flex-shrink-0">
+                  <img src="/hubspot.webp" alt="HubSpot" className="w-5 h-5 object-contain" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[13px] font-medium text-[#1a1a1a]">HubSpot</p>
+                  {hubspotConnectedAt && (
+                    <p className="text-[11px] text-[#888]">
+                      Conectado em {new Date(hubspotConnectedAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}
+                    </p>
+                  )}
+                </div>
+                <button
+                  onClick={handleDisconnectHubspot}
+                  disabled={hubspotDisconnecting}
+                  className="flex items-center gap-1.5 text-[12px] text-[#888] hover:text-[#DC3545] transition-colors"
+                  title="Desconectar HubSpot"
+                >
+                  {hubspotDisconnecting
+                    ? <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-r-transparent" />
+                    : <Link2Off className="h-3.5 w-3.5" />}
+                  Desconectar
+                </button>
+              </div>
+              <p className="text-[12px] text-[#888]">
+                ✓ Nas reuniões concluídas, clique em "Enviar para HubSpot" para criar um deal e nota no seu CRM.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <p className="text-[13px] text-[#555]">
+                Nenhuma conta HubSpot conectada. Conecte para enviar resumos e follow-ups das reuniões diretamente ao seu CRM.
+              </p>
+              <Button
+                onClick={handleConnectHubspot}
+                className="flex items-center gap-2"
+              >
+                <img src="/hubspot.webp" alt="HubSpot" className="w-4 h-4 object-contain" />
+                Conectar HubSpot
+              </Button>
+            </div>
+          )}
+
+          {hubspotMessage && (
+            <div className={`mt-4 flex items-center gap-2 text-[13px] px-3 py-2.5 rounded-lg ${
+              hubspotMessage.type === 'success'
+                ? 'bg-[#FF7A59]/8 text-[#FF7A59]'
+                : 'bg-[#DC3545]/8 text-[#DC3545]'
+            }`}>
+              {hubspotMessage.type === 'success'
+                ? <CheckCircle className="h-4 w-4 flex-shrink-0" />
+                : <XCircle className="h-4 w-4 flex-shrink-0" />}
+              {hubspotMessage.text}
             </div>
           )}
         </Card>
