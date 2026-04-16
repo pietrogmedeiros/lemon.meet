@@ -13,6 +13,7 @@ import integrationsRouter from './routes/integrations.routes.js'
 import coachingRouter from './routes/coaching.routes.js'
 import meetingBaasRouter from './routes/meetingbaas.routes.js'
 import calendarRouter from './routes/calendar.routes.js'
+import pipedriveRouter from './routes/pipedrive.routes.js'
 
 // Load environment variables
 dotenv.config()
@@ -77,6 +78,7 @@ app.use('/api/integrations', integrationsRouter)
 app.use('/api/coaching', coachingRouter)
 app.use('/api/meetingbaas', meetingBaasRouter)
 app.use('/api/calendar', calendarRouter)
+app.use('/api/pipedrive', pipedriveRouter)
 
 // 404 handler
 app.use((req, res) => {

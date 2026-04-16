@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { MainLayout } from '../components/layout/MainLayout';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import { Webhook, CheckCircle, XCircle, Trash2, Zap, AlertCircle, Calendar, Link2Off, Shield } from 'lucide-react';
+import { Webhook, CheckCircle, XCircle, Trash2, Zap, AlertCircle, Link2Off, Shield } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 interface WebhookConfig {
@@ -43,6 +43,14 @@ export function IntegrationsPage() {
   const [calendarDisconnecting, setCalendarDisconnecting] = useState(false);
   const [calendarMessage, setCalendarMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  // Pipedrive state
+  const [pipedriveConnected, setPipedriveConnected] = useState(false);
+  const [pipedriveConnectedAt, setPipedriveConnectedAt] = useState<string | null>(null);
+  const [pipedriveCompanyDomain, setPipedriveCompanyDomain] = useState<string | null>(null);
+  const [pipedriveLoading, setPipedriveLoading] = useState(true);
+  const [pipedriveDisconnecting, setPipedriveDisconnecting] = useState(false);
+  const [pipedriveMessage, setPipedriveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
   const getAuthHeader = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession();
     return { Authorization: `Bearer ${session?.access_token}` };
@@ -79,6 +87,70 @@ export function IntegrationsPage() {
   }, [getAuthHeader]);
 
   useEffect(() => { loadCalendar(); }, [loadCalendar]);
+
+  // ── Pipedrive ────────────────────────────────────────────────
+  const loadPipedrive = useCallback(async () => {
+    setPipedriveLoading(true);
+    try {
+      const headers = await getAuthHeader();
+      const res = await fetch(`${apiUrl}/api/pipedrive/status`, { headers });
+      if (res.ok) {
+        const data = await res.json();
+        setPipedriveConnected(data.connected);
+        setPipedriveConnectedAt(data.connectedAt ?? null);
+        setPipedriveCompanyDomain(data.companyDomain ?? null);
+      }
+    } catch {}
+    finally { setPipedriveLoading(false); }
+  }, [getAuthHeader]);
+
+  useEffect(() => { loadPipedrive(); }, [loadPipedrive]);
+
+  // Lê parâmetro ?pipedrive= da URL para mostrar feedback pós-OAuth
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const pdParam = params.get('pipedrive');
+    if (pdParam === 'success') {
+      setPipedriveMessage({ type: 'success', text: 'Pipedrive conectado com sucesso!' });
+      loadPipedrive();
+      window.history.replaceState({}, '', window.location.pathname);
+    } else if (pdParam === 'denied') {
+      setPipedriveMessage({ type: 'error', text: 'Autorização negada. Tente novamente.' });
+      window.history.replaceState({}, '', window.location.pathname);
+    } else if (pdParam === 'error') {
+      setPipedriveMessage({ type: 'error', text: 'Erro ao conectar o Pipedrive. Tente novamente.' });
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, [loadPipedrive]);
+
+  const handleConnectPipedrive = async () => {
+    const headers = await getAuthHeader();
+    const res = await fetch(`${apiUrl}/api/pipedrive/connect`, { headers });
+    if (!res.ok) {
+      setPipedriveMessage({ type: 'error', text: 'Erro ao iniciar conexão. Tente novamente.' });
+      return;
+    }
+    const { url } = await res.json();
+    if (url) window.location.href = url;
+  };
+
+  const handleDisconnectPipedrive = async () => {
+    if (!window.confirm('Desconectar o Pipedrive? O histórico de reuniões enviadas não será removido do Pipedrive.')) return;
+    setPipedriveDisconnecting(true);
+    try {
+      const headers = await getAuthHeader();
+      await fetch(`${apiUrl}/api/pipedrive/disconnect`, { method: 'DELETE', headers });
+      setPipedriveConnected(false);
+      setPipedriveConnectedAt(null);
+      setPipedriveCompanyDomain(null);
+      setPipedriveMessage({ type: 'success', text: 'Pipedrive desconectado.' });
+    } catch {
+      setPipedriveMessage({ type: 'error', text: 'Erro ao desconectar. Tente novamente.' });
+    } finally {
+      setPipedriveDisconnecting(false);
+      setTimeout(() => setPipedriveMessage(null), 5000);
+    }
+  };
 
   // Lê parâmetro ?calendar= da URL para mostrar feedback pós-OAuth
   useEffect(() => {
@@ -267,7 +339,7 @@ export function IntegrationsPage() {
         <Card className="p-6">
           <div className="flex items-center gap-3 mb-5">
             <div className="w-10 h-10 rounded-xl bg-[#2D5A27]/10 flex items-center justify-center flex-shrink-0">
-              <Calendar className="h-5 w-5 text-[#2D5A27]" />
+              <img src="/calendar.png" alt="Google Calendar" className="w-6 h-6 object-contain" />
             </div>
             <div>
               <h2 className="text-[16px] font-semibold text-[#1a1a1a]">Google Calendar</h2>
@@ -296,11 +368,7 @@ export function IntegrationsPage() {
             <div className="space-y-4">
               <div className="flex items-center gap-3 p-3 bg-[#F8F9FA] border border-[#E0E0E0] rounded-lg">
                 <div className="w-8 h-8 rounded-full bg-white border border-[#E0E0E0] flex items-center justify-center flex-shrink-0">
-                  <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none">
-                    <rect x="3" y="4" width="18" height="17" rx="2" stroke="#4285F4" strokeWidth="1.5"/>
-                    <path d="M3 9h18" stroke="#4285F4" strokeWidth="1.5"/>
-                    <path d="M8 2v3M16 2v3" stroke="#4285F4" strokeWidth="1.5" strokeLinecap="round"/>
-                  </svg>
+                  <img src="/calendar.png" alt="Google Calendar" className="w-5 h-5 object-contain" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-[13px] font-medium text-[#1a1a1a]">Google Calendar</p>
@@ -334,11 +402,7 @@ export function IntegrationsPage() {
                 onClick={handleConnectCalendar}
                 className="flex items-center gap-2"
               >
-                <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none">
-                  <rect x="3" y="4" width="18" height="17" rx="2" stroke="currentColor" strokeWidth="1.5"/>
-                  <path d="M3 9h18" stroke="currentColor" strokeWidth="1.5"/>
-                  <path d="M8 2v3M16 2v3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                </svg>
+                <img src="/calendar.png" alt="Google Calendar" className="w-4 h-4 object-contain" />
                 Conectar Google Calendar
               </Button>
             </div>
@@ -354,6 +418,95 @@ export function IntegrationsPage() {
                 ? <CheckCircle className="h-4 w-4 flex-shrink-0" />
                 : <XCircle className="h-4 w-4 flex-shrink-0" />}
               {calendarMessage.text}
+            </div>
+          )}
+        </Card>
+        )}
+
+        {/* Pipedrive Integration Card */}
+        {activeTab === 'permissions' && (
+        <Card className="p-6">
+          <div className="flex items-center gap-3 mb-5">
+            <div className="w-10 h-10 rounded-xl bg-[#2D5A27]/10 flex items-center justify-center flex-shrink-0">
+              <img src="/pipedrive.png" alt="Pipedrive" className="w-6 h-6 object-contain" />
+            </div>
+            <div>
+              <h2 className="text-[16px] font-semibold text-[#1a1a1a]">Pipedrive</h2>
+              <p className="text-[13px] text-[#666]">
+                Envie resumos de reuniões e crie tarefas de follow-up direto no seu CRM.
+              </p>
+            </div>
+            {pipedriveConnected && (
+              <span className="ml-auto flex-shrink-0 inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-[#2D5A27]/10 text-[#2D5A27]">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#2D5A27]" />
+                Conectado
+              </span>
+            )}
+          </div>
+
+          {pipedriveLoading ? (
+            <div className="flex items-center gap-2 text-sm text-[#999] py-4">
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-[#2D5A27] border-r-transparent" />
+              Carregando…
+            </div>
+          ) : pipedriveConnected ? (
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 p-3 bg-[#F8F9FA] border border-[#E0E0E0] rounded-lg">
+                <div className="w-8 h-8 rounded-full bg-white border border-[#E0E0E0] flex items-center justify-center flex-shrink-0">
+                  <img src="/pipedrive.png" alt="Pipedrive" className="w-5 h-5 object-contain" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[13px] font-medium text-[#1a1a1a]">Pipedrive</p>
+                  {pipedriveConnectedAt && (
+                    <p className="text-[11px] text-[#888]">
+                      Conectado em {new Date(pipedriveConnectedAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}
+                    </p>
+                  )}
+                  {pipedriveCompanyDomain && (
+                    <p className="text-[11px] text-[#888]">{pipedriveCompanyDomain}</p>
+                  )}
+                </div>
+                <button
+                  onClick={handleDisconnectPipedrive}
+                  disabled={pipedriveDisconnecting}
+                  className="flex items-center gap-1.5 text-[12px] text-[#888] hover:text-[#DC3545] transition-colors"
+                  title="Desconectar Pipedrive"
+                >
+                  {pipedriveDisconnecting
+                    ? <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-r-transparent" />
+                    : <Link2Off className="h-3.5 w-3.5" />}
+                  Desconectar
+                </button>
+              </div>
+              <p className="text-[12px] text-[#888]">
+                ✓ Nas reuniões concluídas, clique em "Enviar para Pipedrive" para criar uma nota e tarefa de follow-up no seu CRM.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <p className="text-[13px] text-[#555]">
+                Nenhuma conta Pipedrive conectada. Conecte para enviar resumos e follow-ups das reuniões diretamente ao seu CRM.
+              </p>
+              <Button
+                onClick={handleConnectPipedrive}
+                className="flex items-center gap-2"
+              >
+                <img src="/pipedrive.png" alt="Pipedrive" className="w-4 h-4 object-contain" />
+                Conectar Pipedrive
+              </Button>
+            </div>
+          )}
+
+          {pipedriveMessage && (
+            <div className={`mt-4 flex items-center gap-2 text-[13px] px-3 py-2.5 rounded-lg ${
+              pipedriveMessage.type === 'success'
+                ? 'bg-[#2D5A27]/8 text-[#2D5A27]'
+                : 'bg-[#DC3545]/8 text-[#DC3545]'
+            }`}>
+              {pipedriveMessage.type === 'success'
+                ? <CheckCircle className="h-4 w-4 flex-shrink-0" />
+                : <XCircle className="h-4 w-4 flex-shrink-0" />}
+              {pipedriveMessage.text}
             </div>
           )}
         </Card>
