@@ -170,7 +170,7 @@ export class CalendarCronService {
       meet_link:       meetingUrl,
       title,
       platform,
-      source:          'calendar_cron',
+      source:          'calendar',
       status:          'requesting',
       baas_bot_id:     baasBotId,
       baas_event_uuid: eventId,
@@ -179,6 +179,10 @@ export class CalendarCronService {
 
     if (insertError) {
       logger.error(`[CalendarCron] Erro ao salvar reunião no banco (evento ${eventId}):`, insertError)
+      // Remove o bot para não deixar órfão no MeetingBaas
+      meetingBaasService.removeBot(baasBotId).catch(e =>
+        logger.warn(`[CalendarCron] Falha ao remover bot órfão ${baasBotId}:`, e)
+      )
     } else {
       logger.info(`[CalendarCron] ✅ Bot enviado: event=${eventId} meeting=${meetingId} bot=${baasBotId} title="${title}"`)
     }
