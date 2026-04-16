@@ -12,26 +12,20 @@ import { Router, type Router as RouterType, type Request, type Response } from '
 import { authMiddleware, type AuthRequest } from '../middleware/auth.middleware.js'
 import { supabase } from '../config/supabase.js'
 import { logger } from '../utils/logger.js'
+import {
+  getValidAccessToken,
+  extractMeetingUrl,
+  GCAL_EVENTS_URL,
+} from '../utils/calendarTokens.js'
 
 const router: RouterType = Router()
 
 const GOOGLE_AUTH_URL  = 'https://accounts.google.com/o/oauth2/v2/auth'
-const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token'
-const GCAL_EVENTS_URL  = 'https://www.googleapis.com/calendar/v3/calendars/primary/events'
 const BAAS_API_URL     = 'https://api.meetingbaas.com'
 
 const SCOPES = 'https://www.googleapis.com/auth/calendar.events'
 
 // ── Helpers ───────────────────────────────────────────────────
-
-function extractMeetingUrl(item: any): string | null {
-  const entryPoints: any[] = item.conferenceData?.entryPoints ?? []
-  const videoEntry = entryPoints.find((e: any) => e.entryPointType === 'video')
-  if (videoEntry?.uri) return videoEntry.uri
-  const text = `${item.location ?? ''} ${item.description ?? ''}`
-  const urlMatch = text.match(/https:\/\/[^\s"<>()]+(?:zoom\.us|teams\.microsoft\.com|meet\.google\.com)[^\s"<>()]*/i)
-  return urlMatch?.[0] ?? null
-}
 
 function detectPlatform(item: any): 'meet' | 'zoom' | 'teams' | null {
   const url = extractMeetingUrl(item) ?? ''
@@ -39,44 +33,6 @@ function detectPlatform(item: any): 'meet' | 'zoom' | 'teams' | null {
   if (url.includes('zoom.us')) return 'zoom'
   if (url.includes('teams.microsoft.com')) return 'teams'
   return null
-}
-
-async function refreshAccessToken(userId: string, refreshToken: string): Promise<string> {
-  const tokenRes = await fetch(GOOGLE_TOKEN_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      grant_type: 'refresh_token',
-      refresh_token: refreshToken,
-      client_id: process.env.GOOGLE_CALENDAR_CLIENT_ID!,
-      client_secret: process.env.GOOGLE_CALENDAR_CLIENT_SECRET!,
-    }),
-  })
-  const data = await tokenRes.json() as any
-  if (!tokenRes.ok || !data.access_token) {
-    throw new Error(`Token refresh failed: ${JSON.stringify(data)}`)
-  }
-  const expiresAt = new Date(Date.now() + data.expires_in * 1000).toISOString()
-  await supabase
-    .from('calendar_integrations')
-    .update({ access_token: data.access_token, token_expires_at: expiresAt })
-    .eq('user_id', userId)
-  return data.access_token
-}
-
-async function getValidAccessToken(userId: string, integration: {
-  refresh_token: string
-  access_token: string | null
-  token_expires_at: string | null
-}): Promise<string> {
-  const expiredOrMissing =
-    !integration.access_token ||
-    !integration.token_expires_at ||
-    new Date(integration.token_expires_at) <= new Date(Date.now() + 60_000)
-  if (expiredOrMissing) {
-    return refreshAccessToken(userId, integration.refresh_token)
-  }
-  return integration.access_token!
 }
 
 // ── GET /api/calendar/connect ─────────────────────────────────

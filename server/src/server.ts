@@ -14,6 +14,7 @@ import coachingRouter from './routes/coaching.routes.js'
 import meetingBaasRouter from './routes/meetingbaas.routes.js'
 import calendarRouter from './routes/calendar.routes.js'
 import pipedriveRouter from './routes/pipedrive.routes.js'
+import { calendarCronService } from './services/CalendarCronService.js'
 
 // Load environment variables
 dotenv.config()
@@ -110,11 +111,15 @@ httpServer.listen(PORT, () => {
 ║                                                          ║
 ╚══════════════════════════════════════════════════════════╝
   `)
+
+  // Inicia o cron de auto-dispatch de bots via Google Calendar
+  calendarCronService.start()
 })
 
 // Graceful shutdown
 const shutdown = async () => {
   console.log('Shutdown initiated...')
+  calendarCronService.stop()
   
   // Fecha servidor HTTP
   httpServer.close(() => {
