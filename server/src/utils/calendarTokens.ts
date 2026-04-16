@@ -5,10 +5,8 @@
 
 import { supabase } from '../config/supabase.js'
 
-const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token'
-const GCAL_EVENTS_URL  = 'https://www.googleapis.com/calendar/v3/calendars/primary/events'
-
-export { GCAL_EVENTS_URL }
+export const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token'
+export const GCAL_EVENTS_URL  = 'https://www.googleapis.com/calendar/v3/calendars/primary/events'
 
 export async function refreshAccessToken(userId: string, refreshToken: string): Promise<string> {
   const tokenRes = await fetch(GOOGLE_TOKEN_URL, {
