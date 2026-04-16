@@ -118,9 +118,23 @@ export class CalendarCronService {
 
     if (!items.length) return
 
-    logger.info(`[CalendarCron] ${items.length} evento(s) na janela para user ${user_id}`)
+    // Filtra explicitamente por startTime dentro da janela
+    // (Google timeMin filtra por endTime, não startTime)
+    const nowMs      = Date.now()
+    const minStartMs = nowMs - LOOKBEHIND_MS
+    const maxStartMs = nowMs + LOOKAHEAD_MS
+    const filtered = items.filter(item => {
+      const start = item.start?.dateTime ?? item.start?.date
+      if (!start) return false
+      const ms = new Date(start).getTime()
+      return ms >= minStartMs && ms <= maxStartMs
+    })
 
-    for (const item of items) {
+    if (!filtered.length) return
+
+    logger.info(`[CalendarCron] ${filtered.length} evento(s) na janela para user ${user_id}`)
+
+    for (const item of filtered) {
       try {
         await this.dispatchBotForEvent(item, user_id)
       } catch (err) {
@@ -156,6 +170,23 @@ export class CalendarCronService {
     if (existingRows && existingRows.length > 0) {
       logger.info(`[CalendarCron] Evento ${eventId} já tem reunião ${existingRows[0].id} (${existingRows[0].status}) — ignorando`)
       return
+    }
+
+    // Checa também se outro usuário já enviou bot para o mesmo link (mesma reunião)
+    if (meetingUrl) {
+      const windowStart = new Date(Date.now() - 30 * 60 * 1000).toISOString()
+      const { data: sameLink } = await supabase
+        .from('meetings')
+        .select('id, user_id')
+        .eq('meet_link', meetingUrl)
+        .in('status', ['requesting', 'recording', 'processing'])
+        .gte('created_at', windowStart)
+        .limit(1)
+
+      if (sameLink && sameLink.length > 0) {
+        logger.info(`[CalendarCron] Já existe bot para ${meetingUrl} (meeting ${sameLink[0].id}) — ignorando duplicata de outro usuário`)
+        return
+      }
     }
 
     // Envia ou agenda o bot via MeetingBaas
