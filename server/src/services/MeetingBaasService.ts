@@ -7,6 +7,7 @@ import { logger } from '../utils/logger.js'
 
 const BAAS_API_URL = 'https://api.meetingbaas.com'
 const BOT_NAME = 'Lemon Notetaker'
+const BOT_IMAGE = 'https://lemon-meet.web.app/lemon-bot-avatar.png'
 
 export interface BaasTranscriptWord {
   start: number
@@ -58,6 +59,7 @@ export class MeetingBaasService {
       body: JSON.stringify({
         meeting_url: meetingUrl,
         bot_name: BOT_NAME,
+        bot_image: BOT_IMAGE,
         recording_mode: 'audio_only',
         transcription_enabled: true,
         transcription_config: { provider: 'gladia' },
@@ -93,6 +95,7 @@ export class MeetingBaasService {
       body: JSON.stringify({
         meeting_url: meetingUrl,
         bot_name: BOT_NAME,
+        bot_image: BOT_IMAGE,
         recording_mode: 'audio_only',
         transcription_enabled: true,
         transcription_config: { provider: 'gladia' },
