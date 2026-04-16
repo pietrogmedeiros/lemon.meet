@@ -242,8 +242,8 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
       noteContent += `🔗 Link: ${meeting.meet_link}`
     }
 
-    // Create a Lead in Pipedrive to associate the note and activity with
-    const leadRes = await fetch(`${PIPEDRIVE_API_BASE}/leads`, {
+    // Create a Deal in Pipedrive to associate the note and activity with
+    const dealRes = await fetch(`${PIPEDRIVE_API_BASE}/deals`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -252,24 +252,24 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
       body: JSON.stringify({ title }),
     })
 
-    if (!leadRes.ok) {
-      const err = await leadRes.text()
-      console.error('[Pipedrive] create lead failed', err)
-      res.status(502).json({ error: 'Failed to create lead in Pipedrive' })
+    if (!dealRes.ok) {
+      const err = await dealRes.text()
+      console.error('[Pipedrive] create deal failed', err)
+      res.status(502).json({ error: 'Failed to create deal in Pipedrive' })
       return
     }
 
-    const leadData = await leadRes.json() as { data: { id: string } }
-    const leadId = leadData.data?.id
+    const dealData = await dealRes.json() as { data: { id: number } }
+    const dealId = dealData.data?.id
 
-    // Create Note linked to the lead
+    // Create Note linked to the deal
     const noteRes = await fetch(`${PIPEDRIVE_API_BASE}/notes`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ content: noteContent, lead_id: leadId }),
+      body: JSON.stringify({ content: noteContent, deal_id: dealId }),
     })
 
     if (!noteRes.ok) {
@@ -281,7 +281,7 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
 
     const noteData = await noteRes.json() as { data: { id: number } }
 
-    // Create Activity (follow-up task) linked to the lead
+    // Create Activity (follow-up task) linked to the deal
     const followUpSuggestion = insights?.followUpSuggestions?.[0] || insights?.followUp?.[0]
     const activitySubject = `Follow-up: ${title}`
 
@@ -300,7 +300,7 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
         type: 'task',
         due_date: dueDateStr,
         note: followUpSuggestion || `Reunião: ${title}`,
-        lead_id: leadId,
+        deal_id: dealId,
       }),
     })
 
@@ -308,7 +308,7 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
 
     res.json({
       success: true,
-      leadId,
+      dealId,
       noteId: noteData.data?.id,
       activityId: activityData?.data?.id,
     })
