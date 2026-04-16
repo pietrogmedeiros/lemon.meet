@@ -53,6 +53,9 @@ interface Meeting {
   transcript: string | null;
   created_at: string;
   participant_emails?: string[] | null;
+  user_name?: string | null;
+  user_email?: string | null;
+  user_avatar_url?: string | null;
 }
 
 interface ActionItem {
@@ -499,6 +502,29 @@ export function TranscricaoDetalhesPage() {
                       {email}
                     </span>
                   ))}
+                </div>
+              </div>
+            )}
+            {(meeting.user_name || meeting.user_email) && (
+              <div className="mt-2 flex items-center gap-2">
+                <span className="text-xs text-secondary flex-shrink-0">Gravada por:</span>
+                <div className="flex items-center gap-1.5">
+                  {meeting.user_avatar_url ? (
+                    <img
+                      src={meeting.user_avatar_url}
+                      alt={meeting.user_name ?? meeting.user_email ?? ''}
+                      className="w-5 h-5 rounded-full object-cover flex-shrink-0"
+                    />
+                  ) : (
+                    <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                      <span className="text-[10px] font-bold text-primary">
+                        {(meeting.user_name ?? meeting.user_email ?? '?')[0].toUpperCase()}
+                      </span>
+                    </div>
+                  )}
+                  <span className="text-xs font-medium text-secondary">
+                    {meeting.user_name ?? meeting.user_email}
+                  </span>
                 </div>
               </div>
             )}

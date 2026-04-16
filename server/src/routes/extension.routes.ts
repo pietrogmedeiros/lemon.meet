@@ -201,13 +201,31 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ success: false, message: 'Meeting not found' })
     }
 
+    // Enriquece com nome, email e avatar do dono da reunião
+    let user_name: string | null = null
+    let user_email: string | null = null
+    let user_avatar_url: string | null = null
+    try {
+      const { data: userProfile } = await supabase.auth.admin.getUserById(meeting.user_id)
+      if (userProfile?.user) {
+        const u = userProfile.user
+        user_name = u.user_metadata?.full_name ?? u.user_metadata?.name ?? null
+        user_email = u.email ?? null
+        user_avatar_url = u.user_metadata?.avatar_url ?? u.user_metadata?.picture ?? null
+      }
+    } catch {}
+
     const { data: segments } = await supabase
       .from('transcript_segments')
       .select('id, text, start_seconds, end_seconds, speaker, sequence, created_at')
       .eq('meeting_id', id)
       .order('sequence', { ascending: true })
 
-    return res.json({ success: true, meeting, segments: segments ?? [] })
+    return res.json({
+      success: true,
+      meeting: { ...meeting, user_name, user_email, user_avatar_url },
+      segments: segments ?? [],
+    })
   } catch (err) {
     logger.error('Unexpected error in GET /meetings/:id:', err)
     return res.status(500).json({ success: false, message: 'Internal server error' })
