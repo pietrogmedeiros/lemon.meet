@@ -242,14 +242,34 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
       noteContent += `🔗 Link: ${meeting.meet_link}`
     }
 
-    // Create Note in Pipedrive
+    // Create a Lead in Pipedrive to associate the note and activity with
+    const leadRes = await fetch(`${PIPEDRIVE_API_BASE}/leads`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ title }),
+    })
+
+    if (!leadRes.ok) {
+      const err = await leadRes.text()
+      console.error('[Pipedrive] create lead failed', err)
+      res.status(502).json({ error: 'Failed to create lead in Pipedrive' })
+      return
+    }
+
+    const leadData = await leadRes.json() as { data: { id: string } }
+    const leadId = leadData.data?.id
+
+    // Create Note linked to the lead
     const noteRes = await fetch(`${PIPEDRIVE_API_BASE}/notes`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ content: noteContent }),
+      body: JSON.stringify({ content: noteContent, lead_id: leadId }),
     })
 
     if (!noteRes.ok) {
@@ -261,11 +281,9 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
 
     const noteData = await noteRes.json() as { data: { id: number } }
 
-    // Create Activity (follow-up task)
+    // Create Activity (follow-up task) linked to the lead
     const followUpSuggestion = insights?.followUpSuggestions?.[0] || insights?.followUp?.[0]
-    const activitySubject = followUpSuggestion
-      ? `Follow-up: ${title}`
-      : `Follow-up pós-reunião: ${title}`
+    const activitySubject = `Follow-up: ${title}`
 
     const dueDate = new Date()
     dueDate.setDate(dueDate.getDate() + 1) // tomorrow
@@ -282,6 +300,7 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
         type: 'task',
         due_date: dueDateStr,
         note: followUpSuggestion || `Reunião: ${title}`,
+        lead_id: leadId,
       }),
     })
 
@@ -289,6 +308,7 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
 
     res.json({
       success: true,
+      leadId,
       noteId: noteData.data?.id,
       activityId: activityData?.data?.id,
     })
