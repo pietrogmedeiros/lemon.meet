@@ -65,8 +65,8 @@ export function OnboardingModal({ open, onClose }: OnboardingModalProps) {
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
       <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col overflow-hidden"
-        style={{ maxHeight: '90vh' }}
+        className={`bg-white rounded-2xl shadow-2xl w-full flex flex-col overflow-hidden transition-all duration-300 ${page === 2 ? 'max-w-2xl' : 'max-w-lg'}`}
+        style={{ maxHeight: '92vh' }}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-[#F0F0F0]">
@@ -182,7 +182,7 @@ export function OnboardingModal({ open, onClose }: OnboardingModalProps) {
                     <img
                       src="/permissaocalendar1.png"
                       alt="Clique em Avançado"
-                      className="w-full rounded-xl border border-[#E0E0E0] object-contain max-h-40"
+                      className="w-full rounded-xl border border-[#E0E0E0] object-contain max-h-64"
                     />
                   </div>
                 </li>
@@ -193,7 +193,7 @@ export function OnboardingModal({ open, onClose }: OnboardingModalProps) {
                     <img
                       src="/permissaocalendar2.png"
                       alt="Acessar Lemon.meet (não seguro)"
-                      className="w-full rounded-xl border border-[#E0E0E0] object-contain max-h-40"
+                      className="w-full rounded-xl border border-[#E0E0E0] object-contain max-h-64"
                     />
                   </div>
                 </li>
@@ -219,7 +219,7 @@ export function OnboardingModal({ open, onClose }: OnboardingModalProps) {
                     <img
                       src="/permissaonotetaker2.jpeg"
                       alt="Clique nos 3 pontos"
-                      className="w-full rounded-xl border border-[#E0E0E0] object-contain max-h-40"
+                      className="w-full rounded-xl border border-[#E0E0E0] object-contain max-h-64"
                     />
                   </div>
                 </li>
@@ -230,7 +230,7 @@ export function OnboardingModal({ open, onClose }: OnboardingModalProps) {
                     <img
                       src="/permissaonotetaker1.jpeg"
                       alt="Permitir Entrada"
-                      className="w-full rounded-xl border border-[#E0E0E0] object-contain max-h-40"
+                      className="w-full rounded-xl border border-[#E0E0E0] object-contain max-h-64"
                     />
                   </div>
                 </li>
