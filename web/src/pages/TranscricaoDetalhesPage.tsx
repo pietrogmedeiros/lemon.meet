@@ -5,6 +5,7 @@ import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { ArrowLeft, Clock, Calendar, Mic, Target, CheckCircle, Mail, BookOpen, Sparkles, X, Copy, Check, Trash2, Lock, Users } from 'lucide-react';
+import { RapportSection } from '../components/ui/RapportSection';
 import { supabase } from '../lib/supabase';
 import { useSubscription } from '../contexts';
 
@@ -187,6 +188,15 @@ export function TranscricaoDetalhesPage() {
   // Per-suggestion copy state
   const [copiedSuggestionIndex, setCopiedSuggestionIndex] = useState<number | null>(null);
 
+  // Rapport state
+  const [rapport, setRapport] = useState<{
+    website_url: string | null;
+    linkedin_url: string | null;
+    instagram_url: string | null;
+    rapport_data: any | null;
+  } | null>(null);
+  const [rapportLoaded, setRapportLoaded] = useState(false);
+
   // Briefing state
   const [briefing, setBriefing] = useState<string | null>(null);
   const [briefingLoading, setBriefingLoading] = useState(false);
@@ -262,6 +272,25 @@ export function TranscricaoDetalhesPage() {
 
     loadActionItems();
   }, [id, meeting, actionItemsLoaded, apiUrl, getAuthHeader]);
+
+  // Load rapport once meeting is ready (non-blocking)
+  useEffect(() => {
+    if (!id || !meeting || rapportLoaded) return;
+    setRapportLoaded(true);
+    const loadRapport = async () => {
+      try {
+        const headers = await getAuthHeader();
+        const res = await fetch(`${apiUrl}/api/meetings/${id}/rapport`, { headers });
+        if (res.ok) {
+          const data = await res.json();
+          setRapport(data.rapport ?? null);
+        }
+      } catch {
+        // Non-critical
+      }
+    };
+    loadRapport();
+  }, [id, meeting, rapportLoaded, apiUrl, getAuthHeader]);
 
   // Load briefing once meeting is ready (non-blocking)
   useEffect(() => {
@@ -574,6 +603,16 @@ export function TranscricaoDetalhesPage() {
             </button>
           )}
         </div>
+
+        {/* Rapport pré-reunião */}
+        {rapportLoaded && (
+          <RapportSection
+            meetingId={id!}
+            initialRapport={rapport}
+            apiUrl={apiUrl}
+            getAuthHeader={getAuthHeader}
+          />
+        )}
 
         {/* Briefing pré-reunião */}
         {(briefingLoading || briefing) && (

@@ -15,6 +15,7 @@ import { supabase } from '../config/supabase.js'
 import { logger } from '../utils/logger.js'
 import { meetingBaasService } from '../services/MeetingBaasService.js'
 import { insightsService } from '../services/InsightsService.js'
+import { rapportService } from '../services/RapportService.js'
 import { getAccessibleMemberIds } from '../utils/teamAccess.js'
 
 const router: express.Router = Router()
@@ -520,6 +521,84 @@ router.delete('/:id/action-items/:itemId', authMiddleware, async (req: AuthReque
   } catch (err) {
     logger.error('Unexpected error in DELETE /meetings/:id/action-items/:itemId:', err)
     return res.status(500).json({ success: false, message: 'Internal server error' })
+  }
+})
+
+// ── GET /api/meetings/:id/rapport ────────────────────────────
+// Retorna o rapport salvo para a reunião (se existir)
+router.get('/:id/rapport', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params
+    const userId = req.user!.id
+    const memberIds = await getAccessibleMemberIds(userId)
+
+    // Verifica acesso
+    const { data: meeting, error: meetingError } = await supabase
+      .from('meetings')
+      .select('id')
+      .eq('id', id)
+      .in('user_id', memberIds)
+      .single()
+
+    if (meetingError || !meeting) {
+      return res.status(404).json({ success: false, message: 'Reunião não encontrada' })
+    }
+
+    const rapport = await rapportService.getRapport(id)
+    return res.json({ success: true, rapport })
+  } catch (err) {
+    logger.error('Unexpected error in GET /meetings/:id/rapport:', err)
+    return res.status(500).json({ success: false, message: 'Erro interno do servidor' })
+  }
+})
+
+// ── POST /api/meetings/:id/rapport/enrich ────────────────────
+// Raspa o site (se fornecido), chama DeepSeek e salva o rapport
+router.post('/:id/rapport/enrich', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params
+    const userId = req.user!.id
+
+    // Verifica ownership
+    const { data: meeting, error: meetingError } = await supabase
+      .from('meetings')
+      .select('id')
+      .eq('id', id)
+      .eq('user_id', userId)
+      .single()
+
+    if (meetingError || !meeting) {
+      return res.status(404).json({ success: false, message: 'Reunião não encontrada' })
+    }
+
+    const { website, linkedin, instagram } = req.body as {
+      website?: string
+      linkedin?: string
+      instagram?: string
+    }
+
+    if (!website && !linkedin && !instagram) {
+      return res.status(400).json({ success: false, message: 'Informe ao menos uma URL (website, linkedin ou instagram)' })
+    }
+
+    // Validação básica de URLs
+    const urlsToValidate = [website, linkedin, instagram].filter(Boolean) as string[]
+    for (const raw of urlsToValidate) {
+      try {
+        const parsed = new URL(raw)
+        if (!['http:', 'https:'].includes(parsed.protocol)) {
+          return res.status(400).json({ success: false, message: `URL inválida: ${raw}` })
+        }
+      } catch {
+        return res.status(400).json({ success: false, message: `URL inválida: ${raw}` })
+      }
+    }
+
+    const rapport = await rapportService.enrichAndSave(id, userId, { website, linkedin, instagram })
+    return res.json({ success: true, rapport })
+  } catch (err) {
+    logger.error('Unexpected error in POST /meetings/:id/rapport/enrich:', err)
+    return res.status(500).json({ success: false, message: 'Erro interno do servidor' })
   }
 })
 
