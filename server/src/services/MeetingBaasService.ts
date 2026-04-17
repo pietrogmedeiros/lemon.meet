@@ -7,7 +7,7 @@ import { logger } from '../utils/logger.js'
 
 const BAAS_API_URL = 'https://api.meetingbaas.com'
 const BOT_NAME = 'Lemon Notetaker'
-const BOT_IMAGE = 'https://lemon-meet.web.app/lemon-bot-avatar.png'
+const BOT_IMAGE = 'https://lemon-meet.web.app/logo.png'
 
 export interface BaasTranscriptWord {
   start: number
