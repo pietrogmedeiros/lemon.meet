@@ -559,12 +559,14 @@ router.post('/:id/rapport/enrich', authMiddleware, async (req: AuthRequest, res:
     const { id } = req.params
     const userId = req.user!.id
 
-    // Verifica ownership
+    const memberIds = await getAccessibleMemberIds(userId)
+
+    // Verifica acesso (próprio ou admin do time)
     const { data: meeting, error: meetingError } = await supabase
       .from('meetings')
       .select('id')
       .eq('id', id)
-      .eq('user_id', userId)
+      .in('user_id', memberIds)
       .single()
 
     if (meetingError || !meeting) {
