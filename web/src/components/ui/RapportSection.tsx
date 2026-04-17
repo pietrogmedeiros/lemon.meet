@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Globe, Linkedin, Instagram, Sparkles, RefreshCw, Building2, User, Lightbulb, MessageCircle, Hash } from 'lucide-react';
 import { Card } from './Card';
 import { Button } from './Button';
@@ -193,6 +193,15 @@ export function RapportSection({ meetingId, initialRapport, apiUrl, getAuthHeade
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(!initialRapport?.rapport_data);
+
+  // Sincroniza quando o pai passa os dados carregados do banco
+  useEffect(() => {
+    setWebsite(initialRapport?.website_url ?? '');
+    setLinkedin(initialRapport?.linkedin_url ?? '');
+    setInstagram(initialRapport?.instagram_url ?? '');
+    setRapport(initialRapport);
+    setShowForm(!initialRapport?.rapport_data);
+  }, [initialRapport]);
 
   const hasAnyUrl = website.trim() || linkedin.trim() || instagram.trim();
 

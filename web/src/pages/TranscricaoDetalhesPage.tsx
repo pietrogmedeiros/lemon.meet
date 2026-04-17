@@ -195,7 +195,7 @@ export function TranscricaoDetalhesPage() {
     instagram_url: string | null;
     rapport_data: any | null;
   } | null>(null);
-  const [rapportLoaded, setRapportLoaded] = useState(false);
+  const [rapportFetchDone, setRapportFetchDone] = useState(false);
 
   // Briefing state
   const [briefing, setBriefing] = useState<string | null>(null);
@@ -273,10 +273,9 @@ export function TranscricaoDetalhesPage() {
     loadActionItems();
   }, [id, meeting, actionItemsLoaded, apiUrl, getAuthHeader]);
 
-  // Load rapport once meeting is ready (non-blocking)
+  // Load rapport once meeting is ready — só busca dados existentes, nunca gera automaticamente
   useEffect(() => {
-    if (!id || !meeting || rapportLoaded) return;
-    setRapportLoaded(true);
+    if (!id || !meeting || rapportFetchDone) return;
     const loadRapport = async () => {
       try {
         const headers = await getAuthHeader();
@@ -287,10 +286,12 @@ export function TranscricaoDetalhesPage() {
         }
       } catch {
         // Non-critical
+      } finally {
+        setRapportFetchDone(true);
       }
     };
     loadRapport();
-  }, [id, meeting, rapportLoaded, apiUrl, getAuthHeader]);
+  }, [id, meeting, rapportFetchDone, apiUrl, getAuthHeader]);
 
   // Load briefing once meeting is ready (non-blocking)
   useEffect(() => {
@@ -605,7 +606,7 @@ export function TranscricaoDetalhesPage() {
         </div>
 
         {/* Rapport pré-reunião */}
-        {rapportLoaded && (
+        {rapportFetchDone && (
           <RapportSection
             meetingId={id!}
             initialRapport={rapport}
