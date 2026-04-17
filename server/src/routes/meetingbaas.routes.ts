@@ -33,7 +33,7 @@ router.post('/webhook', async (req: Request, res: Response) => {
         await handleComplete(data as BaasCompletePayload)
       } else if (event === 'bot.completed') {
         await handleBotCompleted(data)
-      } else if (event === 'failed') {
+      } else if (event === 'failed' || event === 'bot.failed') {
         await handleFailed(data)
       } else if (event === 'calendar.sync_events' || event === 'calendar.events_synced' || event === 'calendar.event_created' || event === 'calendar.event_updated') {
         await handleCalendarSyncEvents(data)
@@ -341,9 +341,10 @@ async function handleBotCompleted(data: Record<string, any>) {
   }
 }
 
-async function handleFailed(data: { bot_id: string; error: string; event_uuid?: string }) {
-  const { bot_id, error, event_uuid } = data
-  logger.warn(`[MeetingBaas] Bot ${bot_id} falhou: ${error}`)
+async function handleFailed(data: { bot_id: string; error?: string; error_message?: string; error_code?: string; event_uuid?: string }) {
+  const { bot_id, event_uuid } = data
+  const errorMsg = data.error_message ?? data.error ?? data.error_code ?? 'unknown'
+  logger.warn(`[MeetingBaas] Bot ${bot_id} falhou: ${errorMsg}`)
 
   const { data: failedUpdated } = await supabase
     .from('meetings')
