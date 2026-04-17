@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { X, Calendar, Bot, FileText, Lightbulb, ExternalLink, AlertTriangle, ChevronRight } from 'lucide-react'
+import { X, Calendar, Bot, FileText, Lightbulb, ExternalLink, AlertTriangle, ChevronRight, ZoomIn } from 'lucide-react'
 
 const STORAGE_KEY = 'lemon_onboarding_seen'
 
@@ -50,15 +50,40 @@ interface OnboardingModalProps {
 
 export function OnboardingModal({ open, onClose }: OnboardingModalProps) {
   const [page, setPage] = useState<1 | 2>(1)
+  const [lightbox, setLightbox] = useState<string | null>(null)
 
   // Reseta para página 1 toda vez que o modal abre
   useEffect(() => {
-    if (open) setPage(1)
+    if (open) { setPage(1); setLightbox(null) }
   }, [open])
 
   if (!open) return null
 
   return (
+    <>
+    {/* Lightbox */}
+    {lightbox && (
+      <div
+        className="fixed inset-0 z-[10000] flex items-center justify-center p-6"
+        style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(4px)' }}
+        onClick={() => setLightbox(null)}
+      >
+        <button
+          onClick={() => setLightbox(null)}
+          className="absolute top-4 right-4 p-2 rounded-full bg-white/20 hover:bg-white/30 text-white transition-colors"
+          aria-label="Fechar imagem"
+        >
+          <X size={22} />
+        </button>
+        <img
+          src={lightbox}
+          alt="Imagem ampliada"
+          className="max-w-full max-h-full rounded-2xl shadow-2xl object-contain"
+          onClick={(e) => e.stopPropagation()}
+        />
+      </div>
+    )}
+
     <div
       className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
       style={{ background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(2px)' }}
@@ -179,22 +204,36 @@ export function OnboardingModal({ open, onClose }: OnboardingModalProps) {
                   <span className="text-[11px] font-bold bg-[#4285F4] text-white rounded-full w-5 h-5 flex items-center justify-center shrink-0 mt-0.5">1</span>
                   <div className="flex-1 min-w-0">
                     <p className="text-[13px] text-[#444] leading-snug mb-2">Na tela de aviso do Google, clique em <strong>"Avançado"</strong></p>
-                    <img
-                      src="/permissaocalendar1.png"
-                      alt="Clique em Avançado"
-                      className="w-full rounded-xl border border-[#E0E0E0] object-contain max-h-64"
-                    />
+                    <div className="relative group cursor-zoom-in" onClick={() => setLightbox('/permissaocalendar1.png')}>
+                      <img
+                        src="/permissaocalendar1.png"
+                        alt="Clique em Avançado"
+                        className="w-full rounded-xl border border-[#E0E0E0] object-contain max-h-64 transition-opacity group-hover:opacity-90"
+                      />
+                      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="bg-black/50 rounded-full p-2">
+                          <ZoomIn size={18} className="text-white" />
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </li>
                 <li className="flex gap-3 items-start">
                   <span className="text-[11px] font-bold bg-[#4285F4] text-white rounded-full w-5 h-5 flex items-center justify-center shrink-0 mt-0.5">2</span>
                   <div className="flex-1 min-w-0">
                     <p className="text-[13px] text-[#444] leading-snug mb-2">Depois clique em <strong>"Acessar Lemon.meet (não seguro)"</strong></p>
-                    <img
-                      src="/permissaocalendar2.png"
-                      alt="Acessar Lemon.meet (não seguro)"
-                      className="w-full rounded-xl border border-[#E0E0E0] object-contain max-h-64"
-                    />
+                    <div className="relative group cursor-zoom-in" onClick={() => setLightbox('/permissaocalendar2.png')}>
+                      <img
+                        src="/permissaocalendar2.png"
+                        alt="Acessar Lemon.meet (não seguro)"
+                        className="w-full rounded-xl border border-[#E0E0E0] object-contain max-h-64 transition-opacity group-hover:opacity-90"
+                      />
+                      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="bg-black/50 rounded-full p-2">
+                          <ZoomIn size={18} className="text-white" />
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </li>
               </ol>
@@ -216,22 +255,36 @@ export function OnboardingModal({ open, onClose }: OnboardingModalProps) {
                   <span className="text-[11px] font-bold bg-[#2D5A27] text-white rounded-full w-5 h-5 flex items-center justify-center shrink-0 mt-0.5">1</span>
                   <div className="flex-1 min-w-0">
                     <p className="text-[13px] text-[#444] leading-snug mb-2">Na reunião, clique nos <strong>3 pontos</strong> ao lado do "Lemon Notetaker" na lista de participantes</p>
-                    <img
-                      src="/permissaonotetaker2.jpeg"
-                      alt="Clique nos 3 pontos"
-                      className="w-full rounded-xl border border-[#E0E0E0] object-contain max-h-64"
-                    />
+                    <div className="relative group cursor-zoom-in" onClick={() => setLightbox('/permissaonotetaker2.jpeg')}>
+                      <img
+                        src="/permissaonotetaker2.jpeg"
+                        alt="Clique nos 3 pontos"
+                        className="w-full rounded-xl border border-[#E0E0E0] object-contain max-h-64 transition-opacity group-hover:opacity-90"
+                      />
+                      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="bg-black/50 rounded-full p-2">
+                          <ZoomIn size={18} className="text-white" />
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </li>
                 <li className="flex gap-3 items-start">
                   <span className="text-[11px] font-bold bg-[#2D5A27] text-white rounded-full w-5 h-5 flex items-center justify-center shrink-0 mt-0.5">2</span>
                   <div className="flex-1 min-w-0">
                     <p className="text-[13px] text-[#444] leading-snug mb-2">Selecione <strong>"Permitir Entrada"</strong></p>
-                    <img
-                      src="/permissaonotetaker1.jpeg"
-                      alt="Permitir Entrada"
-                      className="w-full rounded-xl border border-[#E0E0E0] object-contain max-h-64"
-                    />
+                    <div className="relative group cursor-zoom-in" onClick={() => setLightbox('/permissaonotetaker1.jpeg')}>
+                      <img
+                        src="/permissaonotetaker1.jpeg"
+                        alt="Permitir Entrada"
+                        className="w-full rounded-xl border border-[#E0E0E0] object-contain max-h-64 transition-opacity group-hover:opacity-90"
+                      />
+                      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="bg-black/50 rounded-full p-2">
+                          <ZoomIn size={18} className="text-white" />
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </li>
               </ol>
@@ -277,6 +330,7 @@ export function OnboardingModal({ open, onClose }: OnboardingModalProps) {
         </div>
       </div>
     </div>
+    </>
   )
 }
 
