@@ -306,4 +306,155 @@ router.get('/:id/transcript', authMiddleware, async (req: AuthRequest, res: Resp
   }
 });
 
+// POST /api/meetings/:id/regenerate-fup - Regenera FUP com direcionador de tom
+router.post('/:id/regenerate-fup', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { originalFup, tone, fupIndex } = req.body;
+    const userId = req.user!.id;
+    const memberIds = await getAccessibleMemberIds(userId);
+
+    // Validações
+    if (!originalFup || !tone || fupIndex === undefined) {
+      return res.status(400).json({
+        success: false,
+        message: 'originalFup, tone and fupIndex are required'
+      });
+    }
+
+    const validTones = ['formal', 'objetivo', 'urgente', 'consultivo', 'criativo'];
+    if (!validTones.includes(tone)) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid tone. Must be one of: ${validTones.join(', ')}`
+      });
+    }
+
+    // Busca a reunião
+    const { data: meeting, error: meetingError } = await supabase
+      .from('meetings')
+      .select('transcript, insights')
+      .eq('id', id)
+      .in('user_id', memberIds)
+      .single();
+
+    if (meetingError || !meeting) {
+      return res.status(404).json({
+        success: false,
+        message: 'Meeting not found'
+      });
+    }
+
+    if (!meeting.transcript) {
+      return res.status(400).json({
+        success: false,
+        message: 'Meeting has no transcript'
+      });
+    }
+
+    // Gera o FUP regenerado usando o InsightsService
+    const { insightsService } = await import('../services/InsightsService.js');
+    const regeneratedFup = await insightsService.regenerateFollowUp(
+      originalFup,
+      tone as 'formal' | 'objetivo' | 'urgente' | 'consultivo' | 'criativo',
+      meeting.transcript
+    );
+
+    // Salva a versão no banco de dados
+    const { error: insertError } = await supabase
+      .from('meeting_fup_versions')
+      .upsert({
+        meeting_id: id,
+        fup_index: fupIndex,
+        tone,
+        content: regeneratedFup,
+        updated_at: new Date().toISOString()
+      }, {
+        onConflict: 'meeting_id,fup_index,tone'
+      });
+
+    if (insertError) {
+      logger.error('Error saving FUP version:', insertError);
+      // Não falha a request, apenas loga o erro
+    }
+
+    logger.info(`FUP regenerated and saved for meeting ${id} with tone ${tone}`);
+
+    return res.json({
+      success: true,
+      regeneratedFup,
+      tone
+    });
+
+  } catch (error) {
+    logger.error('Error in POST /meetings/:id/regenerate-fup:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+});
+
+// GET /api/meetings/:id/fup-versions - Busca versões salvas de FUPs
+router.get('/:id/fup-versions', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user!.id;
+    const memberIds = await getAccessibleMemberIds(userId);
+
+    // Verifica acesso à reunião
+    const { data: meeting, error: meetingError } = await supabase
+      .from('meetings')
+      .select('id')
+      .eq('id', id)
+      .in('user_id', memberIds)
+      .single();
+
+    if (meetingError || !meeting) {
+      return res.status(404).json({
+        success: false,
+        message: 'Meeting not found'
+      });
+    }
+
+    // Busca todas as versões salvas
+    const { data: versions, error: versionsError } = await supabase
+      .from('meeting_fup_versions')
+      .select('*')
+      .eq('meeting_id', id)
+      .order('fup_index', { ascending: true })
+      .order('created_at', { ascending: false });
+
+    if (versionsError) {
+      logger.error('Error fetching FUP versions:', versionsError);
+      return res.status(500).json({
+        success: false,
+        message: 'Error fetching FUP versions'
+      });
+    }
+
+    // Organiza por fupIndex e tone
+    const versionsByIndex: { [key: number]: { [tone: string]: string } } = {};
+    
+    (versions || []).forEach((v: any) => {
+      if (!versionsByIndex[v.fup_index]) {
+        versionsByIndex[v.fup_index] = {};
+      }
+      versionsByIndex[v.fup_index][v.tone] = v.content;
+    });
+
+    return res.json({
+      success: true,
+      versions: versionsByIndex
+    });
+
+  } catch (error) {
+    logger.error('Error in GET /meetings/:id/fup-versions:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+});
+
 export default router;

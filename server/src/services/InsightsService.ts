@@ -289,6 +289,84 @@ Retorne APENAS o texto do briefing, sem cabeçalhos ou formatação markdown.`;
   }
 
   /**
+   * Regenera um FUP aplicando um direcionador de tom específico
+   */
+  async regenerateFollowUp(
+    originalFup: string,
+    tone: 'formal' | 'objetivo' | 'urgente' | 'consultivo' | 'criativo',
+    transcriptContext: string
+  ): Promise<string> {
+    const toneInstructions = {
+      formal: `Tom FORMAL:
+- Linguagem profissional e estruturada
+- Tratamento respeitoso e autoritativo
+- Evite informalidades e gírias
+- Use estrutura clara com saudação, corpo e fechamento
+- Adequado para enterprise e primeiro contato`,
+      
+      objetivo: `Tom OBJETIVO:
+- Máximo 3-4 linhas, direto ao ponto
+- Sem enrolação ou rodeios
+- Foco na ação e próximos passos
+- Linguagem clara e sucinta
+- Adequado para clientes apressados e reengajamento`,
+      
+      urgente: `Tom URGENTE:
+- Enfatize deadlines e prazos
+- Use gatilhos de scarcity (vagas limitadas, oferta temporária)
+- Call-to-action forte e imediata
+- Senso de oportunidade que não pode ser perdida
+- Adequado para fim de mês e propostas vencendo`,
+      
+      consultivo: `Tom CONSULTIVO:
+- Faça perguntas estratégicas
+- Demonstre empatia e interesse genuíno
+- Foque em entender a situação do cliente
+- Linguagem de parceria e diálogo
+- Adequado para qualificação e exploração`,
+      
+      criativo: `Tom CRIATIVO:
+- Linguagem descontraída e humanizada
+- Use storytelling quando apropriado
+- Seja memorável e diferente
+- Mantenha profissionalismo mas com personalidade
+- Adequado para reengajamento e prospecção`
+    };
+
+    const systemPrompt = `Você é um assistente de vendas especializado em follow-ups. Sua tarefa é regenerar uma mensagem de follow-up aplicando um tom específico.
+
+INSTRUÇÕES:
+${toneInstructions[tone]}
+
+IMPORTANTE:
+- Mantenha a essência e informações-chave da mensagem original
+- Adapte APENAS o tom, estilo e estrutura
+- A mensagem deve estar pronta para enviar (primeira pessoa)
+- Não adicione placeholders como [nome do cliente]
+- Use informações do contexto da transcrição quando relevante
+- Retorne APENAS o texto da mensagem, sem aspas ou formatação extra`;
+
+    const userPrompt = `Mensagem original:
+${originalFup}
+
+Contexto da reunião (use para personalizar):
+${transcriptContext.substring(0, 1000)}
+
+Regenere a mensagem aplicando o tom ${tone.toUpperCase()}.`;
+
+    const response = await deepseek.chat.completions.create({
+      model: 'deepseek-chat',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+      temperature: 0.7,
+    });
+
+    return response.choices[0]?.message?.content?.trim() ?? originalFup;
+  }
+
+  /**
    * Gera insights de forma assíncrona (para ser chamado após reunião terminar)
    */
   async generateInsightsAsync(meetingId: string): Promise<void> {

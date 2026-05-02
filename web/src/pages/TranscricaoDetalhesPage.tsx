@@ -4,10 +4,10 @@ import { MainLayout } from '../components/layout/MainLayout';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
-import { ArrowLeft, Clock, Calendar, Mic, Target, CheckCircle, Mail, BookOpen, Sparkles, X, Copy, Check, Trash2, Lock, Users } from 'lucide-react';
+import { ArrowLeft, Clock, Calendar, Mic, Target, CheckCircle, Mail, BookOpen, Sparkles, X, Copy, Check, Trash2, Lock, Users, RefreshCw } from 'lucide-react';
 import { RapportSection } from '../components/ui/RapportSection';
 import { supabase } from '../lib/supabase';
-import { useSubscription } from '../contexts';
+import { useSubscription, useAuth } from '../contexts';
 
 interface TranscriptSegment {
   id: string;
@@ -83,17 +83,176 @@ function StatusBadge({ status }: { status: string }) {
 
 // ── FollowUpSection — bloqueado no plano Starter ───────────────────────────────
 
+type ToneType = 'formal' | 'objetivo' | 'urgente' | 'consultivo' | 'criativo';
+
 interface FollowUpSectionProps {
   suggestions: string[];
   emailLoading: boolean;
   onGenerateEmail: () => void;
   copiedIndex: number | null;
   onCopy: (text: string, idx: number) => void;
+  meetingId: string;
 }
 
-function FollowUpSection({ suggestions, emailLoading, onGenerateEmail, copiedIndex, onCopy }: FollowUpSectionProps) {
+function FollowUpSection({ suggestions, emailLoading, onGenerateEmail, copiedIndex, onCopy, meetingId }: FollowUpSectionProps) {
   const { subscription } = useSubscription();
   const isPro = subscription?.plan === 'professional' || subscription?.plan === 'trial';
+  const { session } = useAuth();
+  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+  
+  // Estado para controlar tom selecionado por FUP
+  const [selectedTones, setSelectedTones] = useState<{ [key: number]: ToneType | null }>({});
+  // Estado para FUPs regenerados (carrega do banco + novos)
+  const [regeneratedFups, setRegeneratedFups] = useState<{ [key: number]: { [tone: string]: string } }>({});
+  // FUP atualmente exibido por índice
+  const [currentFups, setCurrentFups] = useState<{ [key: number]: { content: string; tone?: string } }>({});
+  // Estado de loading por FUP
+  const [regeneratingIndex, setRegeneratingIndex] = useState<number | null>(null);
+
+  // Carrega versões salvas do banco ao montar o componente
+  useEffect(() => {
+    if (!isPro || !session?.access_token) return;
+
+    const loadSavedVersions = async () => {
+      try {
+        const headers = {
+          Authorization: `Bearer ${session.access_token}`,
+        };
+        
+        const res = await fetch(`${apiUrl}/api/meetings/${meetingId}/fup-versions`, { headers });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && data.versions) {
+            setRegeneratedFups(data.versions);
+            
+            // Define o FUP atual para cada índice (usa a última versão salva se existir)
+            const initialCurrentFups: { [key: number]: { content: string; tone?: string } } = {};
+            suggestions.forEach((suggestion, i) => {
+              const versions = data.versions[i];
+              if (versions && Object.keys(versions).length > 0) {
+                // Usa a primeira versão disponível como padrão
+                const firstTone = Object.keys(versions)[0];
+                initialCurrentFups[i] = {
+                  content: versions[firstTone],
+                  tone: firstTone
+                };
+              } else {
+                initialCurrentFups[i] = { content: suggestion };
+              }
+            });
+            setCurrentFups(initialCurrentFups);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading saved FUP versions:', error);
+      }
+    };
+
+    loadSavedVersions();
+  }, [isPro, session?.access_token, meetingId, apiUrl, suggestions]);
+
+  const toneLabels: { value: ToneType; label: string; description: string }[] = [
+    { value: 'formal', label: 'Formal', description: 'Profissional e estruturado' },
+    { value: 'objetivo', label: 'Objetivo', description: 'Direto ao ponto' },
+    { value: 'urgente', label: 'Urgente', description: 'Ação imediata' },
+    { value: 'consultivo', label: 'Consultivo', description: 'Empático e dialógico' },
+    { value: 'criativo', label: 'Criativo', description: 'Descontraído e humano' },
+  ];
+
+  const handleToneSelect = (fupIndex: number, tone: ToneType) => {
+    setSelectedTones(prev => ({
+      ...prev,
+      [fupIndex]: prev[fupIndex] === tone ? null : tone
+    }));
+  };
+
+  const handleRegenerate = async (fupIndex: number) => {
+    const selectedTone = selectedTones[fupIndex];
+    if (!selectedTone) return;
+
+    const currentFup = currentFups[fupIndex]?.content || suggestions[fupIndex];
+    
+    setRegeneratingIndex(fupIndex);
+    try {
+      const headers = {
+        Authorization: `Bearer ${session?.access_token}`,
+        'Content-Type': 'application/json',
+      };
+      
+      const res = await fetch(`${apiUrl}/api/meetings/${meetingId}/regenerate-fup`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          originalFup: currentFup,
+          tone: selectedTone,
+          fupIndex,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        
+        // Atualiza o estado com a nova versão
+        setRegeneratedFups(prev => ({
+          ...prev,
+          [fupIndex]: {
+            ...prev[fupIndex],
+            [selectedTone]: data.regeneratedFup
+          }
+        }));
+
+        // Atualiza o FUP atual exibido
+        setCurrentFups(prev => ({
+          ...prev,
+          [fupIndex]: {
+            content: data.regeneratedFup,
+            tone: selectedTone
+          }
+        }));
+
+        // Limpa o tom selecionado após regenerar
+        setSelectedTones(prev => ({
+          ...prev,
+          [fupIndex]: null
+        }));
+      } else {
+        console.error('Failed to regenerate FUP:', res.status);
+      }
+    } catch (error) {
+      console.error('Error regenerating FUP:', error);
+    } finally {
+      setRegeneratingIndex(null);
+    }
+  };
+
+  const handleCopy = (fupIndex: number) => {
+    const textToCopy = currentFups[fupIndex]?.content || suggestions[fupIndex];
+    onCopy(textToCopy, fupIndex);
+    // Limpa a seleção de tom após copiar
+    setSelectedTones(prev => ({
+      ...prev,
+      [fupIndex]: null
+    }));
+  };
+
+  const handleSwitchToVersion = (fupIndex: number, tone: ToneType | null) => {
+    if (tone === null) {
+      // Volta ao original
+      setCurrentFups(prev => ({
+        ...prev,
+        [fupIndex]: { content: suggestions[fupIndex] }
+      }));
+    } else if (regeneratedFups[fupIndex]?.[tone]) {
+      // Troca para a versão específica
+      setCurrentFups(prev => ({
+        ...prev,
+        [fupIndex]: {
+          content: regeneratedFups[fupIndex][tone],
+          tone
+        }
+      }));
+    }
+  };
 
   return (
     <div className="relative">
@@ -121,32 +280,148 @@ function FollowUpSection({ suggestions, emailLoading, onGenerateEmail, copiedInd
             </Button>
           )}
         </div>
-        <div className={`space-y-3 ${!isPro ? 'blur-sm pointer-events-none' : ''}`}>
-          {suggestions.slice(0, 4).map((suggestion, i) => (
-            <div key={i} className="flex items-start gap-3 p-3 rounded-lg bg-primary/5 border border-primary/10 group">
-              <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-white text-xs font-bold flex items-center justify-center mt-0.5">
-                {i + 1}
-              </span>
-              <span className="flex-1 text-sm text-secondary leading-relaxed">{suggestion}</span>
-              {isPro && (
-                <button
-                  onClick={() => onCopy(suggestion, i)}
-                  title="Copiar mensagem"
-                  className={`flex-shrink-0 flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md transition-all ${
-                    copiedIndex === i
-                      ? 'bg-primary text-white'
-                      : 'text-secondary opacity-0 group-hover:opacity-100 hover:bg-primary/10 hover:text-primary'
-                  }`}
-                >
-                  {copiedIndex === i ? (
-                    <><Check className="h-3.5 w-3.5" />Copiado</>
-                  ) : (
-                    <><Copy className="h-3.5 w-3.5" />Copiar</>
-                  )}
-                </button>
-              )}
-            </div>
-          ))}
+        <div className={`space-y-4 ${!isPro ? 'blur-sm pointer-events-none' : ''}`}>
+          {suggestions.slice(0, 4).map((suggestion, i) => {
+            const currentFup = currentFups[i]?.content || suggestion;
+            const currentTone = currentFups[i]?.tone;
+            const selectedTone = selectedTones[i];
+            const isRegenerating = regeneratingIndex === i;
+            const hasVersions = regeneratedFups[i] && Object.keys(regeneratedFups[i]).length > 0;
+
+            return (
+              <div key={i} className="rounded-lg bg-primary/5 border border-primary/10">
+                {/* Indicador de tom atual */}
+                {currentTone && (
+                  <div className="px-3 pt-2 pb-1">
+                    <span className="inline-flex items-center gap-1 text-xs text-primary/70 font-medium">
+                      <span className="w-1.5 h-1.5 rounded-full bg-primary/70"></span>
+                      Tom aplicado: {toneLabels.find(t => t.value === currentTone)?.label}
+                    </span>
+                  </div>
+                )}
+                
+                {/* Conteúdo do FUP */}
+                <div className="flex items-start gap-3 p-3">
+                  <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-white text-xs font-bold flex items-center justify-center mt-0.5">
+                    {i + 1}
+                  </span>
+                  <span className="flex-1 text-sm text-secondary leading-relaxed">{currentFup}</span>
+                </div>
+
+                {/* Controles de Tom e Ações */}
+                {isPro && (
+                  <div className="px-3 pb-3 space-y-2 border-t border-primary/10 pt-3">
+                    {/* Versões Salvas - Se existir */}
+                    {hasVersions && (
+                      <div className="mb-2">
+                        <p className="text-xs font-medium text-secondary mb-2">Versões salvas:</p>
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            onClick={() => handleSwitchToVersion(i, null)}
+                            className={`px-2 py-1 text-xs font-medium rounded border transition-all ${
+                              !currentTone
+                                ? 'bg-primary/10 text-primary border-primary/30'
+                                : 'bg-white text-secondary/70 border-primary/10 hover:border-primary/30'
+                            }`}
+                          >
+                            Original
+                          </button>
+                          {Object.keys(regeneratedFups[i] || {}).map((tone) => (
+                            <button
+                              key={tone}
+                              onClick={() => handleSwitchToVersion(i, tone as ToneType)}
+                              className={`px-2 py-1 text-xs font-medium rounded border transition-all ${
+                                currentTone === tone
+                                  ? 'bg-primary/10 text-primary border-primary/30'
+                                  : 'bg-white text-secondary/70 border-primary/10 hover:border-primary/30'
+                              }`}
+                            >
+                              {toneLabels.find(t => t.value === tone)?.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Label e Botões de Tom */}
+                    <div>
+                      <p className="text-xs font-medium text-secondary mb-2">Refinar tom do FUP:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {toneLabels.map(({ value, label }) => {
+                          const hasVersion = regeneratedFups[i]?.[value];
+                          return (
+                            <button
+                              key={value}
+                              onClick={() => handleToneSelect(i, value)}
+                              disabled={isRegenerating}
+                              className={`relative px-3 py-1.5 text-xs font-medium rounded-md border transition-all ${
+                                selectedTone === value
+                                  ? 'bg-primary text-white border-primary'
+                                  : 'bg-white text-secondary border-primary/20 hover:border-primary/40 hover:bg-primary/5'
+                              } ${isRegenerating ? 'opacity-50 cursor-not-allowed' : ''}`}
+                              title={toneLabels.find(t => t.value === value)?.description}
+                            >
+                              {label}
+                              {hasVersion && (
+                                <span className="absolute -top-1 -right-1 w-2 h-2 bg-primary rounded-full border border-white"></span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Botões de Ação */}
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleRegenerate(i)}
+                        disabled={!selectedTone || isRegenerating}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                          !selectedTone || isRegenerating
+                            ? 'bg-neutral-lighter text-secondary/50 cursor-not-allowed'
+                            : 'bg-primary text-white hover:bg-primary/90'
+                        }`}
+                      >
+                        {isRegenerating ? (
+                          <>
+                            <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-r-transparent" />
+                            Regenerando…
+                          </>
+                        ) : (
+                          <>
+                            <RefreshCw className="h-3.5 w-3.5" />
+                            Regenerar
+                          </>
+                        )}
+                      </button>
+                      
+                      <button
+                        onClick={() => handleCopy(i)}
+                        disabled={isRegenerating}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                          copiedIndex === i
+                            ? 'bg-primary text-white'
+                            : 'bg-white text-secondary border border-primary/20 hover:border-primary/40 hover:bg-primary/5'
+                        } ${isRegenerating ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
+                        {copiedIndex === i ? (
+                          <>
+                            <Check className="h-3.5 w-3.5" />
+                            Copiado
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="h-3.5 w-3.5" />
+                            Copiar
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </Card>
 
@@ -794,6 +1069,7 @@ export function TranscricaoDetalhesPage() {
         {/* Follow-up Suggestions + Email Generator */}
         {(meeting.insights?.followUpSuggestions ?? []).length > 0 && (
           <FollowUpSection
+            meetingId={id!}
             suggestions={meeting.insights!.followUpSuggestions}
             emailLoading={emailLoading}
             onGenerateEmail={generateEmail}
