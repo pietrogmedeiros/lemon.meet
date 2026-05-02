@@ -223,7 +223,7 @@ Sugestões de follow-up: ${insights.followUpSuggestions.slice(0, 2).join('; ')}`
   /**
    * Gera briefing pré-reunião baseado no histórico de reuniões anteriores
    */
-  async generateBriefing(currentMeetingTitle: string, pastMeetings: { title: string | null; insights: MeetingInsights }[]): Promise<string> {
+  async generateBriefing(currentMeetingTitle: string, pastMeetings: { title: string | null; insights: MeetingInsights; created_at?: string }[]): Promise<string> {
     if (pastMeetings.length === 0) return '';
 
     const systemPrompt = `Você é um assistente de vendas. Com base no histórico de reuniões anteriores com este cliente, gere um briefing pré-reunião conciso e útil em português do Brasil.
@@ -231,17 +231,50 @@ Sugestões de follow-up: ${insights.followUpSuggestions.slice(0, 2).join('; ')}`
 O briefing deve:
 - Resumir os principais pontos discutidos anteriormente
 - Destacar os compromissos e próximos passos que ficaram em aberto
-- Pontuar o histórico de interesse e objeções do cliente
-- Sugerir 2-3 pontos para abordar na reunião atual
-- Ser objetivo (máx. 180 palavras)
+- Pontuar o histórico de interesse, objeções e sentiment do cliente
+- Mencionar a probabilidade de fechamento se relevante
+- Sugerir 2-3 pontos estratégicos para abordar na reunião atual
+- Ser objetivo e direto (máx. 200 palavras)
 
 Retorne APENAS o texto do briefing, sem cabeçalhos ou formatação markdown.`;
 
-    const history = pastMeetings.map((m, i) =>
-      `Reunião ${i + 1}: ${m.title ?? 'Sem título'}\nContexto: ${m.insights.executiveContext}\nAções pendentes: ${m.insights.actionItems.slice(0, 2).join('; ')}`
-    ).join('\n\n');
+    const history = pastMeetings.map((m, i) => {
+      const parts = [`Reunião ${i + 1}: ${m.title ?? 'Sem título'}`];
+      
+      // Adiciona contexto executivo se disponível
+      if (m.insights.executiveContext) {
+        parts.push(`Contexto: ${m.insights.executiveContext}`);
+      }
+      
+      // Adiciona tópicos principais
+      if (m.insights.keyTopics && m.insights.keyTopics.length > 0) {
+        parts.push(`Tópicos: ${m.insights.keyTopics.slice(0, 3).join(', ')}`);
+      }
+      
+      // Adiciona ações pendentes
+      if (m.insights.actionItems && m.insights.actionItems.length > 0) {
+        parts.push(`Ações pendentes: ${m.insights.actionItems.slice(0, 3).join('; ')}`);
+      }
+      
+      // Adiciona sentiment e probabilidade
+      const sentiment = m.insights.sentiment === 'positive' ? '😊 Positivo' : 
+                       m.insights.sentiment === 'negative' ? '😟 Negativo' : '😐 Neutro';
+      parts.push(`Sentiment: ${sentiment}`);
+      
+      if (m.insights.closingProbability !== undefined) {
+        parts.push(`Prob. fechamento: ${m.insights.closingProbability}%`);
+      }
+      
+      // Adiciona data se disponível
+      if (m.created_at) {
+        const date = new Date(m.created_at);
+        parts.push(`Data: ${date.toLocaleDateString('pt-BR')}`);
+      }
+      
+      return parts.join('\n');
+    }).join('\n\n');
 
-    const userPrompt = `Reunião atual: ${currentMeetingTitle}\n\nHistórico:\n${history}`;
+    const userPrompt = `Reunião atual: ${currentMeetingTitle}\n\nHistórico de reuniões anteriores:\n${history}`;
 
     const response = await deepseek.chat.completions.create({
       model: 'deepseek-chat',

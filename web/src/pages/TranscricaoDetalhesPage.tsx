@@ -304,9 +304,13 @@ export function TranscricaoDetalhesPage() {
         if (res.ok) {
           const data = await res.json();
           setBriefing(data.briefing ?? null);
+        } else {
+          console.error('Failed to load briefing:', res.status);
+          setBriefing(null);
         }
-      } catch {
-        // Non-critical
+      } catch (error) {
+        console.error('Error loading briefing:', error);
+        setBriefing(null);
       } finally {
         setBriefingLoading(false);
       }
@@ -616,7 +620,7 @@ export function TranscricaoDetalhesPage() {
         )}
 
         {/* Briefing pré-reunião */}
-        {(briefingLoading || briefing) && (
+        {(briefingLoading || briefing || (!briefingLoading && briefing === null)) && meeting.status === 'completed' && (
           <Card className="p-5 border-l-4 border-l-[#FFD700] bg-[#FFFDF0]">
             <h2 className="text-headline-2 text-primary mb-3 flex items-center gap-2">
               <BookOpen className="h-5 w-5 text-[#B8860B]" />
@@ -628,8 +632,12 @@ export function TranscricaoDetalhesPage() {
                 <div className="h-4 w-4 animate-spin rounded-full border-2 border-[#B8860B] border-r-transparent" />
                 Gerando contexto…
               </div>
-            ) : (
+            ) : briefing ? (
               <p className="text-sm text-secondary leading-relaxed whitespace-pre-line">{briefing}</p>
+            ) : (
+              <p className="text-sm text-secondary/70 italic">
+                Nenhuma reunião anterior encontrada com este cliente. O contexto será gerado quando houver histórico de reuniões.
+              </p>
             )}
           </Card>
         )}
