@@ -100,14 +100,15 @@ function FollowUpSection({ suggestions, emailLoading, onGenerateEmail, copiedInd
   const { session } = useAuth();
   const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
   
-  // Estado para controlar tom selecionado por FUP
-  const [selectedTones, setSelectedTones] = useState<{ [key: number]: ToneType | null }>({});
+  // Estado da barra de controle global
+  const [selectedFupIndex, setSelectedFupIndex] = useState<number | null>(null);
+  const [selectedTone, setSelectedTone] = useState<ToneType | null>(null);
+  const [isRegenerating, setIsRegenerating] = useState(false);
+  
   // Estado para FUPs regenerados (carrega do banco + novos)
   const [regeneratedFups, setRegeneratedFups] = useState<{ [key: number]: { [tone: string]: string } }>({});
   // FUP atualmente exibido por índice
   const [currentFups, setCurrentFups] = useState<{ [key: number]: { content: string; tone?: string } }>({});
-  // Estado de loading por FUP
-  const [regeneratingIndex, setRegeneratingIndex] = useState<number | null>(null);
 
   // Carrega versões salvas do banco ao montar o componente
   useEffect(() => {
@@ -159,20 +160,12 @@ function FollowUpSection({ suggestions, emailLoading, onGenerateEmail, copiedInd
     { value: 'criativo', label: 'Criativo', description: 'Descontraído e humano' },
   ];
 
-  const handleToneSelect = (fupIndex: number, tone: ToneType) => {
-    setSelectedTones(prev => ({
-      ...prev,
-      [fupIndex]: prev[fupIndex] === tone ? null : tone
-    }));
-  };
+  const handleRegenerate = async () => {
+    if (selectedFupIndex === null || !selectedTone) return;
 
-  const handleRegenerate = async (fupIndex: number) => {
-    const selectedTone = selectedTones[fupIndex];
-    if (!selectedTone) return;
-
-    const currentFup = currentFups[fupIndex]?.content || suggestions[fupIndex];
+    const currentFup = currentFups[selectedFupIndex]?.content || suggestions[selectedFupIndex];
     
-    setRegeneratingIndex(fupIndex);
+    setIsRegenerating(true);
     try {
       const headers = {
         Authorization: `Bearer ${session?.access_token}`,
@@ -185,7 +178,7 @@ function FollowUpSection({ suggestions, emailLoading, onGenerateEmail, copiedInd
         body: JSON.stringify({
           originalFup: currentFup,
           tone: selectedTone,
-          fupIndex,
+          fupIndex: selectedFupIndex,
         }),
       });
 
@@ -195,8 +188,8 @@ function FollowUpSection({ suggestions, emailLoading, onGenerateEmail, copiedInd
         // Atualiza o estado com a nova versão
         setRegeneratedFups(prev => ({
           ...prev,
-          [fupIndex]: {
-            ...prev[fupIndex],
+          [selectedFupIndex]: {
+            ...prev[selectedFupIndex],
             [selectedTone]: data.regeneratedFup
           }
         }));
@@ -204,35 +197,30 @@ function FollowUpSection({ suggestions, emailLoading, onGenerateEmail, copiedInd
         // Atualiza o FUP atual exibido
         setCurrentFups(prev => ({
           ...prev,
-          [fupIndex]: {
+          [selectedFupIndex]: {
             content: data.regeneratedFup,
             tone: selectedTone
           }
         }));
 
-        // Limpa o tom selecionado após regenerar
-        setSelectedTones(prev => ({
-          ...prev,
-          [fupIndex]: null
-        }));
+        // Limpa os controles após regenerar com sucesso
+        setSelectedFupIndex(null);
+        setSelectedTone(null);
       } else {
         console.error('Failed to regenerate FUP:', res.status);
+        alert('Erro ao regenerar FUP. Tente novamente.');
       }
     } catch (error) {
       console.error('Error regenerating FUP:', error);
+      alert('Erro ao regenerar FUP. Tente novamente.');
     } finally {
-      setRegeneratingIndex(null);
+      setIsRegenerating(false);
     }
   };
 
   const handleCopy = (fupIndex: number) => {
     const textToCopy = currentFups[fupIndex]?.content || suggestions[fupIndex];
     onCopy(textToCopy, fupIndex);
-    // Limpa a seleção de tom após copiar
-    setSelectedTones(prev => ({
-      ...prev,
-      [fupIndex]: null
-    }));
   };
 
   const handleSwitchToVersion = (fupIndex: number, tone: ToneType | null) => {
@@ -257,6 +245,7 @@ function FollowUpSection({ suggestions, emailLoading, onGenerateEmail, copiedInd
   return (
     <div className="relative">
       <Card className={`p-5 ${!isPro ? 'select-none' : ''}`}>
+        {/* Header */}
         <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
           <h2 className="text-headline-2 text-primary flex items-center gap-2">
             <Mail className="h-5 w-5" />
@@ -280,49 +269,118 @@ function FollowUpSection({ suggestions, emailLoading, onGenerateEmail, copiedInd
             </Button>
           )}
         </div>
-        <div className={`space-y-4 ${!isPro ? 'blur-sm pointer-events-none' : ''}`}>
+
+        {/* Barra de controle unificada (apenas se isPro) */}
+        {isPro && (selectedFupIndex !== null) && (
+          <div className="mb-4 p-4 bg-primary/5 border border-primary/15 rounded-lg">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-sm font-medium text-secondary">
+                Editando FUP #{(selectedFupIndex ?? 0) + 1}
+              </span>
+              <button
+                onClick={() => {
+                  setSelectedFupIndex(null);
+                  setSelectedTone(null);
+                }}
+                className="ml-auto text-xs text-secondary/70 hover:text-secondary transition-colors"
+              >
+                ✕ Cancelar
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              {/* Tons disponíveis */}
+              <div>
+                <p className="text-xs font-medium text-secondary mb-2">Selecione o tom:</p>
+                <div className="flex flex-wrap gap-2">
+                  {toneLabels.map(({ value, label, description }) => {
+                    const hasVersion = regeneratedFups[selectedFupIndex]?.[value];
+                    return (
+                      <button
+                        key={value}
+                        onClick={() => setSelectedTone(value)}
+                        disabled={isRegenerating}
+                        className={`relative px-3 py-1.5 text-xs font-medium rounded-md border transition-all ${
+                          selectedTone === value
+                            ? 'bg-primary text-white border-primary'
+                            : 'bg-white text-secondary border-primary/20 hover:border-primary/40 hover:bg-primary/5'
+                        } ${isRegenerating ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        title={description}
+                      >
+                        {label}
+                        {hasVersion && (
+                          <span className="absolute -top-1 -right-1 w-2 h-2 bg-primary rounded-full border border-white"></span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Botão de regenerar */}
+              <button
+                onClick={handleRegenerate}
+                disabled={!selectedTone || isRegenerating}
+                className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-md transition-all ${
+                  !selectedTone || isRegenerating
+                    ? 'bg-neutral-lighter text-secondary/50 cursor-not-allowed'
+                    : 'bg-primary text-white hover:bg-primary/90'
+                }`}
+              >
+                {isRegenerating ? (
+                  <>
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-r-transparent" />
+                    Regenerando…
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="h-4 w-4" />
+                    Regenerar com tom {selectedTone && toneLabels.find(t => t.value === selectedTone)?.label}
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Lista de FUPs */}
+        <div className={`space-y-3 ${!isPro ? 'blur-sm pointer-events-none' : ''}`}>
           {suggestions.slice(0, 4).map((suggestion, i) => {
             const currentFup = currentFups[i]?.content || suggestion;
             const currentTone = currentFups[i]?.tone;
-            const selectedTone = selectedTones[i];
-            const isRegenerating = regeneratingIndex === i;
             const hasVersions = regeneratedFups[i] && Object.keys(regeneratedFups[i]).length > 0;
+            const isEditing = selectedFupIndex === i;
 
             return (
-              <div key={i} className="rounded-lg bg-primary/5 border border-primary/10">
-                {/* Indicador de tom atual */}
-                {currentTone && (
-                  <div className="px-3 pt-2 pb-1">
-                    <span className="inline-flex items-center gap-1 text-xs text-primary/70 font-medium">
-                      <span className="w-1.5 h-1.5 rounded-full bg-primary/70"></span>
-                      Tom aplicado: {toneLabels.find(t => t.value === currentTone)?.label}
-                    </span>
-                  </div>
-                )}
-                
+              <div
+                key={i}
+                className={`rounded-lg border transition-all ${
+                  isEditing
+                    ? 'bg-primary/10 border-primary/30 shadow-sm'
+                    : 'bg-primary/5 border-primary/10'
+                }`}
+              >
                 {/* Conteúdo do FUP */}
                 <div className="flex items-start gap-3 p-3">
                   <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-white text-xs font-bold flex items-center justify-center mt-0.5">
                     {i + 1}
                   </span>
                   <span className="flex-1 text-sm text-secondary leading-relaxed">{currentFup}</span>
-                </div>
-
-                {/* Controles de Tom e Ações */}
-                {isPro && (
-                  <div className="px-3 pb-3 space-y-2 border-t border-primary/10 pt-3">
-                    {/* Versões Salvas - Se existir */}
-                    {hasVersions && (
-                      <div className="mb-2">
-                        <p className="text-xs font-medium text-secondary mb-2">Versões salvas:</p>
-                        <div className="flex flex-wrap gap-2">
+                  
+                  {/* Botões à direita */}
+                  {isPro && (
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      {/* Indicador de tom + versões salvas */}
+                      {hasVersions && (
+                        <div className="flex items-center gap-1">
                           <button
                             onClick={() => handleSwitchToVersion(i, null)}
                             className={`px-2 py-1 text-xs font-medium rounded border transition-all ${
                               !currentTone
-                                ? 'bg-primary/10 text-primary border-primary/30'
+                                ? 'bg-primary text-white border-primary'
                                 : 'bg-white text-secondary/70 border-primary/10 hover:border-primary/30'
                             }`}
+                            title="Versão original"
                           >
                             Original
                           </button>
@@ -332,93 +390,56 @@ function FollowUpSection({ suggestions, emailLoading, onGenerateEmail, copiedInd
                               onClick={() => handleSwitchToVersion(i, tone as ToneType)}
                               className={`px-2 py-1 text-xs font-medium rounded border transition-all ${
                                 currentTone === tone
-                                  ? 'bg-primary/10 text-primary border-primary/30'
+                                  ? 'bg-primary text-white border-primary'
                                   : 'bg-white text-secondary/70 border-primary/10 hover:border-primary/30'
                               }`}
+                              title={`Tom: ${toneLabels.find(t => t.value === tone)?.label}`}
                             >
                               {toneLabels.find(t => t.value === tone)?.label}
                             </button>
                           ))}
                         </div>
-                      </div>
-                    )}
-
-                    {/* Label e Botões de Tom */}
-                    <div>
-                      <p className="text-xs font-medium text-secondary mb-2">Refinar tom do FUP:</p>
-                      <div className="flex flex-wrap gap-2">
-                        {toneLabels.map(({ value, label }) => {
-                          const hasVersion = regeneratedFups[i]?.[value];
-                          return (
-                            <button
-                              key={value}
-                              onClick={() => handleToneSelect(i, value)}
-                              disabled={isRegenerating}
-                              className={`relative px-3 py-1.5 text-xs font-medium rounded-md border transition-all ${
-                                selectedTone === value
-                                  ? 'bg-primary text-white border-primary'
-                                  : 'bg-white text-secondary border-primary/20 hover:border-primary/40 hover:bg-primary/5'
-                              } ${isRegenerating ? 'opacity-50 cursor-not-allowed' : ''}`}
-                              title={toneLabels.find(t => t.value === value)?.description}
-                            >
-                              {label}
-                              {hasVersion && (
-                                <span className="absolute -top-1 -right-1 w-2 h-2 bg-primary rounded-full border border-white"></span>
-                              )}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* Botões de Ação */}
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => handleRegenerate(i)}
-                        disabled={!selectedTone || isRegenerating}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
-                          !selectedTone || isRegenerating
-                            ? 'bg-neutral-lighter text-secondary/50 cursor-not-allowed'
-                            : 'bg-primary text-white hover:bg-primary/90'
-                        }`}
-                      >
-                        {isRegenerating ? (
-                          <>
-                            <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-r-transparent" />
-                            Regenerando…
-                          </>
-                        ) : (
-                          <>
-                            <RefreshCw className="h-3.5 w-3.5" />
-                            Regenerar
-                          </>
-                        )}
-                      </button>
+                      )}
                       
+                      {/* Botão Refinar */}
+                      <button
+                        onClick={() => setSelectedFupIndex(isEditing ? null : i)}
+                        disabled={isRegenerating}
+                        className={`flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-md border transition-all ${
+                          isEditing
+                            ? 'bg-primary text-white border-primary'
+                            : 'bg-white text-secondary border-primary/20 hover:border-primary/40 hover:bg-primary/5'
+                        } ${isRegenerating ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
+                        <RefreshCw className="h-3 w-3" />
+                        Refinar
+                      </button>
+
+                      {/* Botão Copiar */}
                       <button
                         onClick={() => handleCopy(i)}
                         disabled={isRegenerating}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                        className={`flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-md border transition-all ${
                           copiedIndex === i
-                            ? 'bg-primary text-white'
-                            : 'bg-white text-secondary border border-primary/20 hover:border-primary/40 hover:bg-primary/5'
+                            ? 'bg-primary text-white border-primary'
+                            : 'bg-white text-secondary border-primary/20 hover:border-primary/40 hover:bg-primary/5'
                         } ${isRegenerating ? 'opacity-50 cursor-not-allowed' : ''}`}
                       >
                         {copiedIndex === i ? (
                           <>
-                            <Check className="h-3.5 w-3.5" />
+                            <Check className="h-3 w-3" />
                             Copiado
                           </>
                         ) : (
                           <>
-                            <Copy className="h-3.5 w-3.5" />
+                            <Copy className="h-3 w-3" />
                             Copiar
                           </>
                         )}
                       </button>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             );
           })}
