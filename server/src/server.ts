@@ -1,3 +1,4 @@
+// Server version: 2026-05-09T03:05:00Z - Fix invite flow
 import express, { type Express } from 'express'
 import { createServer } from 'http'
 import cors from 'cors'
