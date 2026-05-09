@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { MainLayout } from '@/components/layout'
 import { supabase } from '@/lib/supabase'
 import {
-  Users, Plus, Mail, Trash2, CheckCircle, Clock,
+  Users, Plus, Trash2, CheckCircle, Clock,
   AlertCircle, Loader, Video, Crown, UserPlus, ChevronRight,
   Shield, Link2, Copy, Check
 } from 'lucide-react'
@@ -67,11 +67,6 @@ export function TeamPage() {
   const [teamName, setTeamName] = useState('')
   const [createStatus, setCreateStatus] = useState<'idle' | 'loading' | 'error'>('idle')
   const [createError, setCreateError] = useState('')
-
-  // Convidar
-  const [inviteEmail, setInviteEmail] = useState('')
-  const [inviteStatus, setInviteStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
-  const [inviteError, setInviteError] = useState('')
 
   // Meetings do time
   const [meetings, setMeetings] = useState<TeamMeeting[]>([])
@@ -240,26 +235,6 @@ export function TeamPage() {
       setCreateStatus('error')
     } finally {
       setCreateStatus('idle')
-    }
-  }
-
-  const handleInvite = async () => {
-    if (!inviteEmail.trim() || !team) return
-    setInviteError('')
-    setInviteStatus('loading')
-    try {
-      const data = await apiFetch(`/api/teams/${team.id}/invite`, session, {
-        method: 'POST',
-        body: JSON.stringify({ email: inviteEmail.trim() }),
-      })
-      if (!data.success) throw new Error(data.message)
-      setInviteStatus('success')
-      setInviteEmail('')
-      await loadTeamDetails(team.id)
-      setTimeout(() => setInviteStatus('idle'), 3000)
-    } catch (err: any) {
-      setInviteError(err.message ?? 'Erro ao enviar convite.')
-      setInviteStatus('error')
     }
   }
 
@@ -624,54 +599,9 @@ export function TeamPage() {
               </div>
             </div>
 
-            {/* Coluna lateral: convidar (só owner) */}
+            {/* Coluna lateral: link de convite (só owner) */}
             {isOwner && (
               <div className="space-y-4">
-                <div className="bg-white border border-[#E0E0E0] rounded-2xl p-5 shadow-sm space-y-4">
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-lg bg-[#2D5A27]/10 flex items-center justify-center">
-                      <UserPlus size={14} className="text-[#2D5A27]" />
-                    </div>
-                    <span className="text-sm font-semibold text-[#333333]">Convidar membro</span>
-                  </div>
-                  <p className="text-xs text-[#666666] leading-relaxed">
-                    Informe o e-mail do colaborador. Ele receberá um link de acesso por e-mail.
-                  </p>
-                  <div className="space-y-2">
-                    <input
-                      type="email"
-                      value={inviteEmail}
-                      onChange={(e) => setInviteEmail(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleInvite()}
-                      placeholder="email@exemplo.com"
-                      className="w-full px-4 py-2.5 rounded-xl border border-[#E0E0E0] text-[#333333] text-sm focus:outline-none focus:ring-2 focus:ring-[#2D5A27]/25 focus:border-[#2D5A27] transition bg-white placeholder:text-[#999]"
-                    />
-                    <button
-                      onClick={handleInvite}
-                      disabled={inviteStatus === 'loading' || !inviteEmail.trim()}
-                      className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition shadow-sm ${
-                        inviteStatus === 'success'
-                          ? 'bg-[#4CAF50] text-white'
-                          : 'bg-[#2D5A27] text-white hover:bg-[#1E3D1A] disabled:opacity-50'
-                      }`}
-                    >
-                      {inviteStatus === 'loading' ? (
-                        <Loader size={15} className="animate-spin" />
-                      ) : inviteStatus === 'success' ? (
-                        <CheckCircle size={15} />
-                      ) : (
-                        <Mail size={15} />
-                      )}
-                      {inviteStatus === 'success' ? 'Convite enviado!' : 'Enviar convite'}
-                    </button>
-                  </div>
-                  {inviteError && (
-                    <p className="text-xs text-[#DC3545] flex items-center gap-1.5">
-                      <AlertCircle size={13} /> {inviteError}
-                    </p>
-                  )}
-                </div>
-
                 {/* Link de convite */}
                 <div className="bg-white border border-[#E0E0E0] rounded-2xl p-5 shadow-sm space-y-4">
                   <div className="flex items-center gap-2">
