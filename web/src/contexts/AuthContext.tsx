@@ -3,42 +3,53 @@ import { User, Session, AuthError } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { invalidateMeetingsCache } from '@/lib/meetingsCache'
 
-const API = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+// REMOVIDO: tryAcceptInvite() - era para convites por email (antigo)
+// Agora usamos apenas o fluxo de links com tokens, processado pelo Dashboard
 
-async function tryAcceptInvite(session: Session) {
-  try {
-    await fetch(`${API}/api/teams/accept-invite`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${session.access_token}` },
-    })
-  } catch {
-    // não bloqueia o login
-  }
-}
-
-// Função de limpeza TOTAL para evitar cache entre usuários
+// Função de limpeza SELETIVA para evitar cache entre usuários
 function clearAllCaches(keepPendingInvite = false) {
-  console.log('[Auth] 🧹 LIMPEZA TOTAL DE CACHE E STORAGE')
-  
-  // Salva token de convite se necessário
-  const pendingToken = keepPendingInvite ? localStorage.getItem('pending_team_join') : null
+  console.log('[Auth] 🧹 LIMPEZA SELETIVA DE CACHE')
   
   // Limpa cache in-memory
   invalidateMeetingsCache()
   
-  // Limpa localStorage COMPLETAMENTE
+  // Lista de chaves para PRESERVAR (Supabase auth)
+  const keysToPreserve: string[] = []
+  
+  // Preserva token de convite se necessário
+  if (keepPendingInvite) {
+    keysToPreserve.push('pending_team_join')
+  }
+  
+  // Preserva chaves do Supabase (auth tokens)
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i)
+    if (key && key.startsWith('sb-')) {
+      keysToPreserve.push(key)
+    }
+  }
+  
+  console.log('[Auth] 🔒 Preservando chaves:', keysToPreserve)
+  
+  // Salva valores que precisam ser preservados
+  const preserved: Record<string, string> = {}
+  keysToPreserve.forEach(key => {
+    const value = localStorage.getItem(key)
+    if (value) preserved[key] = value
+  })
+  
+  // Limpa localStorage
   localStorage.clear()
   
   // Limpa sessionStorage
   sessionStorage.clear()
   
-  // Restaura token de convite se necessário
-  if (pendingToken) {
-    console.log('[Auth] 🎟️ Restaurando token de convite:', pendingToken)
-    localStorage.setItem('pending_team_join', pendingToken)
-  }
+  // Restaura valores preservados
+  Object.entries(preserved).forEach(([key, value]) => {
+    localStorage.setItem(key, value)
+  })
   
-  console.log('[Auth] ✅ Limpeza completa executada')
+  console.log('[Auth] ✅ Limpeza seletiva executada')
 }
 
 interface AuthContextType {
@@ -74,31 +85,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const previousUserId = user?.id
       const newUserId = session?.user?.id
       
-      // LIMPEZA TOTAL ao fazer logout
+      // LIMPEZA apenas ao fazer logout
       if (event === 'SIGNED_OUT') {
-        console.log('[Auth] 🚪 LOGOUT detectado - Limpando TUDO')
+        console.log('[Auth] 🚪 LOGOUT detectado - Limpando cache')
         clearAllCaches(false) // Não preserva convite
       }
       
-      // LIMPEZA TOTAL ao fazer login (exceto token de convite)
-      if (event === 'SIGNED_IN') {
-        console.log('[Auth] 🔑 LOGIN detectado - Limpando cache anterior')
+      // Se mudou de usuário (troca de conta sem logout), limpa cache mas preserva token
+      if (event === 'SIGNED_IN' && previousUserId && newUserId && previousUserId !== newUserId) {
+        console.warn('[Auth] ⚠️ MUDANÇA DE USUÁRIO! Previous:', previousUserId, 'New:', newUserId)
         clearAllCaches(true) // Preserva token de convite
-        
-        // Se mudou de usuário, alerta extra
-        if (previousUserId && newUserId && previousUserId !== newUserId) {
-          console.warn('[Auth] ⚠️ MUDANÇA DE USUÁRIO! Previous:', previousUserId, 'New:', newUserId)
-        }
       }
       
       setSession(session)
       setUser(session?.user ?? null)
       setLoading(false)
       
-      // Ativa convites pendentes quando o usuário loga
-      if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session) {
-        tryAcceptInvite(session)
-      }
+      // Convites pendentes são processados pelo Dashboard via localStorage
     })
 
     return () => subscription.unsubscribe()

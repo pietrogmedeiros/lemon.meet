@@ -67,22 +67,33 @@ export function JoinTeamPage() {
 
   const handleLogin = () => {
     if (!token) {
-      console.error('[JoinTeam] ❌ Token não disponível!');
+      console.error('[JoinTeam] ❌ ERRO: Token não disponível!');
+      alert('Erro: Link inválido');
       return;
     }
     
-    console.log('[JoinTeam] 💾 Salvando token no localStorage:', token);
+    console.log('[JoinTeam] 🎟️ ===== SALVANDO TOKEN =====');
+    console.log('[JoinTeam] Token recebido:', token);
+    console.log('[JoinTeam] 📦 localStorage ANTES:', Object.keys(localStorage));
+    
     // Salva o token para processar após login
     localStorage.setItem('pending_team_join', token);
     
-    // Verifica se salvou
+    // Verifica IMEDIATAMENTE se salvou
     const saved = localStorage.getItem('pending_team_join');
-    console.log('[JoinTeam] ✅ Token salvo com sucesso?', saved === token);
+    console.log('[JoinTeam] ✅ Salvo com sucesso?', saved === token);
     console.log('[JoinTeam] 📦 Conteúdo salvo:', saved);
+    console.log('[JoinTeam] 📦 localStorage DEPOIS:', Object.keys(localStorage));
     
-    // Redireciona para login com ?next=/dashboard explícito
-    console.log('[JoinTeam] 🔄 Redirecionando para /login?next=/dashboard');
-    navigate('/login?next=/dashboard');
+    if (saved !== token) {
+      console.error('[JoinTeam] ❌ FALHA AO SALVAR! Esperado:', token, 'Obtido:', saved);
+      alert('Erro ao salvar convite. Tente novamente.');
+      return;
+    }
+    
+    console.log('[JoinTeam] 🔄 Redirecionando para /login');
+    // Redireciona para login
+    navigate('/login');
   }
 
   if (!session) {
