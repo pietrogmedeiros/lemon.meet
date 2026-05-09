@@ -40,6 +40,7 @@ export async function fetchMeetings(limit = 100): Promise<Meeting[]> {
   const now = Date.now()
   
   console.log('[MeetingsCache] 🔍 Iniciando fetchMeetings...')
+  console.log('[MeetingsCache] ⏰ Timestamp:', new Date().toISOString())
   
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) {
@@ -49,14 +50,19 @@ export async function fetchMeetings(limit = 100): Promise<Meeting[]> {
 
   const currentUserId = session.user.id
   console.log('[MeetingsCache] 👤 Current user ID:', currentUserId)
+  console.log('[MeetingsCache] 📧 Current user email:', session.user.email)
 
-  // SEGURANÇA: Invalida cache se for de outro usuário
+  // SEGURANÇA REFORÇADA: SEMPRE invalida cache se não for do usuário atual
   if (cache) {
-    console.log('[MeetingsCache] 📦 Cache existe - userId:', cache.userId)
+    console.log('[MeetingsCache] 📦 Cache existe')
+    console.log('[MeetingsCache] 🔍 Cache userId:', cache.userId)
+    console.log('[MeetingsCache] 🔍 Cache expiresAt:', new Date(cache.expiresAt).toISOString())
+    
     if (cache.userId !== currentUserId) {
-      console.warn('[MeetingsCache] ⚠️ Cache é de outro usuário! Invalidando...')
-      console.log('[MeetingsCache] ❌ Cache userId:', cache.userId)
-      console.log('[MeetingsCache] ✅ Current userId:', currentUserId)
+      console.error('[MeetingsCache] 🚨 CACHE DE OUTRO USUÁRIO DETECTADO!')
+      console.error('[MeetingsCache] ❌ Cache userId:', cache.userId)
+      console.error('[MeetingsCache] ✅ Current userId:', currentUserId)
+      console.error('[MeetingsCache] 🧹 INVALIDANDO IMEDIATAMENTE')
       cache = null
     }
   } else {
@@ -67,6 +73,11 @@ export async function fetchMeetings(limit = 100): Promise<Meeting[]> {
   if (cache && now < cache.expiresAt && cache.userId === currentUserId) {
     console.log('[MeetingsCache] ✅ Usando cache válido')
     return cache.data
+  }
+
+  if (cache && now >= cache.expiresAt) {
+    console.log('[MeetingsCache] ⏱️ Cache expirado, buscando novamente')
+    cache = null
   }
 
   // Deduplica: se já há um fetch em andamento, aguarda o mesmo

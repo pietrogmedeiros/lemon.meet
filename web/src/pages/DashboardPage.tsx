@@ -105,12 +105,14 @@ export function DashboardPage() {
   }, [navigate]);
 
   const fetchMeetings = async () => {
+    console.log('[Dashboard] 📡 Iniciando fetchMeetings...')
     setIsLoading(true);
     try {
       const data = await fetchMeetingsCache();
+      console.log('[Dashboard] ✅ Reuniões carregadas:', data.length)
       setMeetings(data);
     } catch (err) {
-      console.error('Erro ao buscar reuniões:', err);
+      console.error('[Dashboard] ❌ Erro ao buscar reuniões:', err);
     } finally {
       setIsLoading(false);
     }

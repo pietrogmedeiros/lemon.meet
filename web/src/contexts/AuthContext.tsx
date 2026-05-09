@@ -13,13 +13,16 @@ function clearAllCaches(keepPendingInvite = false) {
   // Limpa cache in-memory
   invalidateMeetingsCache()
   
-  // Lista de chaves para PRESERVAR (Supabase auth)
+  // Lista de chaves para PRESERVAR (Supabase auth + preferências do usuário)
   const keysToPreserve: string[] = []
   
   // Preserva token de convite se necessário
   if (keepPendingInvite) {
     keysToPreserve.push('pending_team_join')
   }
+  
+  // Preserva preferência de onboarding
+  keysToPreserve.push('lemon_onboarding_seen')
   
   // Preserva chaves do Supabase (auth tokens)
   for (let i = 0; i < localStorage.length; i++) {
@@ -71,6 +74,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // Verificar sessão inicial
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('[Auth] 🔍 Sessão inicial detectada:', session?.user?.email)
+      
+      // CRÍTICO: Limpa cache logo ao carregar se há sessão
+      // Garante que não há cache de outro usuário ao iniciar
+      if (session) {
+        console.log('[Auth] 🧹 Limpando cache ao detectar sessão inicial')
+        clearAllCaches(true) // Preserva token de convite
+      }
+      
       setSession(session)
       setUser(session?.user ?? null)
       setLoading(false)

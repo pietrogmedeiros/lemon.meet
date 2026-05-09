@@ -61,19 +61,21 @@ export function MeetingsPage() {
   }, []);
 
   useEffect(() => {
+    console.log('[MeetingsPage] 🔄 Carregando reuniões, viewMode:', viewMode)
     const load = async () => {
       setIsLoading(true);
       try {
         const data = await fetchMeetingsCache();
+        console.log('[MeetingsPage] 📦 Reuniões carregadas:', data.length)
         setMeetings(data);
       } catch (err) {
-        console.error('Erro ao buscar reuniões:', err);
+        console.error('[MeetingsPage] ❌ Erro ao buscar reuniões:', err);
       } finally {
         setIsLoading(false);
       }
     };
     load();
-  }, []);
+  }, [viewMode]); // Recarrega quando viewMode muda
 
   const getStatusBadge = (status: string | null) => {
     if (status === 'completed') return <Badge variant="success">Concluída</Badge>;
