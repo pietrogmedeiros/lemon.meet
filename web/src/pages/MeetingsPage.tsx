@@ -21,11 +21,17 @@ export function MeetingsPage() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null); // Novo: ID do usuário atual
 
   useEffect(() => {
+    console.log('[MeetingsPage] 🔍 Verificando admin...')
     const checkAdmin = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
-        if (!session) return;
+        if (!session) {
+          console.log('[MeetingsPage] ❌ Sem sessão')
+          return;
+        }
         
+        console.log('[MeetingsPage] 👤 User ID:', session.user.id)
+        console.log('[MeetingsPage] 📧 Email:', session.user.email)
         setCurrentUserId(session.user.id);
 
         // Verifica se é owner de algum time
@@ -35,7 +41,10 @@ export function MeetingsPage() {
           .eq('owner_id', session.user.id)
           .maybeSingle();
 
+        console.log('[MeetingsPage] 🏢 Times como owner:', ownedTeam)
+
         if (ownedTeam) {
+          console.log('[MeetingsPage] ✅ É OWNER de time!')
           setIsAdmin(true);
           return;
         }
@@ -49,11 +58,16 @@ export function MeetingsPage() {
           .eq('status', 'active')
           .maybeSingle();
 
+        console.log('[MeetingsPage] 👥 Membership como admin:', adminMembership)
+
         if (adminMembership) {
+          console.log('[MeetingsPage] ✅ É ADMIN de time!')
           setIsAdmin(true);
+        } else {
+          console.log('[MeetingsPage] ℹ️ Não é admin')
         }
       } catch (err) {
-        console.error('Erro ao verificar admin:', err);
+        console.error('[MeetingsPage] ❌ Erro ao verificar admin:', err);
       }
     };
     
@@ -109,7 +123,9 @@ export function MeetingsPage() {
         });
       }
     });
-    return Array.from(map.entries()).map(([id, info]) => ({ id, ...info }));
+    const users = Array.from(map.entries()).map(([id, info]) => ({ id, ...info }));
+    console.log('[MeetingsPage] 👥 Usuários únicos encontrados:', users.length, users);
+    return users;
   }, [meetings]);
 
   const filtered = useMemo(() => {
@@ -136,6 +152,8 @@ export function MeetingsPage() {
       return matchesSearch && matchesStatus && matchesUser;
     });
   }, [meetings, search, statusFilter, userFilter, viewMode, isAdmin, currentUserId]);
+
+  console.log('[MeetingsPage] 🎛️ Estado toggle:', { isLoading, meetingsCount: meetings.length, isAdmin });
 
   return (
     <MainLayout>
