@@ -456,7 +456,8 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
           
           const taskProperties: Record<string, string> = {
             hs_task_subject: `Follow-up ${i + 1}: ${title}`,
-            hs_task_body: followUp.content,
+            hs_task_body: followUp.content, // Corpo/descrição da task
+            hs_task_notes: followUp.content, // Observações da task (campo adicional)
             hs_task_status: 'NOT_STARTED',
             hs_task_priority: i === 0 ? 'HIGH' : 'MEDIUM',
             hs_timestamp: String(dueDate.getTime()),
