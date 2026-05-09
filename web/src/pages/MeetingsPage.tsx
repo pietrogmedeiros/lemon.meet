@@ -8,87 +8,134 @@ import { formatDate, formatTime } from '@/lib';
 import { fetchMeetings as fetchMeetingsCache, type Meeting } from '@/lib/meetingsCache';
 import { supabase } from '@/lib/supabase';
 
+const API = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
+interface TeamOption {
+  id: string;
+  name: string;
+  isOwner?: boolean;
+}
+
+interface TeamMeeting extends Meeting {
+  member_name?: string | null;
+}
+
 export function MeetingsPage() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const [meetings, setMeetings] = useState<Meeting[]>([]);
+  const [teams, setTeams] = useState<TeamOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [userFilter, setUserFilter] = useState<string>('all');
-  const [viewMode, setViewMode] = useState<'mine' | 'team'>('mine'); // Novo: modo de visualização
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null); // Novo: ID do usuário atual
-  const [userTeamIds, setUserTeamIds] = useState<string[]>([]); // Novo: IDs dos times do usuário
+  const [viewMode, setViewMode] = useState<'mine' | 'team'>('mine');
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [selectedTeamId, setSelectedTeamId] = useState<string>('all');
 
   useEffect(() => {
-    console.log('[MeetingsPage] 🔍 Verificando sessão e times...')
-    const checkSession = async () => {
+    const loadSessionAndTeams = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) {
-          console.log('[MeetingsPage] ❌ Sem sessão')
+          setMeetings([]);
+          setTeams([]);
+          setIsLoading(false);
           return;
         }
-        
-        console.log('[MeetingsPage] 👤 User ID:', session.user.id)
-        console.log('[MeetingsPage] 📧 Email:', session.user.email)
+
         setCurrentUserId(session.user.id);
 
-        // Buscar times onde o usuário é owner
-        const { data: ownedTeams } = await supabase
-          .from('teams')
-          .select('id')
-          .eq('owner_id', session.user.id);
+        const res = await fetch(`${API}/api/teams`, {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
 
-        // Buscar times onde o usuário é member
-        const { data: memberTeams } = await supabase
-          .from('team_members')
-          .select('team_id')
-          .eq('user_id', session.user.id)
-          .eq('status', 'active');
+        if (!res.ok) {
+          throw new Error('Falha ao carregar times do usuário');
+        }
 
-        // Combinar IDs de todos os times
-        const teamIds = [
-          ...(ownedTeams?.map(t => t.id) || []),
-          ...(memberTeams?.map(t => t.team_id) || [])
-        ];
-        
-        const uniqueTeamIds = [...new Set(teamIds)];
-        console.log('[MeetingsPage] 🏢 Times do usuário:', uniqueTeamIds);
-        setUserTeamIds(uniqueTeamIds);
+        const json = await res.json();
+        const nextTeams: TeamOption[] = json.teams ?? [];
+        setTeams(nextTeams);
       } catch (err) {
-        console.error('[MeetingsPage] ❌ Erro ao verificar sessão:', err);
-      }
-    };
-    
-    checkSession();
-  }, []);
-
-  useEffect(() => {
-    console.log('[MeetingsPage] 🔄 Carregando reuniões, viewMode:', viewMode)
-    const load = async () => {
-      setIsLoading(true);
-      try {
-        const data = await fetchMeetingsCache();
-        console.log('[MeetingsPage] 📦 Reuniões carregadas:', data.length)
-        
-        // DEBUG: Verificar team_id das reuniões
-        const teamIdCounts = data.reduce((acc, m) => {
-          const tid = m.team_id || 'null';
-          acc[tid] = (acc[tid] || 0) + 1;
-          return acc;
-        }, {} as Record<string, number>);
-        console.log('[MeetingsPage] 🔍 Distribuição de team_ids:', teamIdCounts);
-        
-        setMeetings(data);
-      } catch (err) {
-        console.error('[MeetingsPage] ❌ Erro ao buscar reuniões:', err);
+        console.error('[MeetingsPage] Erro ao carregar sessão/times:', err);
+        setTeams([]);
       } finally {
         setIsLoading(false);
       }
     };
+
+    loadSessionAndTeams();
+  }, []);
+
+  useEffect(() => {
+    const load = async () => {
+      if (!currentUserId) return;
+
+      setIsLoading(true);
+      setUserFilter('all');
+
+      try {
+        if (viewMode === 'mine') {
+          const data = await fetchMeetingsCache();
+          setMeetings(data.filter(meeting => meeting.user_id === currentUserId));
+          return;
+        }
+
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          setMeetings([]);
+          return;
+        }
+
+        const teamIdsToLoad = selectedTeamId === 'all'
+          ? teams.map(team => team.id)
+          : teams.filter(team => team.id === selectedTeamId).map(team => team.id);
+
+        if (!teamIdsToLoad.length) {
+          setMeetings([]);
+          return;
+        }
+
+        const responses = await Promise.all(
+          teamIdsToLoad.map(async (teamId) => {
+            const response = await fetch(`${API}/api/teams/${teamId}/meetings`, {
+              headers: { Authorization: `Bearer ${session.access_token}` },
+            });
+
+            if (!response.ok) {
+              throw new Error(`Falha ao carregar reuniões do time ${teamId}`);
+            }
+
+            const json = await response.json();
+            return (json.meetings ?? []).map((meeting: TeamMeeting) => ({
+              ...meeting,
+              team_id: meeting.team_id ?? teamId,
+              user_name: meeting.user_name ?? meeting.member_name ?? meeting.user_id,
+              user_avatar_url: meeting.user_avatar_url ?? null,
+            } as Meeting));
+          })
+        );
+
+        const dedupedMeetings = Array.from(
+          new Map(
+            responses
+              .flat()
+              .map(meeting => [meeting.id, meeting])
+          ).values()
+        ).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+        setMeetings(dedupedMeetings);
+      } catch (err) {
+        console.error('[MeetingsPage] Erro ao carregar reuniões:', err);
+        setMeetings([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
     load();
-  }, [viewMode]); // Recarrega quando viewMode muda
+  }, [currentUserId, selectedTeamId, teams, viewMode]);
 
   const getStatusBadge = (status: string | null) => {
     if (status === 'completed') return <Badge variant="success">Concluída</Badge>;
@@ -122,29 +169,12 @@ export function MeetingsPage() {
         });
       }
     });
-    const users = Array.from(map.entries()).map(([id, info]) => ({ id, ...info }));
-    console.log('[MeetingsPage] 👥 Usuários únicos encontrados:', users.length, users);
-    return users;
+    return Array.from(map.entries()).map(([id, info]) => ({ id, ...info }));
   }, [meetings]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    let result = meetings;
-
-    console.log('[MeetingsPage] Filtro:', viewMode, 'meetings:', meetings.length);
-
-    // Filtro por modo de visualização
-    if (viewMode === 'mine' && currentUserId) {
-      result = result.filter(m => m.user_id === currentUserId);
-      console.log('[MeetingsPage] MINE:', result.length);
-    } else if (viewMode === 'team' && userTeamIds.length > 0) {
-      console.log('[MeetingsPage] TEAM filter - userTeamIds:', userTeamIds);
-      result = result.filter(m => m.team_id && userTeamIds.includes(m.team_id));
-      console.log('[MeetingsPage] TEAM result:', result.length);
-    }
-
-    // Filtros normais
-    return result.filter(m => {
+    return meetings.filter(m => {
       const matchesSearch = !q ||
         (m.title ?? '').toLowerCase().includes(q) ||
         (m.meet_link ?? '').toLowerCase().includes(q) ||
@@ -154,15 +184,7 @@ export function MeetingsPage() {
       
       return matchesSearch && matchesStatus && matchesUser;
     });
-  }, [meetings, search, statusFilter, userFilter, viewMode, currentUserId, userTeamIds]);
-
-  console.log('[MeetingsPage] 🎛️ Estado:', { 
-    isLoading, 
-    meetingsCount: meetings.length, 
-    viewMode, 
-    userTeamIds,
-    filteredCount: filtered.length 
-  });
+  }, [meetings, search, statusFilter, userFilter]);
 
   return (
     <MainLayout>
@@ -174,13 +196,12 @@ export function MeetingsPage() {
           </p>
         </div>
 
-        {/* Toggle Minhas/Time - SEMPRE VISÍVEL se houver reuniões */}
-        {!isLoading && meetings.length > 0 && (
+        {!isLoading && (meetings.length > 0 || teams.length > 0) && (
           <div className="flex items-center gap-1.5 bg-[#F5F5F5] rounded-xl p-1 w-fit">
             <button
               onClick={() => {
                 setViewMode('mine');
-                setUserFilter('all'); // Reset user filter ao trocar
+                setUserFilter('all');
               }}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                 viewMode === 'mine'
@@ -192,7 +213,10 @@ export function MeetingsPage() {
               Minhas Reuniões
             </button>
             <button
-              onClick={() => setViewMode('team')}
+              onClick={() => {
+                setViewMode('team');
+                setUserFilter('all');
+              }}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                 viewMode === 'team'
                   ? 'bg-white text-[#2D5A27] shadow-sm font-semibold'
@@ -205,7 +229,35 @@ export function MeetingsPage() {
           </div>
         )}
 
-        {/* ── Busca + filtro de status ── */}
+        {!isLoading && viewMode === 'team' && teams.length > 0 && (
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs font-semibold text-[#666666] mr-1">Time:</span>
+            <button
+              onClick={() => setSelectedTeamId('all')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition ${
+                selectedTeamId === 'all'
+                  ? 'bg-[#2D5A27] text-white border-[#2D5A27]'
+                  : 'bg-white text-[#666666] border-[#E0E0E0] hover:border-[#2D5A27] hover:text-[#2D5A27]'
+              }`}
+            >
+              Todos os times
+            </button>
+            {teams.map(team => (
+              <button
+                key={team.id}
+                onClick={() => setSelectedTeamId(team.id)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition ${
+                  selectedTeamId === team.id
+                    ? 'bg-[#2D5A27] text-white border-[#2D5A27]'
+                    : 'bg-white text-[#666666] border-[#E0E0E0] hover:border-[#2D5A27] hover:text-[#2D5A27]'
+                }`}
+              >
+                {team.name}
+              </button>
+            ))}
+          </div>
+        )}
+
         {!isLoading && meetings.length > 0 && (
           <>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
