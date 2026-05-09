@@ -71,6 +71,15 @@ export function MeetingsPage() {
       try {
         const data = await fetchMeetingsCache();
         console.log('[MeetingsPage] 📦 Reuniões carregadas:', data.length)
+        
+        // DEBUG: Verificar team_id das reuniões
+        const teamIdCounts = data.reduce((acc, m) => {
+          const tid = m.team_id || 'null';
+          acc[tid] = (acc[tid] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>);
+        console.log('[MeetingsPage] 🔍 Distribuição de team_ids:', teamIdCounts);
+        
         setMeetings(data);
       } catch (err) {
         console.error('[MeetingsPage] ❌ Erro ao buscar reuniões:', err);
@@ -122,6 +131,13 @@ export function MeetingsPage() {
     const q = search.trim().toLowerCase();
     let result = meetings;
 
+    console.log('[MeetingsPage] 🔍 INICIANDO FILTRO:', {
+      viewMode,
+      totalMeetings: meetings.length,
+      currentUserId,
+      userTeamIds,
+    });
+
     // Filtro por modo de visualização
     if (viewMode === 'mine' && currentUserId) {
       // Modo "Minhas Reuniões": apenas reuniões do próprio usuário
@@ -129,8 +145,22 @@ export function MeetingsPage() {
       console.log('[MeetingsPage] 🔍 Filtro MINE: mostrando', result.length, 'reuniões do usuário');
     } else if (viewMode === 'team' && userTeamIds.length > 0) {
       // Modo "Reuniões do Time": apenas reuniões dos times do usuário
-      result = result.filter(m => m.team_id && userTeamIds.includes(m.team_id));
-      console.log('[MeetingsPage] 🔍 Filtro TEAM: mostrando', result.length, 'reuniões dos times', userTeamIds);
+      console.log('[MeetingsPage] 🔍 ANTES DO FILTRO TEAM:');
+      console.log('  - userTeamIds:', userTeamIds);
+      console.log('  - Primeiros 3 team_ids das reuniões:', meetings.slice(0, 3).map(m => ({ id: m.id, team_id: m.team_id })));
+      
+      result = result.filter(m => {
+        const hasTeamId = !!m.team_id;
+        const isInUserTeams = m.team_id && userTeamIds.includes(m.team_id);
+        
+        if (!hasTeamId) {
+          console.log('[MeetingsPage] ⚠️ Reunião sem team_id:', m.id, m.title);
+        }
+        
+        return hasTeamId && isInUserTeams;
+      });
+      
+      console.log('[MeetingsPage] 🔍 APÓS Filtro TEAM: mostrando', result.length, 'reuniões dos times', userTeamIds);
     }
 
     // Filtros normais
