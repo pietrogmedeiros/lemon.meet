@@ -3,9 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { MainLayout } from '@/components/layout';
 import { Card, Badge } from '@/components/ui';
-import { Video, Clock, Calendar, ChevronRight, Search, X, User } from 'lucide-react';
+import { Video, Clock, Calendar, ChevronRight, Search, X, User, Users } from 'lucide-react';
 import { formatDate, formatTime } from '@/lib';
 import { fetchMeetings as fetchMeetingsCache, type Meeting } from '@/lib/meetingsCache';
+import { supabase } from '@/lib/supabase';
 
 export function MeetingsPage() {
   const { t, i18n } = useTranslation();
@@ -15,6 +16,49 @@ export function MeetingsPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [userFilter, setUserFilter] = useState<string>('all');
+  const [viewMode, setViewMode] = useState<'mine' | 'team'>('mine'); // Novo: modo de visualização
+  const [isAdmin, setIsAdmin] = useState(false); // Novo: se é admin
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null); // Novo: ID do usuário atual
+
+  useEffect(() => {
+    const checkAdmin = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+        
+        setCurrentUserId(session.user.id);
+
+        // Verifica se é owner de algum time
+        const { data: ownedTeam } = await supabase
+          .from('teams')
+          .select('id')
+          .eq('owner_id', session.user.id)
+          .maybeSingle();
+
+        if (ownedTeam) {
+          setIsAdmin(true);
+          return;
+        }
+
+        // Verifica se é admin de algum time
+        const { data: adminMembership } = await supabase
+          .from('team_members')
+          .select('role')
+          .eq('user_id', session.user.id)
+          .eq('role', 'admin')
+          .eq('status', 'active')
+          .maybeSingle();
+
+        if (adminMembership) {
+          setIsAdmin(true);
+        }
+      } catch (err) {
+        console.error('Erro ao verificar admin:', err);
+      }
+    };
+    
+    checkAdmin();
+  }, []);
 
   useEffect(() => {
     const load = async () => {
@@ -68,16 +112,27 @@ export function MeetingsPage() {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return meetings.filter(m => {
+    let result = meetings;
+
+    // Filtro por modo de visualização (se é admin)
+    if (isAdmin && viewMode === 'mine' && currentUserId) {
+      result = result.filter(m => m.user_id === currentUserId);
+    }
+
+    // Filtros normais
+    return result.filter(m => {
       const matchesSearch = !q ||
         (m.title ?? '').toLowerCase().includes(q) ||
         (m.meet_link ?? '').toLowerCase().includes(q) ||
         (m.platform ?? '').toLowerCase().includes(q);
       const matchesStatus = statusFilter === 'all' || m.status === statusFilter;
-      const matchesUser = userFilter === 'all' || m.user_id === userFilter;
+      
+      // Filtro de usuário só se aplica no modo 'team'
+      const matchesUser = viewMode === 'mine' || userFilter === 'all' || m.user_id === userFilter;
+      
       return matchesSearch && matchesStatus && matchesUser;
     });
-  }, [meetings, search, statusFilter, userFilter]);
+  }, [meetings, search, statusFilter, userFilter, viewMode, isAdmin, currentUserId]);
 
   return (
     <MainLayout>
@@ -88,6 +143,37 @@ export function MeetingsPage() {
             {t('meetings.subtitle', 'Acompanhe todas as suas reuniões transcritas e insights gerados')}
           </p>
         </div>
+
+        {/* Toggle Minhas/Time (só para admins) */}
+        {isAdmin && !isLoading && meetings.length > 0 && (
+          <div className="flex items-center gap-1.5 bg-[#F5F5F5] rounded-xl p-1 w-fit">
+            <button
+              onClick={() => {
+                setViewMode('mine');
+                setUserFilter('all'); // Reset user filter ao trocar
+              }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                viewMode === 'mine'
+                  ? 'bg-white text-[#2D5A27] shadow-sm font-semibold'
+                  : 'text-[#666666] hover:text-[#333333]'
+              }`}
+            >
+              <User size={14} />
+              Minhas Reuniões
+            </button>
+            <button
+              onClick={() => setViewMode('team')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                viewMode === 'team'
+                  ? 'bg-white text-[#2D5A27] shadow-sm font-semibold'
+                  : 'text-[#666666] hover:text-[#333333]'
+              }`}
+            >
+              <Users size={14} />
+              Reuniões do Time
+            </button>
+          </div>
+        )}
 
         {/* ── Busca + filtro de status ── */}
         {!isLoading && meetings.length > 0 && (
@@ -131,8 +217,8 @@ export function MeetingsPage() {
             </div>
           </div>
 
-          {/* Filtro por usuário (só aparece se houver mais de 1 usuário) */}
-          {uniqueUsers.length > 1 && (
+          {/* Filtro por usuário (só aparece no modo 'team' para admins) */}
+          {isAdmin && viewMode === 'team' && uniqueUsers.length > 1 && (
             <div className="flex items-center gap-2 flex-wrap">
               <button
                 onClick={() => setUserFilter('all')}
@@ -142,7 +228,7 @@ export function MeetingsPage() {
                     : 'bg-white text-[#666666] border-[#E0E0E0] hover:border-[#2D5A27] hover:text-[#2D5A27]'
                 }`}
               >
-                Todos os usuários
+                Todos os membros
               </button>
               {uniqueUsers.map(u => (
                 <button
