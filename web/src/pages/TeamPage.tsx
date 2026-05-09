@@ -101,41 +101,69 @@ export function TeamPage() {
 
   // Carregar lista de times
   const loadTeams = useCallback(async () => {
-    if (!session) return
+    if (!session) {
+      console.log('[TeamPage] ⚠️ Sem sessão, não pode carregar times')
+      return
+    }
+    console.log('[TeamPage] 🔄 Carregando times para user:', session.user.id)
     setLoading(true)
     try {
       const data = await apiFetch('/api/teams', session)
-      console.log('[TeamPage] Resposta da API:', data)
-      console.log('[TeamPage] Times encontrados:', data.teams?.length ?? 0)
+      console.log('[TeamPage] 📦 Resposta da API:', JSON.stringify(data, null, 2))
+      console.log('[TeamPage] 📊 Times encontrados:', data.teams?.length ?? 0)
+      
       const loadedTeams = data.teams ?? []
       setTeams(loadedTeams)
+      
+      if (loadedTeams.length === 0) {
+        console.log('[TeamPage] ⚠️ Nenhum time encontrado para este usuário')
+      }
       
       // Seleciona o primeiro time por padrão se ainda não há nenhum selecionado
       if (loadedTeams.length > 0) {
         setSelectedTeamId(prev => {
           if (!prev) {
-            console.log('[TeamPage] Selecionando primeiro time:', loadedTeams[0].id)
+            console.log('[TeamPage] ✅ Selecionando primeiro time:', loadedTeams[0].id, loadedTeams[0].name)
             return loadedTeams[0].id
           }
           return prev
         })
       }
     } catch (err) {
-      console.error('[TeamPage] Erro ao carregar times:', err)
+      console.error('[TeamPage] ❌ Erro ao carregar times:', err)
     } finally {
       setLoading(false)
     }
   }, [session])
 
-  // Detecta quando retorna de um convite aceito e força reload
+  // Detecta quando retorna de um convite aceito e força reload TOTAL
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
-    if (params.get('joined') === 'true' && session) {
-      console.log('[TeamPage] Detectado join recente, forçando reload dos times')
+    if (params.get('joined') === 'true') {
+      console.log('[TeamPage] 🎉 Detectado join recente!')
       // Remove o parâmetro da URL
       window.history.replaceState({}, '', '/team')
-      // Força reload dos times
-      loadTeams()
+      // FORÇA reload completo da página para garantir que cache foi limpo
+      if (session) {
+        console.log('[TeamPage] 🔄 Sessão disponível, forçando reload dos times')
+        setTimeout(() => {
+          loadTeams()
+        }, 500)
+      } else {
+        console.log('[TeamPage] ⏳ Aguardando sessão ficar disponível...')
+        // Aguarda sessão ficar disponível
+        const checkSession = setInterval(() => {
+          supabase.auth.getSession().then(({ data: { session: s } }) => {
+            if (s) {
+              console.log('[TeamPage] ✅ Sessão disponível agora, carregando times')
+              setSession(s)
+              clearInterval(checkSession)
+            }
+          })
+        }, 500)
+        // Timeout de 10 segundos
+        setTimeout(() => clearInterval(checkSession), 10000)
+      }
     }
   }, [session, loadTeams])
 

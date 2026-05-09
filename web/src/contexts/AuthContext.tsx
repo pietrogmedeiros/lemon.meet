@@ -16,6 +16,31 @@ async function tryAcceptInvite(session: Session) {
   }
 }
 
+// Função de limpeza TOTAL para evitar cache entre usuários
+function clearAllCaches(keepPendingInvite = false) {
+  console.log('[Auth] 🧹 LIMPEZA TOTAL DE CACHE E STORAGE')
+  
+  // Salva token de convite se necessário
+  const pendingToken = keepPendingInvite ? localStorage.getItem('pending_team_join') : null
+  
+  // Limpa cache in-memory
+  invalidateMeetingsCache()
+  
+  // Limpa localStorage COMPLETAMENTE
+  localStorage.clear()
+  
+  // Limpa sessionStorage
+  sessionStorage.clear()
+  
+  // Restaura token de convite se necessário
+  if (pendingToken) {
+    console.log('[Auth] 🎟️ Restaurando token de convite:', pendingToken)
+    localStorage.setItem('pending_team_join', pendingToken)
+  }
+  
+  console.log('[Auth] ✅ Limpeza completa executada')
+}
+
 interface AuthContextType {
   user: User | null
   session: Session | null
@@ -44,21 +69,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('[Auth] Evento:', event, 'User:', session?.user?.email)
+      console.log('[Auth] 🔔 Evento:', event, 'User:', session?.user?.email)
       
       const previousUserId = user?.id
       const newUserId = session?.user?.id
       
-      // SEGURANÇA: Limpa cache se mudou de usuário
-      if (event === 'SIGNED_IN' && previousUserId && newUserId && previousUserId !== newUserId) {
-        console.warn('[Auth] ⚠️ Mudança de usuário detectada! Limpando cache...')
-        invalidateMeetingsCache()
+      // LIMPEZA TOTAL ao fazer logout
+      if (event === 'SIGNED_OUT') {
+        console.log('[Auth] 🚪 LOGOUT detectado - Limpando TUDO')
+        clearAllCaches(false) // Não preserva convite
       }
       
-      // Limpa cache ao fazer logout
-      if (event === 'SIGNED_OUT') {
-        console.log('[Auth] 🗑️ Logout detectado, limpando cache...')
-        invalidateMeetingsCache()
+      // LIMPEZA TOTAL ao fazer login (exceto token de convite)
+      if (event === 'SIGNED_IN') {
+        console.log('[Auth] 🔑 LOGIN detectado - Limpando cache anterior')
+        clearAllCaches(true) // Preserva token de convite
+        
+        // Se mudou de usuário, alerta extra
+        if (previousUserId && newUserId && previousUserId !== newUserId) {
+          console.warn('[Auth] ⚠️ MUDANÇA DE USUÁRIO! Previous:', previousUserId, 'New:', newUserId)
+        }
       }
       
       setSession(session)
@@ -111,7 +141,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     try {
       console.log('[Auth] 🚪 Fazendo logout...')
-      invalidateMeetingsCache() // Limpa cache ANTES de sair
+      clearAllCaches(false) // Limpa TUDO, inclusive token de convite
       await supabase.auth.signOut()
       setUser(null)
       setSession(null)
