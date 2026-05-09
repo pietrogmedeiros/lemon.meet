@@ -17,7 +17,7 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
 
     const { data: meetings, error } = await supabase
       .from('meetings')
-      .select('*')
+      .select('*, team_id')  // Garantir que team_id está incluído
       .in('user_id', memberIds)
       .order('created_at', { ascending: false });
 

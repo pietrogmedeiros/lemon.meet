@@ -1,4 +1,5 @@
-// Server version: 2026-05-09T03:05:00Z - Fix invite flow
+// Server version: 2026-05-09T04:30:00Z - Filtro inteligente de times
+// Adicionado: team_id na query de meetings + filtro por times do usuário
 import express, { type Express } from 'express'
 import { createServer } from 'http'
 import cors from 'cors'

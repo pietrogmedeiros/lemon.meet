@@ -18,9 +18,10 @@ export function MeetingsPage() {
   const [userFilter, setUserFilter] = useState<string>('all');
   const [viewMode, setViewMode] = useState<'mine' | 'team'>('mine'); // Novo: modo de visualização
   const [currentUserId, setCurrentUserId] = useState<string | null>(null); // Novo: ID do usuário atual
+  const [userTeamIds, setUserTeamIds] = useState<string[]>([]); // Novo: IDs dos times do usuário
 
   useEffect(() => {
-    console.log('[MeetingsPage] 🔍 Verificando sessão...')
+    console.log('[MeetingsPage] 🔍 Verificando sessão e times...')
     const checkSession = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
@@ -32,6 +33,29 @@ export function MeetingsPage() {
         console.log('[MeetingsPage] 👤 User ID:', session.user.id)
         console.log('[MeetingsPage] 📧 Email:', session.user.email)
         setCurrentUserId(session.user.id);
+
+        // Buscar times onde o usuário é owner
+        const { data: ownedTeams } = await supabase
+          .from('teams')
+          .select('id')
+          .eq('owner_id', session.user.id);
+
+        // Buscar times onde o usuário é member
+        const { data: memberTeams } = await supabase
+          .from('team_members')
+          .select('team_id')
+          .eq('user_id', session.user.id)
+          .eq('status', 'active');
+
+        // Combinar IDs de todos os times
+        const teamIds = [
+          ...(ownedTeams?.map(t => t.id) || []),
+          ...(memberTeams?.map(t => t.team_id) || [])
+        ];
+        
+        const uniqueTeamIds = [...new Set(teamIds)];
+        console.log('[MeetingsPage] 🏢 Times do usuário:', uniqueTeamIds);
+        setUserTeamIds(uniqueTeamIds);
       } catch (err) {
         console.error('[MeetingsPage] ❌ Erro ao verificar sessão:', err);
       }
@@ -100,9 +124,14 @@ export function MeetingsPage() {
 
     // Filtro por modo de visualização
     if (viewMode === 'mine' && currentUserId) {
+      // Modo "Minhas Reuniões": apenas reuniões do próprio usuário
       result = result.filter(m => m.user_id === currentUserId);
+      console.log('[MeetingsPage] 🔍 Filtro MINE: mostrando', result.length, 'reuniões do usuário');
+    } else if (viewMode === 'team' && userTeamIds.length > 0) {
+      // Modo "Reuniões do Time": apenas reuniões dos times do usuário
+      result = result.filter(m => m.team_id && userTeamIds.includes(m.team_id));
+      console.log('[MeetingsPage] 🔍 Filtro TEAM: mostrando', result.length, 'reuniões dos times', userTeamIds);
     }
-    // No modo 'team', mostra todas as reuniões retornadas pelo backend
 
     // Filtros normais
     return result.filter(m => {
@@ -117,9 +146,15 @@ export function MeetingsPage() {
       
       return matchesSearch && matchesStatus && matchesUser;
     });
-  }, [meetings, search, statusFilter, userFilter, viewMode, currentUserId]);
+  }, [meetings, search, statusFilter, userFilter, viewMode, currentUserId, userTeamIds]);
 
-  console.log('[MeetingsPage] 🎛️ Estado toggle:', { isLoading, meetingsCount: meetings.length, viewMode });
+  console.log('[MeetingsPage] 🎛️ Estado:', { 
+    isLoading, 
+    meetingsCount: meetings.length, 
+    viewMode, 
+    userTeamIds,
+    filteredCount: filtered.length 
+  });
 
   return (
     <MainLayout>
