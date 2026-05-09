@@ -93,16 +93,27 @@ export function TeamPage() {
     setLoading(true)
     try {
       const data = await apiFetch('/api/teams', session)
-      setTeams(data.teams ?? [])
+      console.log('[TeamPage] Resposta da API:', data)
+      console.log('[TeamPage] Times encontrados:', data.teams?.length ?? 0)
+      const loadedTeams = data.teams ?? []
+      setTeams(loadedTeams)
       
-      // Seleciona o primeiro time por padrão
-      if (data.teams && data.teams.length > 0 && !selectedTeamId) {
-        setSelectedTeamId(data.teams[0].id)
+      // Seleciona o primeiro time por padrão se ainda não há nenhum selecionado
+      if (loadedTeams.length > 0) {
+        setSelectedTeamId(prev => {
+          if (!prev) {
+            console.log('[TeamPage] Selecionando primeiro time:', loadedTeams[0].id)
+            return loadedTeams[0].id
+          }
+          return prev
+        })
       }
+    } catch (err) {
+      console.error('[TeamPage] Erro ao carregar times:', err)
     } finally {
       setLoading(false)
     }
-  }, [session, selectedTeamId])
+  }, [session])
 
   // Carregar detalhes de um time específico
   const loadTeamDetails = useCallback(async (teamId: string) => {
