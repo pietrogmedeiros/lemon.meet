@@ -85,15 +85,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const previousUserId = user?.id
       const newUserId = session?.user?.id
       
-      // LIMPEZA apenas ao fazer logout
+      // LIMPEZA ao fazer logout
       if (event === 'SIGNED_OUT') {
         console.log('[Auth] 🚪 LOGOUT detectado - Limpando cache')
         clearAllCaches(false) // Não preserva convite
       }
       
-      // Se mudou de usuário (troca de conta sem logout), limpa cache mas preserva token
-      if (event === 'SIGNED_IN' && previousUserId && newUserId && previousUserId !== newUserId) {
-        console.warn('[Auth] ⚠️ MUDANÇA DE USUÁRIO! Previous:', previousUserId, 'New:', newUserId)
+      // LIMPEZA SEMPRE ao fazer login (novo usuário OU troca de conta)
+      if (event === 'SIGNED_IN') {
+        if (previousUserId && newUserId && previousUserId !== newUserId) {
+          console.warn('[Auth] ⚠️ MUDANÇA DE USUÁRIO! Previous:', previousUserId, 'New:', newUserId)
+        } else {
+          console.log('[Auth] 🔑 NOVO LOGIN - Limpando cache da sessão anterior')
+        }
         clearAllCaches(true) // Preserva token de convite
       }
       

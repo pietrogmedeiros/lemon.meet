@@ -39,6 +39,8 @@ export function invalidateMeetingsCache(): void {
 export async function fetchMeetings(limit = 100): Promise<Meeting[]> {
   const now = Date.now()
   
+  console.log('[MeetingsCache] 🔍 Iniciando fetchMeetings...')
+  
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) {
     console.warn('[MeetingsCache] ❌ Sem sessão, não pode buscar reuniões')
@@ -46,18 +48,24 @@ export async function fetchMeetings(limit = 100): Promise<Meeting[]> {
   }
 
   const currentUserId = session.user.id
+  console.log('[MeetingsCache] 👤 Current user ID:', currentUserId)
 
   // SEGURANÇA: Invalida cache se for de outro usuário
-  if (cache && cache.userId !== currentUserId) {
-    console.warn('[MeetingsCache] ⚠️ Cache é de outro usuário! Invalidando...')
-    console.log('[MeetingsCache] Cache userId:', cache.userId)
-    console.log('[MeetingsCache] Current userId:', currentUserId)
-    cache = null
+  if (cache) {
+    console.log('[MeetingsCache] 📦 Cache existe - userId:', cache.userId)
+    if (cache.userId !== currentUserId) {
+      console.warn('[MeetingsCache] ⚠️ Cache é de outro usuário! Invalidando...')
+      console.log('[MeetingsCache] ❌ Cache userId:', cache.userId)
+      console.log('[MeetingsCache] ✅ Current userId:', currentUserId)
+      cache = null
+    }
+  } else {
+    console.log('[MeetingsCache] 📭 Nenhum cache existente')
   }
 
   // Serve do cache se ainda válido E for do mesmo usuário
   if (cache && now < cache.expiresAt && cache.userId === currentUserId) {
-    console.log('[MeetingsCache] ✅ Usando cache')
+    console.log('[MeetingsCache] ✅ Usando cache válido')
     return cache.data
   }
 
@@ -68,6 +76,7 @@ export async function fetchMeetings(limit = 100): Promise<Meeting[]> {
   }
 
   console.log('[MeetingsCache] 🔄 Buscando reuniões do servidor...')
+  console.log('[MeetingsCache] 📡 API URL:', `${API}/api/meetings?limit=${limit}`)
   
   const promise = (async (): Promise<Meeting[]> => {
     const res = await fetch(`${API}/api/meetings?limit=${limit}`, {

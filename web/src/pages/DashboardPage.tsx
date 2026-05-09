@@ -5,7 +5,7 @@ import { MainLayout } from '@/components/layout';
 import { Card, Badge } from '@/components/ui';
 import { Video, Clock, Calendar, TrendingUp, CheckCircle, Loader, ExternalLink } from 'lucide-react';
 import { formatDate } from '@/lib';
-import { fetchMeetings as fetchMeetingsCache, type Meeting } from '@/lib/meetingsCache';
+import { fetchMeetings as fetchMeetingsCache, invalidateMeetingsCache, type Meeting } from '@/lib/meetingsCache';
 import { supabase } from '@/lib/supabase';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:3000';
@@ -79,6 +79,10 @@ export function DashboardPage() {
           console.log('[Dashboard] 🏢 Time:', data.team?.name);
           console.log('[Dashboard] 🗑️ Removendo token do localStorage');
           localStorage.removeItem('pending_team_join');
+          
+          // FORÇA invalidação total do cache antes de redirecionar
+          console.log('[Dashboard] 🧹 Invalidando cache de reuniões antes de redirecionar');
+          invalidateMeetingsCache();
           
           // Redireciona para página de times
           console.log('[Dashboard] 🔄 Redirecionando para /team?joined=true em 1 segundo');

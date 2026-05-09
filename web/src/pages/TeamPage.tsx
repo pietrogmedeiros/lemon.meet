@@ -633,15 +633,15 @@ export function TeamPage() {
                   <ul className="space-y-2.5 text-xs text-[#666666] leading-relaxed">
                     <li className="flex items-start gap-2">
                       <span className="w-4 h-4 rounded-full bg-[#2D5A27]/15 text-[#2D5A27] flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5">1</span>
-                      Digite o e-mail do colaborador e clique em "Enviar convite".
+                      Clique em "Gerar link de convite" para criar um link compartilhável.
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="w-4 h-4 rounded-full bg-[#2D5A27]/15 text-[#2D5A27] flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5">2</span>
-                      Ele receberá um link por e-mail para acessar o Lemon.meet.
+                      Compartilhe o link com a pessoa que deseja convidar.
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="w-4 h-4 rounded-full bg-[#2D5A27]/15 text-[#2D5A27] flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5">3</span>
-                      Após o primeiro login, ficará ativo na lista de membros.
+                      Após fazer login, ela será automaticamente adicionada ao time.
                     </li>
                   </ul>
                 </div>
