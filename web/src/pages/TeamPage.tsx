@@ -327,6 +327,9 @@ export function TeamPage() {
   const pendingCount = members.filter(m => m.status === 'invited').length
   const canCreateMore = teams.filter(t => t.isOwner).length < 5
 
+  console.log('[TeamPage] Renderizando com teams:', teams)
+  console.log('[TeamPage] Team selecionado:', selectedTeamId)
+
   return (
     <MainLayout>
       <div className="space-y-6">
@@ -342,14 +345,20 @@ export function TeamPage() {
                 </label>
                 <select
                   value={selectedTeamId ?? ''}
-                  onChange={(e) => setSelectedTeamId(e.target.value)}
+                  onChange={(e) => {
+                    console.log('[TeamPage] Selecionando time:', e.target.value)
+                    setSelectedTeamId(e.target.value)
+                  }}
                   className="w-full px-4 py-2.5 rounded-xl border border-[#E0E0E0] text-[#333333] text-sm focus:outline-none focus:ring-2 focus:ring-[#2D5A27]/25 focus:border-[#2D5A27] transition bg-white"
                 >
-                  {teams.map(t => (
-                    <option key={t.id} value={t.id}>
-                      {t.name} {t.isOwner ? '(Owner)' : '(Membro)'}
-                    </option>
-                  ))}
+                  {teams.map(t => {
+                    console.log('[TeamPage] Renderizando option:', t.name, t.id, t.isOwner)
+                    return (
+                      <option key={t.id} value={t.id}>
+                        {t.name} {t.isOwner ? '(Owner)' : '(Membro)'}
+                      </option>
+                    )
+                  })}
                 </select>
               </div>
 
