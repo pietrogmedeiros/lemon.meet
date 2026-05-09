@@ -27,7 +27,32 @@ const PORT = process.env.PORT || 3000
 
 // Middleware
 app.set('trust proxy', 1) // necessário atrás de proxies (Railway, Heroku, etc.)
-app.use(helmet())
+
+// Domínios do Lemon.crm autorizados a embedar o app via iframe
+// Configure via LEMON_CRM_URL (aceita múltiplos domínios separados por vírgula).
+// Em dev, o frontend do CRM roda em http://localhost:3001 e já vem incluído por padrão.
+const lemonCrmOrigins = Array.from(
+  new Set(
+    [
+      'http://localhost:3001',
+      ...(process.env.LEMON_CRM_URL || '').split(',').map((url) => url.trim()),
+    ].filter(Boolean)
+  )
+)
+
+app.use(
+  helmet({
+    // Desabilita X-Frame-Options (substituído por CSP frame-ancestors abaixo).
+    // Manter X-Frame-Options junto com frame-ancestors causa conflito em alguns browsers.
+    frameguard: false,
+    contentSecurityPolicy: {
+      useDefaults: true,
+      directives: {
+        frameAncestors: ["'self'", ...lemonCrmOrigins],
+      },
+    },
+  })
+)
 app.use(cors({
   origin: (origin, callback) => {
     const allowed = [
@@ -36,6 +61,8 @@ app.use(cors({
       // Firebase Hosting (domínio padrão e domínio customizado)
       'https://lemon-meet.web.app',
       'https://lemon-meet.firebaseapp.com',
+      // Lemon.crm (host que embeda o app via iframe)
+      ...lemonCrmOrigins,
     ]
     // Permite extensões Chrome e requisições sem origin (ex: curl)
     if (!origin || origin.startsWith('chrome-extension://') || allowed.includes(origin)) {

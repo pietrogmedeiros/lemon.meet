@@ -35,15 +35,19 @@ router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ success: false, message: 'name is required' })
     }
 
-    // Verifica se já tem um time
-    const { data: existing } = await supabase
+    // Verifica quantos times o usuário já possui
+    const { data: existingTeams, error: countError } = await supabase
       .from('teams')
       .select('id')
       .eq('owner_id', userId)
-      .single()
 
-    if (existing) {
-      return res.status(409).json({ success: false, message: 'Você já possui um time.' })
+    if (countError) throw countError
+
+    if (existingTeams && existingTeams.length >= 5) {
+      return res.status(409).json({ 
+        success: false, 
+        message: 'Você atingiu o limite máximo de 5 times.' 
+      })
     }
 
     const { data: team, error } = await supabase
@@ -72,7 +76,118 @@ router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
   }
 })
 
+// ── GET /api/teams ─────────────────────────────────────────────
+// Lista todos os times do usuário (como owner ou membro)
+router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id
+
+    // Times onde é owner
+    const { data: ownedTeams } = await supabase
+      .from('teams')
+      .select('*')
+      .eq('owner_id', userId)
+      .order('created_at', { ascending: false })
+
+    // Times onde é membro ativo
+    const { data: memberships } = await supabase
+      .from('team_members')
+      .select('team_id')
+      .eq('user_id', userId)
+      .eq('status', 'active')
+      .not('team_id', 'is', null)
+
+    const memberTeamIds = (memberships ?? []).map(m => m.team_id)
+    
+    let memberTeams: any[] = []
+    if (memberTeamIds.length > 0) {
+      const { data } = await supabase
+        .from('teams')
+        .select('*')
+        .in('id', memberTeamIds)
+        .order('created_at', { ascending: false })
+      memberTeams = data ?? []
+    }
+
+    // Combina e remove duplicatas
+    const allTeamsMap = new Map()
+    ;[...(ownedTeams ?? []), ...memberTeams].forEach(t => {
+      if (!allTeamsMap.has(t.id)) {
+        allTeamsMap.set(t.id, { ...t, isOwner: t.owner_id === userId })
+      }
+    })
+
+    const teams = Array.from(allTeamsMap.values())
+
+    return res.json({ success: true, teams })
+  } catch (err) {
+    logger.error('Error fetching teams:', err)
+    return res.status(500).json({ success: false, message: 'Internal server error' })
+  }
+})
+
+// ── GET /api/teams/:id ─────────────────────────────────────────
+// Busca um time específico com seus membros
+router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id
+    const { id: teamId } = req.params
+
+    // Busca o time
+    const { data: team } = await supabase
+      .from('teams')
+      .select('*')
+      .eq('id', teamId)
+      .single()
+
+    if (!team) {
+      return res.status(404).json({ success: false, message: 'Time não encontrado' })
+    }
+
+    // Verifica se o usuário tem acesso (owner ou membro ativo)
+    const isOwner = team.owner_id === userId
+    const { data: membership } = await supabase
+      .from('team_members')
+      .select('id')
+      .eq('team_id', teamId)
+      .eq('user_id', userId)
+      .eq('status', 'active')
+      .maybeSingle()
+
+    if (!isOwner && !membership) {
+      return res.status(403).json({ success: false, message: 'Sem permissão para acessar este time' })
+    }
+
+    // Busca membros com dados do usuário
+    const { data: members } = await supabase
+      .from('team_members')
+      .select('id, user_id, invited_email, role, status, created_at')
+      .eq('team_id', teamId)
+      .order('created_at', { ascending: true })
+
+    // Enriquece com nome do usuário
+    const enriched = await Promise.all(
+      (members ?? []).map(async (m) => {
+        if (m.user_id) {
+          const { data } = await supabase.auth.admin.getUserById(m.user_id)
+          return {
+            ...m,
+            name: data.user?.user_metadata?.full_name ?? data.user?.user_metadata?.name ?? null,
+          }
+        }
+        return { ...m, name: null }
+      })
+    )
+
+    return res.json({ success: true, team, members: enriched, isOwner })
+  } catch (err) {
+    logger.error('Error fetching team:', err)
+    return res.status(500).json({ success: false, message: 'Internal server error' })
+  }
+})
+
 // ── GET /api/teams/my ─────────────────────────────────────────
+// Mantido para compatibilidade - retorna o primeiro time do usuário
 router.get('/my', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.id
@@ -82,7 +197,9 @@ router.get('/my', authMiddleware, async (req: AuthRequest, res: Response) => {
       .from('teams')
       .select('*')
       .eq('owner_id', userId)
-      .single()
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
 
     // Se não é owner, tenta como membro
     if (!team) {

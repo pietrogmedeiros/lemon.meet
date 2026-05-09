@@ -25,6 +25,7 @@ interface Team {
   id: string
   name: string
   owner_id: string
+  isOwner?: boolean
 }
 
 interface TeamMeeting {
@@ -53,10 +54,13 @@ async function apiFetch(path: string, session: any, options?: RequestInit) {
 export function TeamPage() {
   const navigate = useNavigate()
   const [session, setSession] = useState<any>(null)
+  const [teams, setTeams] = useState<Team[]>([])
+  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null)
   const [team, setTeam] = useState<Team | null>(null)
   const [members, setMembers] = useState<Member[]>([])
   const [isOwner, setIsOwner] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [teamLoading, setTeamLoading] = useState(false)
   const [tab, setTab] = useState<'members' | 'meetings'>('members')
 
   // Criar time
@@ -83,22 +87,46 @@ export function TeamPage() {
     supabase.auth.getSession().then(({ data: { session: s } }) => setSession(s))
   }, [])
 
-  const loadTeam = useCallback(async () => {
+  // Carregar lista de times
+  const loadTeams = useCallback(async () => {
     if (!session) return
     setLoading(true)
     try {
-      const data = await apiFetch('/api/teams/my', session)
+      const data = await apiFetch('/api/teams', session)
+      setTeams(data.teams ?? [])
+      
+      // Seleciona o primeiro time por padrão
+      if (data.teams && data.teams.length > 0 && !selectedTeamId) {
+        setSelectedTeamId(data.teams[0].id)
+      }
+    } finally {
+      setLoading(false)
+    }
+  }, [session, selectedTeamId])
+
+  // Carregar detalhes de um time específico
+  const loadTeamDetails = useCallback(async (teamId: string) => {
+    if (!session || !teamId) return
+    setTeamLoading(true)
+    try {
+      const data = await apiFetch(`/api/teams/${teamId}`, session)
       setTeam(data.team ?? null)
       setMembers(data.members ?? [])
       setIsOwner(data.isOwner ?? false)
     } finally {
-      setLoading(false)
+      setTeamLoading(false)
     }
   }, [session])
 
   useEffect(() => {
-    if (session) loadTeam()
-  }, [session, loadTeam])
+    if (session) loadTeams()
+  }, [session, loadTeams])
+
+  useEffect(() => {
+    if (selectedTeamId) {
+      loadTeamDetails(selectedTeamId)
+    }
+  }, [selectedTeamId, loadTeamDetails])
 
   const loadMeetings = useCallback(async () => {
     if (!team || !session) return
@@ -125,7 +153,12 @@ export function TeamPage() {
         body: JSON.stringify({ name: teamName.trim() }),
       })
       if (!data.success) throw new Error(data.message)
-      await loadTeam()
+      setTeamName('')
+      await loadTeams()
+      // Seleciona o time recém-criado
+      if (data.team) {
+        setSelectedTeamId(data.team.id)
+      }
     } catch (err: any) {
       setCreateError(err.message ?? 'Erro ao criar time.')
       setCreateStatus('error')
@@ -146,7 +179,7 @@ export function TeamPage() {
       if (!data.success) throw new Error(data.message)
       setInviteStatus('success')
       setInviteEmail('')
-      await loadTeam()
+      await loadTeamDetails(team.id)
       setTimeout(() => setInviteStatus('idle'), 3000)
     } catch (err: any) {
       setInviteError(err.message ?? 'Erro ao enviar convite.')
@@ -164,7 +197,7 @@ export function TeamPage() {
         { method: 'PATCH', body: JSON.stringify({ role: newRole }) }
       )
       if (!data.success) throw new Error(data.message)
-      await loadTeam()
+      await loadTeamDetails(team.id)
     } catch (err: any) {
       alert(err.message ?? 'Erro ao alterar papel.')
     } finally {
@@ -180,7 +213,7 @@ export function TeamPage() {
       await apiFetch(`/api/teams/${team.id}/members/${encodeURIComponent(email)}`, session, {
         method: 'DELETE',
       })
-      await loadTeam()
+      await loadTeamDetails(team.id)
     } finally {
       setRemovingEmail(null)
     }
@@ -203,7 +236,7 @@ export function TeamPage() {
   }
 
   // ── Sem time → formulário de criação ─────────────────────────
-  if (!team) {
+  if (!loading && teams.length === 0) {
     return (
       <MainLayout>
         <div className="max-w-lg mx-auto mt-20">
@@ -269,12 +302,75 @@ export function TeamPage() {
   }
 
   // ── Time existente ────────────────────────────────────────────
+  if (teamLoading || !team) {
+    return (
+      <MainLayout>
+        <div className="flex items-center justify-center py-32">
+          <Loader size={28} className="animate-spin text-[#2D5A27]" />
+        </div>
+      </MainLayout>
+    )
+  }
+
   const activeCount = members.filter(m => m.status === 'active').length
   const pendingCount = members.filter(m => m.status === 'invited').length
+  const canCreateMore = teams.filter(t => t.isOwner).length < 5
 
   return (
     <MainLayout>
       <div className="space-y-6">
+
+        {/* Seletor de Times + Criar Novo */}
+        {teams.length > 1 || canCreateMore ? (
+          <div className="bg-white border border-[#E0E0E0] rounded-2xl p-4 shadow-sm">
+            <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+              {/* Seletor */}
+              <div className="flex-1">
+                <label className="text-xs font-semibold text-[#666666] uppercase tracking-wider mb-2 block">
+                  Selecione um time ({teams.length}/5)
+                </label>
+                <select
+                  value={selectedTeamId ?? ''}
+                  onChange={(e) => setSelectedTeamId(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-[#E0E0E0] text-[#333333] text-sm focus:outline-none focus:ring-2 focus:ring-[#2D5A27]/25 focus:border-[#2D5A27] transition bg-white"
+                >
+                  {teams.map(t => (
+                    <option key={t.id} value={t.id}>
+                      {t.name} {t.isOwner ? '(Owner)' : '(Membro)'}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Criar novo time */}
+              {canCreateMore && (
+                <div className="sm:pt-6">
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={teamName}
+                      onChange={(e) => setTeamName(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleCreateTeam()}
+                      placeholder="Nome do novo time"
+                      className="flex-1 px-3 py-2 rounded-lg border border-[#E0E0E0] text-sm focus:outline-none focus:ring-2 focus:ring-[#2D5A27]/25"
+                    />
+                    <button
+                      onClick={handleCreateTeam}
+                      disabled={createStatus === 'loading' || !teamName.trim()}
+                      className="px-4 py-2 rounded-lg bg-[#2D5A27] text-white text-sm font-medium hover:bg-[#1E3D1A] transition disabled:opacity-50 flex items-center gap-2"
+                    >
+                      {createStatus === 'loading' ? <Loader size={14} className="animate-spin" /> : <Plus size={14} />}
+                      Criar
+                    </button>
+                  </div>
+                  {createError && (
+                    <p className="text-xs text-[#DC3545] mt-1">{createError}</p>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        ) : null}
 
         {/* Header full-width */}
         <div className="bg-white border border-[#E0E0E0] rounded-2xl p-6 shadow-sm">
