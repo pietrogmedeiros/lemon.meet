@@ -116,10 +116,11 @@ export function MeetingsPage() {
     const q = search.trim().toLowerCase();
     let result = meetings;
 
-    // Filtro por modo de visualização (se é admin)
-    if (isAdmin && viewMode === 'mine' && currentUserId) {
+    // Filtro por modo de visualização
+    if (viewMode === 'mine' && currentUserId) {
       result = result.filter(m => m.user_id === currentUserId);
     }
+    // No modo 'team', mostra todas as reuniões retornadas pelo backend
 
     // Filtros normais
     return result.filter(m => {
@@ -129,8 +130,8 @@ export function MeetingsPage() {
         (m.platform ?? '').toLowerCase().includes(q);
       const matchesStatus = statusFilter === 'all' || m.status === statusFilter;
       
-      // Filtro de usuário só se aplica no modo 'team'
-      const matchesUser = viewMode === 'mine' || userFilter === 'all' || m.user_id === userFilter;
+      // Filtro de usuário SEMPRE se aplica (independente do viewMode)
+      const matchesUser = userFilter === 'all' || m.user_id === userFilter;
       
       return matchesSearch && matchesStatus && matchesUser;
     });
@@ -146,8 +147,8 @@ export function MeetingsPage() {
           </p>
         </div>
 
-        {/* Toggle Minhas/Time (só para admins) */}
-        {isAdmin && !isLoading && meetings.length > 0 && (
+        {/* Toggle Minhas/Time - SEMPRE VISÍVEL se houver reuniões */}
+        {!isLoading && meetings.length > 0 && (
           <div className="flex items-center gap-1.5 bg-[#F5F5F5] rounded-xl p-1 w-fit">
             <button
               onClick={() => {
@@ -163,17 +164,19 @@ export function MeetingsPage() {
               <User size={14} />
               Minhas Reuniões
             </button>
-            <button
-              onClick={() => setViewMode('team')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                viewMode === 'team'
-                  ? 'bg-white text-[#2D5A27] shadow-sm font-semibold'
-                  : 'text-[#666666] hover:text-[#333333]'
-              }`}
-            >
-              <Users size={14} />
-              Reuniões do Time
-            </button>
+            {isAdmin && (
+              <button
+                onClick={() => setViewMode('team')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  viewMode === 'team'
+                    ? 'bg-white text-[#2D5A27] shadow-sm font-semibold'
+                    : 'text-[#666666] hover:text-[#333333]'
+                }`}
+              >
+                <Users size={14} />
+                Reuniões do Time
+              </button>
+            )}
           </div>
         )}
 
@@ -219,9 +222,10 @@ export function MeetingsPage() {
             </div>
           </div>
 
-          {/* Filtro por usuário (só aparece no modo 'team' para admins) */}
-          {isAdmin && viewMode === 'team' && uniqueUsers.length > 1 && (
+          {/* Filtro por usuário - aparece se houver múltiplos usuários */}
+          {uniqueUsers.length > 1 && (
             <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-semibold text-[#666666] mr-1">Filtrar por pessoa:</span>
               <button
                 onClick={() => setUserFilter('all')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition ${
