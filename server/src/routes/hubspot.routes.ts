@@ -23,6 +23,10 @@ const SCOPES = [
   'crm.objects.deals.write',
   'crm.objects.contacts.read',
   'crm.objects.contacts.write',
+  'crm.objects.notes.read',
+  'crm.objects.notes.write',
+  'crm.objects.tasks.read',
+  'crm.objects.tasks.write',
   'oauth',
 ].join(' ')
 
@@ -404,12 +408,64 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
     const taskIds: string[] = []
     if (insights?.followUpSuggestions?.length) {
       try {
+        // Buscar o owner do deal ou contato para atribuir as tasks
+        let ownerId: string | undefined
+        
+        // Tentar buscar owner do deal
+        if (dealId) {
+          try {
+            const dealDetailsRes = await fetch(
+              `${HUBSPOT_API_BASE}/crm/v3/objects/deals/${dealId}?properties=hubspot_owner_id`,
+              {
+                headers: { Authorization: `Bearer ${token}` },
+              }
+            )
+            if (dealDetailsRes.ok) {
+              const dealDetails = await dealDetailsRes.json() as { properties: { hubspot_owner_id?: string } }
+              ownerId = dealDetails.properties.hubspot_owner_id
+            }
+          } catch (err) {
+            console.error('[HubSpot] Error fetching deal owner:', err)
+          }
+        }
+        
+        // Se não encontrou owner no deal, tentar buscar do contato
+        if (!ownerId && contactId) {
+          try {
+            const contactDetailsRes = await fetch(
+              `${HUBSPOT_API_BASE}/crm/v3/objects/contacts/${contactId}?properties=hubspot_owner_id`,
+              {
+                headers: { Authorization: `Bearer ${token}` },
+              }
+            )
+            if (contactDetailsRes.ok) {
+              const contactDetails = await contactDetailsRes.json() as { properties: { hubspot_owner_id?: string } }
+              ownerId = contactDetails.properties.hubspot_owner_id
+            }
+          } catch (err) {
+            console.error('[HubSpot] Error fetching contact owner:', err)
+          }
+        }
+        
         const followUps = insights.followUpSuggestions as Array<{ content: string; tone: string }>
         
         for (let i = 0; i < Math.min(followUps.length, 5); i++) {
           const followUp = followUps[i]
           const dueDate = new Date()
           dueDate.setDate(dueDate.getDate() + (i + 1)) // Distribuir nos próximos dias
+          
+          const taskProperties: Record<string, string> = {
+            hs_task_subject: `Follow-up ${i + 1}: ${title}`,
+            hs_task_body: followUp.content,
+            hs_task_status: 'NOT_STARTED',
+            hs_task_priority: i === 0 ? 'HIGH' : 'MEDIUM',
+            hs_timestamp: String(dueDate.getTime()),
+          }
+          
+          // Atribuir owner se encontrado
+          if (ownerId) {
+            taskProperties.hubspot_owner_id = ownerId
+          }
           
           const taskRes = await fetch(`${HUBSPOT_API_BASE}/crm/v3/objects/tasks`, {
             method: 'POST',
@@ -418,13 +474,7 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              properties: {
-                hs_task_subject: `Follow-up ${i + 1}: ${title}`,
-                hs_task_body: followUp.content,
-                hs_task_status: 'NOT_STARTED',
-                hs_task_priority: i === 0 ? 'HIGH' : 'MEDIUM',
-                hs_timestamp: String(dueDate.getTime()),
-              },
+              properties: taskProperties,
             }),
           })
 
