@@ -77,6 +77,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signInWithEmail = async (email: string, password: string) => {
     try {
       const { error } = await supabase.auth.signInWithPassword({ email, password })
+      
+      if (!error) {
+        console.log('[Auth] ✅ Login bem-sucedido')
+        // Verifica se há token de convite pendente
+        const pendingToken = localStorage.getItem('pending_team_join')
+        if (pendingToken) {
+          console.log('[Auth] 🎟️ Token de convite detectado, será processado pelo Dashboard')
+        }
+      }
+      
       return { error }
     } catch (error) {
       return { error: error as AuthError }

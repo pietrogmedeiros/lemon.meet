@@ -16,7 +16,20 @@ export function DashboardPage() {
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  console.log('[Dashboard] 🏠 Componente montado')
+  
   useEffect(() => {
+    console.log('[Dashboard] 🔍 Verificando localStorage...')
+    const pendingToken = localStorage.getItem('pending_team_join')
+    if (pendingToken) {
+      console.log('[Dashboard] ✅ Token encontrado no localStorage:', pendingToken)
+    } else {
+      console.log('[Dashboard] ℹ️ Nenhum token pendente no localStorage')
+    }
+    
+    // Lista todas as chaves do localStorage para debug
+    console.log('[Dashboard] 📦 Chaves no localStorage:', Object.keys(localStorage))
+    
     fetchMeetings();
   }, []);
 

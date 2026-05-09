@@ -14,10 +14,16 @@ export function JoinTeamPage() {
   const [errorMessage, setErrorMessage] = useState('')
 
   useEffect(() => {
+    console.log('[JoinTeam] 🔍 Verificando sessão...')
+    console.log('[JoinTeam] Token do convite:', token)
+    
     supabase.auth.getSession().then(({ data: { session: s } }) => {
       setSession(s)
       if (s) {
+        console.log('[JoinTeam] ✅ Sessão encontrada, processando convite diretamente')
         joinTeam(s)
+      } else {
+        console.log('[JoinTeam] ❌ Sem sessão, usuário precisa fazer login')
       }
     })
   }, [])
@@ -61,7 +67,7 @@ export function JoinTeamPage() {
 
   const handleLogin = () => {
     if (!token) {
-      console.error('[JoinTeam] Token não disponível!');
+      console.error('[JoinTeam] ❌ Token não disponível!');
       return;
     }
     
@@ -71,11 +77,12 @@ export function JoinTeamPage() {
     
     // Verifica se salvou
     const saved = localStorage.getItem('pending_team_join');
-    console.log('[JoinTeam] Token salvo com sucesso?', saved === token);
+    console.log('[JoinTeam] ✅ Token salvo com sucesso?', saved === token);
+    console.log('[JoinTeam] 📦 Conteúdo salvo:', saved);
     
-    // Redireciona para login (dashboard processará o token automaticamente)
-    console.log('[JoinTeam] Redirecionando para /login');
-    navigate('/login');
+    // Redireciona para login com ?next=/dashboard explícito
+    console.log('[JoinTeam] 🔄 Redirecionando para /login?next=/dashboard');
+    navigate('/login?next=/dashboard');
   }
 
   if (!session) {
