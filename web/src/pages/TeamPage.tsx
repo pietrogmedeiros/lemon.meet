@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase'
 import {
   Users, Plus, Mail, Trash2, CheckCircle, Clock,
   AlertCircle, Loader, Video, Crown, UserPlus, ChevronRight,
-  Shield
+  Shield, Link2, Copy, Check
 } from 'lucide-react'
 import { formatDate } from '@/lib'
 import { useNavigate } from 'react-router-dom'
@@ -82,6 +82,18 @@ export function TeamPage() {
 
   // Alterar papel
   const [promotingMember, setPromotingMember] = useState<string | null>(null)
+
+  // Link de convite
+  const [showInviteLinkModal, setShowInviteLinkModal] = useState(false)
+  const [inviteLink, setInviteLink] = useState<{
+    url: string
+    token: string
+    expiresAt: string
+    currentUses: number
+    maxUses: number | null
+  } | null>(null)
+  const [inviteLinkLoading, setInviteLinkLoading] = useState(false)
+  const [linkCopied, setLinkCopied] = useState(false)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session: s } }) => setSession(s))
@@ -228,6 +240,31 @@ export function TeamPage() {
     } finally {
       setRemovingEmail(null)
     }
+  }
+
+  const handleGenerateInviteLink = async () => {
+    if (!team) return
+    setInviteLinkLoading(true)
+    try {
+      const data = await apiFetch(`/api/teams/${team.id}/invite-link`, session, {
+        method: 'POST',
+        body: JSON.stringify({ expiresInDays: 7 })
+      })
+      if (!data.success) throw new Error(data.message)
+      setInviteLink(data.link)
+      setShowInviteLinkModal(true)
+    } catch (err: any) {
+      alert(err.message ?? 'Erro ao gerar link de convite')
+    } finally {
+      setInviteLinkLoading(false)
+    }
+  }
+
+  const handleCopyLink = () => {
+    if (!inviteLink) return
+    navigator.clipboard.writeText(inviteLink.url)
+    setLinkCopied(true)
+    setTimeout(() => setLinkCopied(false), 2000)
   }
 
   const formatDuration = (s: number | null) => {
@@ -582,6 +619,31 @@ export function TeamPage() {
                   )}
                 </div>
 
+                {/* Link de convite */}
+                <div className="bg-white border border-[#E0E0E0] rounded-2xl p-5 shadow-sm space-y-4">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-[#2D5A27]/10 flex items-center justify-center">
+                      <Link2 size={14} className="text-[#2D5A27]" />
+                    </div>
+                    <span className="text-sm font-semibold text-[#333333]">Link de convite</span>
+                  </div>
+                  <p className="text-xs text-[#666666] leading-relaxed">
+                    Gere um link compartilhável que qualquer pessoa pode usar para entrar no time.
+                  </p>
+                  <button
+                    onClick={handleGenerateInviteLink}
+                    disabled={inviteLinkLoading}
+                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#2D5A27] text-white text-sm font-semibold hover:bg-[#1E3D1A] transition disabled:opacity-50 shadow-sm"
+                  >
+                    {inviteLinkLoading ? (
+                      <Loader size={15} className="animate-spin" />
+                    ) : (
+                      <Link2 size={15} />
+                    )}
+                    Gerar link de convite
+                  </button>
+                </div>
+
                 {/* Info extra */}
                 <div className="bg-[#F8F9FA] border border-[#F0F0F0] rounded-2xl p-5 space-y-3">
                   <p className="text-xs font-semibold text-[#666666] uppercase tracking-wider">Como funciona</p>
@@ -660,6 +722,94 @@ export function TeamPage() {
         )}
 
       </div>
+
+      {/* Modal de Link de Convite */}
+      {showInviteLinkModal && inviteLink && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowInviteLinkModal(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 space-y-5" onClick={(e) => e.stopPropagation()}>
+            {/* Header */}
+            <div className="flex items-start justify-between">
+              <div>
+                <h3 className="text-xl font-bold text-[#333333]">Link de Convite Gerado</h3>
+                <p className="text-sm text-[#666666] mt-1">Compartilhe este link com quem você deseja convidar</p>
+              </div>
+              <button 
+                onClick={() => setShowInviteLinkModal(false)}
+                className="text-[#999999] hover:text-[#333333] transition"
+              >
+                <AlertCircle size={20} />
+              </button>
+            </div>
+
+            {/* Link */}
+            <div className="bg-[#F8F9FA] border border-[#E0E0E0] rounded-xl p-4 space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <code className="text-xs text-[#2D5A27] font-mono break-all flex-1">
+                  {inviteLink.url}
+                </code>
+                <button
+                  onClick={handleCopyLink}
+                  className="shrink-0 p-2 rounded-lg bg-white border border-[#E0E0E0] hover:bg-[#F8F9FA] transition"
+                >
+                  {linkCopied ? (
+                    <Check size={16} className="text-[#4CAF50]" />
+                  ) : (
+                    <Copy size={16} className="text-[#666666]" />
+                  )}
+                </button>
+              </div>
+              <button
+                onClick={handleCopyLink}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-[#2D5A27] text-white text-sm font-semibold hover:bg-[#1E3D1A] transition"
+              >
+                {linkCopied ? (
+                  <>
+                    <Check size={15} />
+                    Copiado!
+                  </>
+                ) : (
+                  <>
+                    <Copy size={15} />
+                    Copiar link
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Info */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-[#F8F9FA] rounded-xl p-3">
+                <p className="text-xs text-[#666666] mb-1">Expira em</p>
+                <p className="text-sm font-semibold text-[#333333]">
+                  {new Date(inviteLink.expiresAt).toLocaleDateString('pt-BR')}
+                </p>
+              </div>
+              <div className="bg-[#F8F9FA] rounded-xl p-3">
+                <p className="text-xs text-[#666666] mb-1">Usos</p>
+                <p className="text-sm font-semibold text-[#333333]">
+                  {inviteLink.currentUses} {inviteLink.maxUses ? `/ ${inviteLink.maxUses}` : '/ ilimitado'}
+                </p>
+              </div>
+            </div>
+
+            {/* Aviso */}
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex gap-2">
+              <AlertCircle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+              <p className="text-xs text-amber-800 leading-relaxed">
+                Qualquer pessoa com este link poderá entrar no seu time. Compartilhe apenas com pessoas confiáveis.
+              </p>
+            </div>
+
+            {/* Botão fechar */}
+            <button
+              onClick={() => setShowInviteLinkModal(false)}
+              className="w-full py-2.5 rounded-xl border border-[#E0E0E0] text-sm font-semibold text-[#666666] hover:bg-[#F8F9FA] transition"
+            >
+              Fechar
+            </button>
+          </div>
+        </div>
+      )}
     </MainLayout>
   )
 }

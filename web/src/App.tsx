@@ -21,6 +21,7 @@ const UpcomingMeetingsPage    = lazy(() => import('@/pages/UpcomingMeetingsPage'
 const PrivacyPolicyPage       = lazy(() => import('@/pages/PrivacyPolicyPage').then(m => ({ default: m.PrivacyPolicyPage })))
 const TermosAppPage           = lazy(() => import('@/pages/TermosAppPage').then(m => ({ default: m.TermosAppPage })))
 const CalendarPage            = lazy(() => import('@/pages/CalendarPage').then(m => ({ default: m.CalendarPage })))
+const JoinTeamPage            = lazy(() => import('@/pages/JoinTeamPage').then(m => ({ default: m.JoinTeamPage })))
 
 function App() {
   return (
@@ -34,6 +35,7 @@ function App() {
         }>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/join/:token" element={<JoinTeamPage />} />
           <Route
             path="/dashboard"
             element={

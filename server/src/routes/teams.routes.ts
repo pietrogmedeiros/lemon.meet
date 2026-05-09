@@ -4,6 +4,8 @@
 // POST   /api/teams                    → cria time (owner)
 // GET    /api/teams/my                 → meu time + membros
 // POST   /api/teams/:id/invite         → convida usuário por e-mail
+// POST   /api/teams/:id/invite-link    → gera link de convite (7 dias)
+// POST   /api/teams/join/:token        → aceita convite via link
 // DELETE /api/teams/:id/members/:email → remove membro
 // GET    /api/teams/:id/meetings       → reuniões de todos os membros
 // POST   /api/teams/accept-invite      → ativa convite pendente (chamado no login)
@@ -15,6 +17,7 @@ import { createClient } from '@supabase/supabase-js'
 import { supabase } from '../config/supabase.js'
 import { authMiddleware, type AuthRequest } from '../middleware/auth.middleware.js'
 import { logger } from '../utils/logger.js'
+import { nanoid } from 'nanoid'
 
 const router: express.Router = Router()
 
@@ -529,6 +532,187 @@ router.post('/accept-invite', authMiddleware, async (req: AuthRequest, res: Resp
   } catch (err) {
     logger.error('Error accepting invite:', err)
     return res.status(500).json({ success: false })
+  }
+})
+
+// ── POST /api/teams/:id/invite-link ───────────────────────────
+// Gera um link de convite para o time (válido por 7 dias)
+router.post('/:id/invite-link', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id
+    const { id: teamId } = req.params
+    const { expiresInDays = 7, maxUses = null } = req.body
+
+    // Verifica se é owner do time
+    const { data: team } = await supabase
+      .from('teams')
+      .select('owner_id, name')
+      .eq('id', teamId)
+      .single()
+
+    if (!team) {
+      return res.status(404).json({ success: false, message: 'Time não encontrado' })
+    }
+
+    if (team.owner_id !== userId) {
+      return res.status(403).json({ success: false, message: 'Apenas o owner pode gerar links de convite' })
+    }
+
+    // Verifica se já existe um link ativo
+    const { data: existingLinks } = await supabase
+      .from('team_invite_links')
+      .select('*')
+      .eq('team_id', teamId)
+      .eq('is_active', true)
+      .gt('expires_at', new Date().toISOString())
+      .limit(1)
+
+    if (existingLinks && existingLinks.length > 0) {
+      // Retorna o link existente
+      const link = existingLinks[0]
+      return res.json({
+        success: true,
+        link: {
+          token: link.token,
+          url: `${process.env.FRONTEND_URL || 'https://lemon-meet.web.app'}/join/${link.token}`,
+          expiresAt: link.expires_at,
+          currentUses: link.current_uses,
+          maxUses: link.max_uses
+        }
+      })
+    }
+
+    // Gera novo token
+    const token = nanoid(10)
+    const expiresAt = new Date()
+    expiresAt.setDate(expiresAt.getDate() + expiresInDays)
+
+    const { data: newLink, error } = await supabase
+      .from('team_invite_links')
+      .insert({
+        team_id: teamId,
+        token,
+        created_by: userId,
+        expires_at: expiresAt.toISOString(),
+        max_uses: maxUses,
+        current_uses: 0,
+        is_active: true
+      })
+      .select()
+      .single()
+
+    if (error) throw error
+
+    logger.info(`Invite link created for team ${teamId}: ${token}`)
+
+    return res.json({
+      success: true,
+      link: {
+        token: newLink.token,
+        url: `${process.env.FRONTEND_URL || 'https://lemon-meet.web.app'}/join/${newLink.token}`,
+        expiresAt: newLink.expires_at,
+        currentUses: newLink.current_uses,
+        maxUses: newLink.max_uses
+      }
+    })
+  } catch (err) {
+    logger.error('Error creating invite link:', err)
+    return res.status(500).json({ success: false, message: 'Erro ao criar link de convite' })
+  }
+})
+
+// ── POST /api/teams/join/:token ───────────────────────────────
+// Aceita convite via link de convite
+router.post('/join/:token', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id
+    const { token } = req.params
+
+    // Busca o link de convite
+    const { data: inviteLink } = await supabase
+      .from('team_invite_links')
+      .select('*, teams(*)')
+      .eq('token', token)
+      .eq('is_active', true)
+      .gt('expires_at', new Date().toISOString())
+      .single()
+
+    if (!inviteLink) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Link de convite inválido ou expirado' 
+      })
+    }
+
+    // Verifica limite de usos
+    if (inviteLink.max_uses && inviteLink.current_uses >= inviteLink.max_uses) {
+      return res.status(410).json({ 
+        success: false, 
+        message: 'Este link atingiu o limite de usos' 
+      })
+    }
+
+    const teamId = inviteLink.team_id
+
+    // Verifica se já é membro do time
+    const { data: existingMember } = await supabase
+      .from('team_members')
+      .select('id, status')
+      .eq('team_id', teamId)
+      .eq('user_id', userId)
+      .single()
+
+    if (existingMember) {
+      if (existingMember.status === 'active') {
+        return res.status(409).json({ 
+          success: false, 
+          message: 'Você já é membro deste time' 
+        })
+      }
+    }
+
+    // Pega o email do usuário
+    const { data: userProfile } = await supabase.auth.admin.getUserById(userId)
+    const email = userProfile.user?.email
+
+    if (!email) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Email do usuário não encontrado' 
+      })
+    }
+
+    // Adiciona como membro ativo
+    const { error: insertError } = await supabase
+      .from('team_members')
+      .insert({
+        team_id: teamId,
+        user_id: userId,
+        invited_email: email.toLowerCase(),
+        role: 'member',
+        status: 'active'
+      })
+
+    if (insertError) throw insertError
+
+    // Incrementa contador de usos
+    await supabase
+      .from('team_invite_links')
+      .update({ current_uses: inviteLink.current_uses + 1 })
+      .eq('id', inviteLink.id)
+
+    logger.info(`User ${userId} joined team ${teamId} via invite link ${token}`)
+
+    return res.json({ 
+      success: true, 
+      team: {
+        id: inviteLink.teams.id,
+        name: inviteLink.teams.name
+      }
+    })
+  } catch (err) {
+    logger.error('Error joining team via link:', err)
+    return res.status(500).json({ success: false, message: 'Erro ao entrar no time' })
   }
 })
 
