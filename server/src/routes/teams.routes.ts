@@ -389,26 +389,48 @@ router.get('/:id/meetings', authMiddleware, async (req: AuthRequest, res: Respon
     const userId = req.user!.id
     const { id: teamId } = req.params
 
-    // Verifica se é owner ou membro
+    // Verifica se é owner do time
     const { data: team } = await supabase.from('teams').select('owner_id').eq('id', teamId).single()
     if (!team) return res.status(404).json({ success: false, message: 'Time não encontrado' })
 
-    const isMember = team.owner_id === userId
-      ? true
-      : !!(await supabase.from('team_members').select('id').eq('team_id', teamId).eq('user_id', userId).eq('status', 'active').maybeSingle()).data
+    const isOwner = team.owner_id === userId
 
-    if (!isMember) {
+    // Verifica se é membro e seu papel
+    const { data: membership } = await supabase
+      .from('team_members')
+      .select('role, status')
+      .eq('team_id', teamId)
+      .eq('user_id', userId)
+      .eq('status', 'active')
+      .maybeSingle()
+
+    const isMember = !!membership
+    const isAdmin = membership?.role === 'admin'
+
+    // Precisa ser owner, admin ou membro para ver
+    if (!isOwner && !isMember) {
       return res.status(403).json({ success: false, message: 'Sem permissão' })
     }
 
-    // Busca todos os user_ids ativos do time
-    const { data: members } = await supabase
-      .from('team_members')
-      .select('user_id, invited_email')
-      .eq('team_id', teamId)
-      .eq('status', 'active')
+    // Define se pode ver todas as reuniões do time ou apenas as suas
+    const canSeeAll = isOwner || isAdmin
 
-    const memberIds = (members ?? []).filter(m => m.user_id).map(m => m.user_id)
+    let memberIds: string[]
+    
+    if (canSeeAll) {
+      // Admin/Owner: busca todas as reuniões do time
+      const { data: members } = await supabase
+        .from('team_members')
+        .select('user_id')
+        .eq('team_id', teamId)
+        .eq('status', 'active')
+        .not('user_id', 'is', null)
+      
+      memberIds = (members ?? []).map(m => m.user_id as string)
+    } else {
+      // Membro comum: apenas suas reuniões
+      memberIds = [userId]
+    }
 
     if (!memberIds.length) {
       return res.json({ success: true, meetings: [] })
@@ -425,11 +447,12 @@ router.get('/:id/meetings', authMiddleware, async (req: AuthRequest, res: Respon
 
     // Enriquece com nome do membro
     const memberMap = new Map<string, string>()
+    const uniqueUserIds = Array.from(new Set((meetings ?? []).map(m => m.user_id)))
     await Promise.all(
-      memberIds.map(async (uid) => {
-        const { data } = await supabase.auth.admin.getUserById(uid as string)
+      uniqueUserIds.map(async (uid) => {
+        const { data } = await supabase.auth.admin.getUserById(uid)
         const name = data.user?.user_metadata?.full_name ?? data.user?.user_metadata?.name ?? data.user?.email ?? uid
-        memberMap.set(uid as string, name)
+        memberMap.set(uid, name)
       })
     )
 
@@ -438,7 +461,7 @@ router.get('/:id/meetings', authMiddleware, async (req: AuthRequest, res: Respon
       member_name: memberMap.get(m.user_id) ?? m.user_id,
     }))
 
-    return res.json({ success: true, meetings: enriched })
+    return res.json({ success: true, meetings: enriched, canSeeAll })
   } catch (err) {
     logger.error('Error fetching team meetings:', err)
     return res.status(500).json({ success: false, message: 'Internal server error' })
