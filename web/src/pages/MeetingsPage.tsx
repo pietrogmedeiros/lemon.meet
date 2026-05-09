@@ -94,13 +94,6 @@ export function MeetingsPage() {
     return users;
   }, [meetings]);
 
-  // Detecta se há reuniões de time (com team_id) para mostrar o botão "Reuniões do Time"
-  const hasTeamMeetings = useMemo(() => {
-    const hasTeam = meetings.some(m => m.team_id != null);
-    console.log('[MeetingsPage] 🏢 Tem reuniões de time?', hasTeam, 'de', meetings.length, 'reuniões');
-    return hasTeam;
-  }, [meetings]);
-
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     let result = meetings;
@@ -126,7 +119,7 @@ export function MeetingsPage() {
     });
   }, [meetings, search, statusFilter, userFilter, viewMode, currentUserId]);
 
-  console.log('[MeetingsPage] 🎛️ Estado toggle:', { isLoading, meetingsCount: meetings.length, hasTeamMeetings });
+  console.log('[MeetingsPage] 🎛️ Estado toggle:', { isLoading, meetingsCount: meetings.length, viewMode });
 
   return (
     <MainLayout>
@@ -155,19 +148,17 @@ export function MeetingsPage() {
               <User size={14} />
               Minhas Reuniões
             </button>
-            {hasTeamMeetings && (
-              <button
-                onClick={() => setViewMode('team')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                  viewMode === 'team'
-                    ? 'bg-white text-[#2D5A27] shadow-sm font-semibold'
-                    : 'text-[#666666] hover:text-[#333333]'
-                }`}
-              >
-                <Users size={14} />
-                Reuniões do Time
-              </button>
-            )}
+            <button
+              onClick={() => setViewMode('team')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                viewMode === 'team'
+                  ? 'bg-white text-[#2D5A27] shadow-sm font-semibold'
+                  : 'text-[#666666] hover:text-[#333333]'
+              }`}
+            >
+              <Users size={14} />
+              Reuniões do Time
+            </button>
           </div>
         )}
 
