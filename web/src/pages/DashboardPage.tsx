@@ -6,6 +6,9 @@ import { Card, Badge } from '@/components/ui';
 import { Video, Clock, Calendar, TrendingUp, CheckCircle, Loader, ExternalLink } from 'lucide-react';
 import { formatDate } from '@/lib';
 import { fetchMeetings as fetchMeetingsCache, type Meeting } from '@/lib/meetingsCache';
+import { supabase } from '@/lib/supabase';
+
+const API = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 export function DashboardPage() {
   const { t, i18n } = useTranslation();
@@ -16,6 +19,52 @@ export function DashboardPage() {
   useEffect(() => {
     fetchMeetings();
   }, []);
+
+  // Processa convite pendente após login/cadastro
+  useEffect(() => {
+    const processPendingTeamJoin = async () => {
+      const pendingToken = localStorage.getItem('pending_team_join');
+      if (!pendingToken) return;
+
+      console.log('[Dashboard] Detectado convite pendente, processando token:', pendingToken);
+
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+
+        const res = await fetch(`${API}/api/teams/join/${pendingToken}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        });
+
+        const data = await res.json();
+
+        if (data.success) {
+          console.log('[Dashboard] ✅ Convite aceito com sucesso!');
+          localStorage.removeItem('pending_team_join');
+          
+          // Mostra notificação de sucesso (opcional)
+          // Você pode adicionar um toast aqui se tiver biblioteca de notificações
+          
+          // Redireciona para página de times após 1 segundo
+          setTimeout(() => {
+            navigate('/team?joined=true');
+          }, 1000);
+        } else {
+          console.error('[Dashboard] Erro ao aceitar convite:', data.message);
+          localStorage.removeItem('pending_team_join');
+        }
+      } catch (err) {
+        console.error('[Dashboard] Erro ao processar convite:', err);
+        localStorage.removeItem('pending_team_join');
+      }
+    };
+
+    processPendingTeamJoin();
+  }, [navigate]);
 
   const fetchMeetings = async () => {
     setIsLoading(true);

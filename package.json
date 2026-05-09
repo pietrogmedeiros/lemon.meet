@@ -19,5 +19,9 @@
   },
   "devDependencies": {
     "typescript": "^5.4.5"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.102.1",
+    "dotenv": "^16.6.1"
   }
 }

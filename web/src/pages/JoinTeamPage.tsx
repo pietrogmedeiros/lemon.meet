@@ -60,8 +60,9 @@ export function JoinTeamPage() {
   }
 
   const handleLogin = () => {
-    // Salva o token na URL para redirecionar após login
+    // Salva o token para processar após login
     localStorage.setItem('pending_team_join', token || '')
+    // Redireciona para login (dashboard processará o token automaticamente)
     navigate('/login')
   }
 
