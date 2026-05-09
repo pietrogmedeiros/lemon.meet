@@ -24,13 +24,33 @@ export function DashboardPage() {
   useEffect(() => {
     const processPendingTeamJoin = async () => {
       const pendingToken = localStorage.getItem('pending_team_join');
-      if (!pendingToken) return;
+      if (!pendingToken) {
+        console.log('[Dashboard] Nenhum convite pendente encontrado');
+        return;
+      }
 
-      console.log('[Dashboard] Detectado convite pendente, processando token:', pendingToken);
+      console.log('[Dashboard] 🔍 Detectado convite pendente, processando token:', pendingToken);
+
+      // Aguarda um pouco para garantir que a sessão está pronta
+      await new Promise(resolve => setTimeout(resolve, 500));
 
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) return;
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          console.error('[Dashboard] Erro ao obter sessão:', sessionError);
+          return;
+        }
+
+        if (!session) {
+          console.error('[Dashboard] ❌ Sessão não disponível, aguardando...');
+          // Tenta novamente em 2 segundos
+          setTimeout(processPendingTeamJoin, 2000);
+          return;
+        }
+
+        console.log('[Dashboard] ✅ Sessão disponível, user_id:', session.user.id);
+        console.log('[Dashboard] 📡 Chamando API /api/teams/join/' + pendingToken);
 
         const res = await fetch(`${API}/api/teams/join/${pendingToken}`, {
           method: 'POST',
@@ -40,25 +60,28 @@ export function DashboardPage() {
           },
         });
 
+        console.log('[Dashboard] Status da resposta:', res.status);
+
         const data = await res.json();
+        console.log('[Dashboard] Resposta da API:', data);
 
         if (data.success) {
-          console.log('[Dashboard] ✅ Convite aceito com sucesso!');
+          console.log('[Dashboard] 🎉 Convite aceito com sucesso! Time:', data.team?.name);
           localStorage.removeItem('pending_team_join');
           
-          // Mostra notificação de sucesso (opcional)
-          // Você pode adicionar um toast aqui se tiver biblioteca de notificações
-          
-          // Redireciona para página de times após 1 segundo
+          // Redireciona para página de times
+          console.log('[Dashboard] Redirecionando para /team?joined=true');
           setTimeout(() => {
             navigate('/team?joined=true');
           }, 1000);
         } else {
-          console.error('[Dashboard] Erro ao aceitar convite:', data.message);
+          console.error('[Dashboard] ❌ Erro ao aceitar convite:', data.message);
+          alert('Erro ao entrar no time: ' + data.message);
           localStorage.removeItem('pending_team_join');
         }
       } catch (err) {
-        console.error('[Dashboard] Erro ao processar convite:', err);
+        console.error('[Dashboard] ❌ Erro ao processar convite:', err);
+        alert('Erro ao processar convite. Tente novamente mais tarde.');
         localStorage.removeItem('pending_team_join');
       }
     };

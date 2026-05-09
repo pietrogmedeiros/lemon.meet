@@ -28,11 +28,18 @@ export function LoginPage() {
     e.preventDefault()
     setError(null)
     setLoading(true)
+    
+    const pendingToken = localStorage.getItem('pending_team_join');
+    if (pendingToken) {
+      console.log('[Login] 🎟️ Token de convite detectado:', pendingToken);
+    }
+    
     const { error } = await signInWithEmail(email, password)
     if (error) {
       setError('Email ou senha inválidos.')
       setLoading(false)
     } else {
+      console.log('[Login] ✅ Login bem-sucedido, redirecionando para:', nextUrl);
       navigate(nextUrl, { replace: true })
     }
   }

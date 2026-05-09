@@ -60,10 +60,22 @@ export function JoinTeamPage() {
   }
 
   const handleLogin = () => {
+    if (!token) {
+      console.error('[JoinTeam] Token não disponível!');
+      return;
+    }
+    
+    console.log('[JoinTeam] 💾 Salvando token no localStorage:', token);
     // Salva o token para processar após login
-    localStorage.setItem('pending_team_join', token || '')
+    localStorage.setItem('pending_team_join', token);
+    
+    // Verifica se salvou
+    const saved = localStorage.getItem('pending_team_join');
+    console.log('[JoinTeam] Token salvo com sucesso?', saved === token);
+    
     // Redireciona para login (dashboard processará o token automaticamente)
-    navigate('/login')
+    console.log('[JoinTeam] Redirecionando para /login');
+    navigate('/login');
   }
 
   if (!session) {
