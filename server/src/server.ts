@@ -1,5 +1,5 @@
-// Server version: 2026-05-09T04:30:00Z - Filtro inteligente de times
-// Adicionado: team_id na query de meetings + filtro por times do usuário
+// Server version: 2026-05-09T05:00:00Z - FORCE DEPLOY: team_id no select de meetings
+// CRÍTICO: meetings.routes.ts retorna team_id agora
 import express, { type Express } from 'express'
 import { createServer } from 'http'
 import cors from 'cors'
