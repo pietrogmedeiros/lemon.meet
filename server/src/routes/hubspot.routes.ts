@@ -195,7 +195,7 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
   try {
     const { data: meeting, error: meetingError } = await supabase
       .from('meetings')
-      .select('id, title, platform, started_at, ended_at, duration_seconds, insights, meet_link')
+      .select('id, title, platform, started_at, ended_at, duration_seconds, insights, meet_link, participant_emails')
       .eq('id', meetingId)
       .eq('user_id', userId)
       .single()
@@ -239,25 +239,131 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
       }
     }
 
-    // 1. Create Deal
-    const dealRes = await fetch(`${HUBSPOT_API_BASE}/crm/v3/objects/deals`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ properties: dealProperties }),
-    })
+    // Obter emails dos participantes da reunião
+    const participantEmails = (meeting.participant_emails as string[] | null) ?? []
+    
+    let dealId: string | undefined
+    let contactId: string | undefined
+    let wasUpdated = false
 
-    if (!dealRes.ok) {
-      const err = await dealRes.text()
-      console.error('[HubSpot] create deal failed', err)
-      res.status(502).json({ error: 'Failed to create deal in HubSpot' })
-      return
+    // Se houver emails de participantes, verificar se existem contatos no Hubspot
+    if (participantEmails.length > 0) {
+      for (const email of participantEmails) {
+        try {
+          // Buscar contato pelo email
+          const searchRes = await fetch(
+            `${HUBSPOT_API_BASE}/crm/v3/objects/contacts/search`,
+            {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                filterGroups: [{
+                  filters: [{
+                    propertyName: 'email',
+                    operator: 'EQ',
+                    value: email,
+                  }]
+                }],
+                properties: ['email', 'firstname', 'lastname'],
+                limit: 1,
+              }),
+            }
+          )
+
+          if (searchRes.ok) {
+            const searchData = await searchRes.json() as { results: Array<{ id: string }> }
+            
+            if (searchData.results.length > 0) {
+              contactId = searchData.results[0].id
+              
+              // Buscar deals associados a este contato
+              const dealsRes = await fetch(
+                `${HUBSPOT_API_BASE}/crm/v3/objects/contacts/${contactId}/associations/deals`,
+                {
+                  headers: { Authorization: `Bearer ${token}` },
+                }
+              )
+
+              if (dealsRes.ok) {
+                const dealsData = await dealsRes.json() as { results: Array<{ id: string }> }
+                
+                if (dealsData.results.length > 0) {
+                  // Atualizar o primeiro deal encontrado
+                  dealId = dealsData.results[0].id
+                  
+                  const updateRes = await fetch(
+                    `${HUBSPOT_API_BASE}/crm/v3/objects/deals/${dealId}`,
+                    {
+                      method: 'PATCH',
+                      headers: {
+                        Authorization: `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                      },
+                      body: JSON.stringify({ properties: dealProperties }),
+                    }
+                  )
+
+                  if (updateRes.ok) {
+                    wasUpdated = true
+                    console.log(`[HubSpot] Deal ${dealId} atualizado para contato ${email}`)
+                    break // Encontrou e atualizou, não precisa verificar outros emails
+                  }
+                }
+              }
+              
+              // Se encontrou contato mas não tem deal, criar deal e associar
+              if (!dealId) {
+                break // Sai do loop para criar deal e associar ao contato encontrado
+              }
+            }
+          }
+        } catch (err) {
+          console.error(`[HubSpot] Erro ao buscar contato ${email}:`, err)
+          // Continua tentando outros emails
+        }
+      }
     }
 
-    const dealData = await dealRes.json() as { id: string }
-    const dealId = dealData.id
+    // Se não encontrou deal existente para atualizar, criar novo
+    if (!dealId) {
+      const dealRes = await fetch(`${HUBSPOT_API_BASE}/crm/v3/objects/deals`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ properties: dealProperties }),
+      })
+
+      if (!dealRes.ok) {
+        const err = await dealRes.text()
+        console.error('[HubSpot] create deal failed', err)
+        res.status(502).json({ error: 'Failed to create deal in HubSpot' })
+        return
+      }
+
+      const dealData = await dealRes.json() as { id: string }
+      dealId = dealData.id
+      
+      // Se encontrou um contato mas não tinha deal, associar o deal criado ao contato
+      if (contactId) {
+        try {
+          await fetch(
+            `${HUBSPOT_API_BASE}/crm/v3/objects/deals/${dealId}/associations/contacts/${contactId}/deal_to_contact`,
+            {
+              method: 'PUT',
+              headers: { Authorization: `Bearer ${token}` },
+            }
+          )
+          console.log(`[HubSpot] Deal ${dealId} associado ao contato ${contactId}`)
+        } catch (err) {
+          console.error('[HubSpot] Erro ao associar deal ao contato:', err)
+        }
+      }
+    }
 
     // 2. Create Note (best-effort — requires crm.objects.notes.write)
     let noteId: string | undefined
@@ -294,7 +400,14 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
       // Non-critical — note creation is best-effort
     }
 
-    res.json({ success: true, dealId, noteId })
+    res.json({ 
+      success: true, 
+      dealId, 
+      noteId,
+      contactId,
+      wasUpdated,
+      action: wasUpdated ? 'updated' : 'created'
+    })
   } catch (err) {
     console.error('[HubSpot] sync error', err)
     res.status(500).json({ error: 'Internal server error' })
