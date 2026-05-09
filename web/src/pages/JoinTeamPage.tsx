@@ -51,7 +51,7 @@ export function JoinTeamPage() {
 
       // Redireciona após 2 segundos e força reload da página
       setTimeout(() => {
-        window.location.href = '/team'
+        window.location.href = '/team?joined=true'
       }, 2000)
     } catch (err: any) {
       setStatus('error')

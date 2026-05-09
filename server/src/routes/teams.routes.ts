@@ -84,6 +84,7 @@ router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
 router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.id
+    logger.info(`📋 GET /api/teams - Usuario ${userId} solicitando lista de times`)
 
     // Times onde é owner
     const { data: ownedTeams } = await supabase
@@ -92,6 +93,8 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
       .eq('owner_id', userId)
       .order('created_at', { ascending: false })
 
+    logger.info(`📋 Times onde é owner: ${ownedTeams?.length ?? 0}`)
+
     // Times onde é membro ativo
     const { data: memberships } = await supabase
       .from('team_members')
@@ -99,6 +102,8 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
       .eq('user_id', userId)
       .eq('status', 'active')
       .not('team_id', 'is', null)
+
+    logger.info(`📋 Memberships ativas: ${memberships?.length ?? 0}`)
 
     const memberTeamIds = (memberships ?? []).map(m => m.team_id)
     
@@ -110,6 +115,7 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
         .in('id', memberTeamIds)
         .order('created_at', { ascending: false })
       memberTeams = data ?? []
+      logger.info(`📋 Times onde é membro: ${memberTeams.length}`)
     }
 
     // Combina e remove duplicatas
@@ -121,6 +127,7 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
     })
 
     const teams = Array.from(allTeamsMap.values())
+    logger.info(`📋 Total de times retornados: ${teams.length}`)
 
     return res.json({ success: true, teams })
   } catch (err) {
@@ -716,7 +723,12 @@ router.post('/join/:token', authMiddleware, async (req: AuthRequest, res: Respon
         status: 'active'
       })
 
-    if (insertError) throw insertError
+    if (insertError) {
+      logger.error(`Error inserting team member: ${insertError.message}`, insertError)
+      throw insertError
+    }
+
+    logger.info(`✅ User ${userId} (${email}) successfully added to team ${teamId} as active member`)
 
     // Incrementa contador de usos
     await supabase

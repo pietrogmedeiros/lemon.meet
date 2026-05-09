@@ -127,6 +127,31 @@ export function TeamPage() {
     }
   }, [session])
 
+  // Detecta quando retorna de um convite aceito e força reload
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('joined') === 'true' && session) {
+      console.log('[TeamPage] Detectado join recente, forçando reload dos times')
+      // Remove o parâmetro da URL
+      window.history.replaceState({}, '', '/team')
+      // Força reload dos times
+      loadTeams()
+    }
+  }, [session, loadTeams])
+
+  // Recarrega times quando a janela volta ao foco (usuário volta da aba do convite)
+  useEffect(() => {
+    const handleFocus = () => {
+      if (session) {
+        console.log('[TeamPage] Janela voltou ao foco, recarregando times')
+        loadTeams()
+      }
+    }
+    
+    window.addEventListener('focus', handleFocus)
+    return () => window.removeEventListener('focus', handleFocus)
+  }, [session, loadTeams])
+
   // Carregar detalhes de um time específico
   const loadTeamDetails = useCallback(async (teamId: string) => {
     if (!session || !teamId) return
