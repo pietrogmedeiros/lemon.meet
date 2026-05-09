@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { formatDate } from '@/lib';
 import { fetchMeetings as fetchMeetingsCache } from '@/lib/meetingsCache';
+import { fetchUserTeams, type TeamOption } from '@/lib/teamScope';
 
 interface MeetingInsights {
   sentiment: 'positive' | 'neutral' | 'negative';
@@ -30,6 +31,7 @@ interface Meeting {
   duration_seconds: number | null;
   insights: MeetingInsights | null;
   created_at: string;
+  team_id?: string | null;
 }
 
 function ScorePill({ score }: { score: number }) {
@@ -67,19 +69,33 @@ export function InsightsPage() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const [meetings, setMeetings] = useState<Meeting[]>([]);
+  const [teams, setTeams] = useState<TeamOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedTeamId, setSelectedTeamId] = useState<string>('all');
 
   useEffect(() => {
     const load = async () => {
       setIsLoading(true);
       try {
-        const data = await fetchMeetingsCache();
-        setMeetings(data as any);
+        const [meetingsResult, teamsResult] = await Promise.allSettled([
+          fetchMeetingsCache(),
+          fetchUserTeams(),
+        ]);
+
+        setMeetings(meetingsResult.status === 'fulfilled' ? meetingsResult.value as any : []);
+        setTeams(teamsResult.status === 'fulfilled' ? teamsResult.value : []);
       } catch {}
       finally { setIsLoading(false); }
     };
     load();
   }, []);
+
+  useEffect(() => {
+    if (selectedTeamId === 'all') return;
+    if (!teams.some(team => team.id === selectedTeamId)) {
+      setSelectedTeamId('all');
+    }
+  }, [selectedTeamId, teams]);
 
   if (isLoading) {
     return (
@@ -91,7 +107,11 @@ export function InsightsPage() {
     );
   }
 
-  const withScores = meetings
+  const filteredMeetings = selectedTeamId === 'all'
+    ? meetings
+    : meetings.filter(meeting => meeting.team_id === selectedTeamId);
+
+  const withScores = filteredMeetings
     .filter(m => m.insights?.commercialQuality != null)
     .map(m => ({ ...m, score: m.insights!.commercialQuality }));
 
@@ -107,23 +127,23 @@ export function InsightsPage() {
   const sortedByScore = [...withScores].sort((a, b) => b.score - a.score);
 
   const topicCounts: Record<string, number> = {};
-  meetings.forEach(m => {
+  filteredMeetings.forEach(m => {
     m.insights?.keyTopics?.forEach(topic => {
       topicCounts[topic] = (topicCounts[topic] || 0) + 1;
     });
   });
   const topTopics = Object.entries(topicCounts).sort((a, b) => b[1] - a[1]).slice(0, 12);
 
-  const total = meetings.length;
-  const completed = meetings.filter(m => m.status === 'completed').length;
+  const total = filteredMeetings.length;
+  const completed = filteredMeetings.filter(m => m.status === 'completed').length;
 
   const sentimentCounts = {
-    positive: meetings.filter(m => m.insights?.sentiment === 'positive').length,
-    neutral:  meetings.filter(m => m.insights?.sentiment === 'neutral').length,
-    negative: meetings.filter(m => m.insights?.sentiment === 'negative').length,
+    positive: filteredMeetings.filter(m => m.insights?.sentiment === 'positive').length,
+    neutral:  filteredMeetings.filter(m => m.insights?.sentiment === 'neutral').length,
+    negative: filteredMeetings.filter(m => m.insights?.sentiment === 'negative').length,
   };
 
-  const hasSentiment = meetings.some(m => m.insights?.sentiment);
+  const hasSentiment = filteredMeetings.some(m => m.insights?.sentiment);
   const lang = i18n.language as 'pt-BR' | 'en-US' | 'es';
 
   return (
@@ -137,6 +157,35 @@ export function InsightsPage() {
             {t('insights.aggregate.subtitle', { count: total })}
           </p>
         </div>
+
+        {teams.length > 0 && (
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs font-semibold text-[#666666] mr-1">{t('common.team', 'Time')}:</span>
+            <button
+              onClick={() => setSelectedTeamId('all')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition ${
+                selectedTeamId === 'all'
+                  ? 'bg-[#2D5A27] text-white border-[#2D5A27]'
+                  : 'bg-white text-[#666666] border-[#E0E0E0] hover:border-[#2D5A27] hover:text-[#2D5A27]'
+              }`}
+            >
+              {t('common.allTeams', 'Todos os times')}
+            </button>
+            {teams.map(team => (
+              <button
+                key={team.id}
+                onClick={() => setSelectedTeamId(team.id)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition ${
+                  selectedTeamId === team.id
+                    ? 'bg-[#2D5A27] text-white border-[#2D5A27]'
+                    : 'bg-white text-[#666666] border-[#E0E0E0] hover:border-[#2D5A27] hover:text-[#2D5A27]'
+                }`}
+              >
+                {team.name}
+              </button>
+            ))}
+          </div>
+        )}
 
         {total === 0 ? (
           <Card className="p-12 text-center">

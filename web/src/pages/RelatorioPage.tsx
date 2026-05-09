@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { MainLayout } from '@/components/layout';
 import { Card } from '@/components/ui';
 import {
@@ -7,6 +8,7 @@ import {
   CheckSquare, Hash, Calendar
 } from 'lucide-react';
 import { fetchMeetings as fetchMeetingsCache } from '@/lib/meetingsCache';
+import { fetchUserTeams, type TeamOption } from '@/lib/teamScope';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -25,6 +27,7 @@ interface Meeting {
   status: string | null;
   insights: MeetingInsights | null;
   created_at: string;
+  team_id?: string | null;
 }
 
 // ── Week helpers ─────────────────────────────────────────────────────────────
@@ -154,27 +157,46 @@ function ScorePill({ score }: { score: number }) {
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export function RelatorioPage() {
+  const { t } = useTranslation();
   const [meetings, setMeetings] = useState<Meeting[]>([]);
+  const [teams, setTeams] = useState<TeamOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [weekOffset, setWeekOffset] = useState(0); // 0 = current week, -1 = prev…
+  const [selectedTeamId, setSelectedTeamId] = useState<string>('all');
 
   useEffect(() => {
     const load = async () => {
       setIsLoading(true);
       try {
-        const data = await fetchMeetingsCache();
-        setMeetings(data as Meeting[]);
+        const [meetingsResult, teamsResult] = await Promise.allSettled([
+          fetchMeetingsCache(),
+          fetchUserTeams(),
+        ]);
+
+        setMeetings(meetingsResult.status === 'fulfilled' ? meetingsResult.value as Meeting[] : []);
+        setTeams(teamsResult.status === 'fulfilled' ? teamsResult.value : []);
       } catch {}
       finally { setIsLoading(false); }
     };
     load();
   }, []);
 
+  useEffect(() => {
+    if (selectedTeamId === 'all') return;
+    if (!teams.some(team => team.id === selectedTeamId)) {
+      setSelectedTeamId('all');
+    }
+  }, [selectedTeamId, teams]);
+
+  const filteredMeetings = selectedTeamId === 'all'
+    ? meetings
+    : meetings.filter(meeting => meeting.team_id === selectedTeamId);
+
   const { start, end } = getWeekBounds(weekOffset);
   const { start: prevStart, end: prevEnd } = getWeekBounds(weekOffset - 1);
 
-  const curr = computeStats(meetings, start, end);
-  const prev = computeStats(meetings, prevStart, prevEnd);
+  const curr = computeStats(filteredMeetings, start, end);
+  const prev = computeStats(filteredMeetings, prevStart, prevEnd);
 
   const isCurrentWeek = weekOffset === 0;
 
@@ -230,6 +252,35 @@ export function RelatorioPage() {
             </button>
           </div>
         </div>
+
+        {teams.length > 0 && (
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs font-semibold text-[#666666] mr-1">{t('common.team', 'Time')}:</span>
+            <button
+              onClick={() => setSelectedTeamId('all')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition ${
+                selectedTeamId === 'all'
+                  ? 'bg-[#2D5A27] text-white border-[#2D5A27]'
+                  : 'bg-white text-[#666666] border-[#E0E0E0] hover:border-[#2D5A27] hover:text-[#2D5A27]'
+              }`}
+            >
+              {t('common.allTeams', 'Todos os times')}
+            </button>
+            {teams.map(team => (
+              <button
+                key={team.id}
+                onClick={() => setSelectedTeamId(team.id)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition ${
+                  selectedTeamId === team.id
+                    ? 'bg-[#2D5A27] text-white border-[#2D5A27]'
+                    : 'bg-white text-[#666666] border-[#E0E0E0] hover:border-[#2D5A27] hover:text-[#2D5A27]'
+                }`}
+              >
+                {team.name}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Range label */}
         <p className="text-xs text-[#aaa]">
