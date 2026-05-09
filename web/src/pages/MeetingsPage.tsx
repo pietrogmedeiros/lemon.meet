@@ -17,12 +17,11 @@ export function MeetingsPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [userFilter, setUserFilter] = useState<string>('all');
   const [viewMode, setViewMode] = useState<'mine' | 'team'>('mine'); // Novo: modo de visualização
-  const [isAdmin, setIsAdmin] = useState(false); // Novo: se é admin
   const [currentUserId, setCurrentUserId] = useState<string | null>(null); // Novo: ID do usuário atual
 
   useEffect(() => {
-    console.log('[MeetingsPage] 🔍 Verificando admin...')
-    const checkAdmin = async () => {
+    console.log('[MeetingsPage] 🔍 Verificando sessão...')
+    const checkSession = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) {
@@ -33,45 +32,12 @@ export function MeetingsPage() {
         console.log('[MeetingsPage] 👤 User ID:', session.user.id)
         console.log('[MeetingsPage] 📧 Email:', session.user.email)
         setCurrentUserId(session.user.id);
-
-        // Verifica se é owner de algum time
-        const { data: ownedTeam } = await supabase
-          .from('teams')
-          .select('id')
-          .eq('owner_id', session.user.id)
-          .maybeSingle();
-
-        console.log('[MeetingsPage] 🏢 Times como owner:', ownedTeam)
-
-        if (ownedTeam) {
-          console.log('[MeetingsPage] ✅ É OWNER de time!')
-          setIsAdmin(true);
-          return;
-        }
-
-        // Verifica se é admin de algum time
-        const { data: adminMembership } = await supabase
-          .from('team_members')
-          .select('role')
-          .eq('user_id', session.user.id)
-          .eq('role', 'admin')
-          .eq('status', 'active')
-          .maybeSingle();
-
-        console.log('[MeetingsPage] 👥 Membership como admin:', adminMembership)
-
-        if (adminMembership) {
-          console.log('[MeetingsPage] ✅ É ADMIN de time!')
-          setIsAdmin(true);
-        } else {
-          console.log('[MeetingsPage] ℹ️ Não é admin')
-        }
       } catch (err) {
-        console.error('[MeetingsPage] ❌ Erro ao verificar admin:', err);
+        console.error('[MeetingsPage] ❌ Erro ao verificar sessão:', err);
       }
     };
     
-    checkAdmin();
+    checkSession();
   }, []);
 
   useEffect(() => {
@@ -128,6 +94,13 @@ export function MeetingsPage() {
     return users;
   }, [meetings]);
 
+  // Detecta se há reuniões de time (com team_id) para mostrar o botão "Reuniões do Time"
+  const hasTeamMeetings = useMemo(() => {
+    const hasTeam = meetings.some(m => m.team_id != null);
+    console.log('[MeetingsPage] 🏢 Tem reuniões de time?', hasTeam, 'de', meetings.length, 'reuniões');
+    return hasTeam;
+  }, [meetings]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     let result = meetings;
@@ -151,9 +124,9 @@ export function MeetingsPage() {
       
       return matchesSearch && matchesStatus && matchesUser;
     });
-  }, [meetings, search, statusFilter, userFilter, viewMode, isAdmin, currentUserId]);
+  }, [meetings, search, statusFilter, userFilter, viewMode, currentUserId]);
 
-  console.log('[MeetingsPage] 🎛️ Estado toggle:', { isLoading, meetingsCount: meetings.length, isAdmin });
+  console.log('[MeetingsPage] 🎛️ Estado toggle:', { isLoading, meetingsCount: meetings.length, hasTeamMeetings });
 
   return (
     <MainLayout>
@@ -182,7 +155,7 @@ export function MeetingsPage() {
               <User size={14} />
               Minhas Reuniões
             </button>
-            {isAdmin && (
+            {hasTeamMeetings && (
               <button
                 onClick={() => setViewMode('team')}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
