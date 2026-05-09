@@ -6,33 +6,32 @@ import { supabase } from '../config/supabase.js'
  * - Caso contrário → retorna apenas o próprio userId
  */
 export async function getAccessibleMemberIds(userId: string): Promise<string[]> {
-  // Verifica se é owner de algum time
-  const { data: ownedTeam } = await supabase
+  // Busca todos os times onde o usuário é owner
+  const { data: ownedTeams } = await supabase
     .from('teams')
     .select('id')
     .eq('owner_id', userId)
-    .maybeSingle()
 
-  let teamId: string | null = ownedTeam?.id ?? null
+  // Busca todos os times onde o usuário é admin membro
+  const { data: adminMemberships } = await supabase
+    .from('team_members')
+    .select('team_id')
+    .eq('user_id', userId)
+    .eq('role', 'admin')
+    .eq('status', 'active')
+    .not('team_id', 'is', null)
 
-  // Se não é owner, verifica se é admin membro de algum time
-  if (!teamId) {
-    const { data: adminMembership } = await supabase
-      .from('team_members')
-      .select('team_id')
-      .eq('user_id', userId)
-      .eq('role', 'admin')
-      .eq('status', 'active')
-      .maybeSingle()
-    teamId = adminMembership?.team_id ?? null
-  }
+  const teamIds = [...new Set([
+    ...(ownedTeams ?? []).map(team => team.id),
+    ...(adminMemberships ?? []).map(membership => membership.team_id),
+  ].filter(Boolean))] as string[]
 
-  if (!teamId) return [userId]
+  if (!teamIds.length) return [userId]
 
   const { data: members } = await supabase
     .from('team_members')
     .select('user_id')
-    .eq('team_id', teamId)
+    .in('team_id', teamIds)
     .eq('status', 'active')
     .not('user_id', 'is', null)
 
