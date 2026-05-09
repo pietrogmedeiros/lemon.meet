@@ -9,6 +9,7 @@ const TTL_MS = 30_000 // 30 segundos
 interface CacheEntry {
   data: Meeting[]
   expiresAt: number
+  userId: string // NOVO: vincula cache ao usuário
   promise?: Promise<Meeting[]> // deduplica fetches simultâneos
 }
 
@@ -31,24 +32,44 @@ export interface Meeting {
 let cache: CacheEntry | null = null
 
 export function invalidateMeetingsCache(): void {
+  console.log('[MeetingsCache] 🗑️ Cache invalidado')
   cache = null
 }
 
 export async function fetchMeetings(limit = 100): Promise<Meeting[]> {
   const now = Date.now()
+  
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) {
+    console.warn('[MeetingsCache] ❌ Sem sessão, não pode buscar reuniões')
+    return []
+  }
 
-  // Serve do cache se ainda válido
-  if (cache && now < cache.expiresAt) {
+  const currentUserId = session.user.id
+
+  // SEGURANÇA: Invalida cache se for de outro usuário
+  if (cache && cache.userId !== currentUserId) {
+    console.warn('[MeetingsCache] ⚠️ Cache é de outro usuário! Invalidando...')
+    console.log('[MeetingsCache] Cache userId:', cache.userId)
+    console.log('[MeetingsCache] Current userId:', currentUserId)
+    cache = null
+  }
+
+  // Serve do cache se ainda válido E for do mesmo usuário
+  if (cache && now < cache.expiresAt && cache.userId === currentUserId) {
+    console.log('[MeetingsCache] ✅ Usando cache')
     return cache.data
   }
 
   // Deduplica: se já há um fetch em andamento, aguarda o mesmo
-  if (cache?.promise) {
+  if (cache?.promise && cache.userId === currentUserId) {
+    console.log('[MeetingsCache] ⏳ Aguardando fetch em andamento')
     return cache.promise
   }
 
+  console.log('[MeetingsCache] 🔄 Buscando reuniões do servidor...')
+  
   const promise = (async (): Promise<Meeting[]> => {
-    const { data: { session } } = await supabase.auth.getSession()
     const res = await fetch(`${API}/api/meetings?limit=${limit}`, {
       headers: { Authorization: `Bearer ${session?.access_token}` },
     })
@@ -56,12 +77,18 @@ export async function fetchMeetings(limit = 100): Promise<Meeting[]> {
     const json = await res.json()
     const meetings: Meeting[] = json.meetings ?? []
 
-    cache = { data: meetings, expiresAt: Date.now() + TTL_MS }
+    console.log('[MeetingsCache] ✅ Reuniões carregadas:', meetings.length)
+    
+    cache = { 
+      data: meetings, 
+      expiresAt: Date.now() + TTL_MS,
+      userId: currentUserId // Vincula ao usuário
+    }
     return meetings
   })()
 
   // Armazena a promise para deduplicação
-  if (!cache) cache = { data: [], expiresAt: 0, promise }
+  if (!cache) cache = { data: [], expiresAt: 0, userId: currentUserId, promise }
   else cache.promise = promise
 
   try {

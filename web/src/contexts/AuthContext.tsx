@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
 import { User, Session, AuthError } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
+import { invalidateMeetingsCache } from '@/lib/meetingsCache'
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:3000'
 
@@ -43,9 +44,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('[Auth] Evento:', event, 'User:', session?.user?.email)
+      
+      const previousUserId = user?.id
+      const newUserId = session?.user?.id
+      
+      // SEGURANÇA: Limpa cache se mudou de usuário
+      if (event === 'SIGNED_IN' && previousUserId && newUserId && previousUserId !== newUserId) {
+        console.warn('[Auth] ⚠️ Mudança de usuário detectada! Limpando cache...')
+        invalidateMeetingsCache()
+      }
+      
+      // Limpa cache ao fazer logout
+      if (event === 'SIGNED_OUT') {
+        console.log('[Auth] 🗑️ Logout detectado, limpando cache...')
+        invalidateMeetingsCache()
+      }
+      
       setSession(session)
       setUser(session?.user ?? null)
       setLoading(false)
+      
       // Ativa convites pendentes quando o usuário loga
       if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session) {
         tryAcceptInvite(session)
@@ -53,7 +72,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
 
     return () => subscription.unsubscribe()
-  }, [])
+  }, [user?.id])
 
   const signInWithEmail = async (email: string, password: string) => {
     try {
@@ -81,9 +100,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     try {
+      console.log('[Auth] 🚪 Fazendo logout...')
+      invalidateMeetingsCache() // Limpa cache ANTES de sair
       await supabase.auth.signOut()
       setUser(null)
       setSession(null)
+      console.log('[Auth] ✅ Logout completo')
     } catch (error) {
       console.error('Error signing out:', error)
     }
