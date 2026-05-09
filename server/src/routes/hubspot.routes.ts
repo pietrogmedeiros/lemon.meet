@@ -400,13 +400,73 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
       // Non-critical — note creation is best-effort
     }
 
+    // 3. Create Tasks for Follow-ups (best-effort)
+    const taskIds: string[] = []
+    if (insights?.followUpSuggestions?.length) {
+      try {
+        const followUps = insights.followUpSuggestions as Array<{ content: string; tone: string }>
+        
+        for (let i = 0; i < Math.min(followUps.length, 5); i++) {
+          const followUp = followUps[i]
+          const dueDate = new Date()
+          dueDate.setDate(dueDate.getDate() + (i + 1)) // Distribuir nos próximos dias
+          
+          const taskRes = await fetch(`${HUBSPOT_API_BASE}/crm/v3/objects/tasks`, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              properties: {
+                hs_task_subject: `Follow-up ${i + 1}: ${title}`,
+                hs_task_body: followUp.content,
+                hs_task_status: 'NOT_STARTED',
+                hs_task_priority: i === 0 ? 'HIGH' : 'MEDIUM',
+                hs_timestamp: String(dueDate.getTime()),
+              },
+            }),
+          })
+
+          if (taskRes.ok) {
+            const taskData = await taskRes.json() as { id: string }
+            taskIds.push(taskData.id)
+            
+            // Associate task with deal
+            await fetch(
+              `${HUBSPOT_API_BASE}/crm/v3/objects/tasks/${taskData.id}/associations/deals/${dealId}/task_to_deal`,
+              {
+                method: 'PUT',
+                headers: { Authorization: `Bearer ${token}` },
+              }
+            )
+            
+            // Associate task with contact if available
+            if (contactId) {
+              await fetch(
+                `${HUBSPOT_API_BASE}/crm/v3/objects/tasks/${taskData.id}/associations/contacts/${contactId}/task_to_contact`,
+                {
+                  method: 'PUT',
+                  headers: { Authorization: `Bearer ${token}` },
+                }
+              )
+            }
+          }
+        }
+      } catch (err) {
+        console.error('[HubSpot] Error creating follow-up tasks:', err)
+        // Non-critical — task creation is best-effort
+      }
+    }
+
     res.json({ 
       success: true, 
       dealId, 
       noteId,
       contactId,
       wasUpdated,
-      action: wasUpdated ? 'updated' : 'created'
+      action: wasUpdated ? 'updated' : 'created',
+      tasksCreated: taskIds.length
     })
   } catch (err) {
     console.error('[HubSpot] sync error', err)
@@ -424,42 +484,69 @@ function buildNoteBody(params: {
   meetLink: string | null
 }): string {
   const { title, date, duration, insights, meetLink } = params
-  let body = `📋 ${title}\n`
-  body += `📅 Data: ${date} | ⏱️ Duração: ${duration}\n\n`
+  
+  // Usar HTML para melhor formatação no Hubspot
+  let body = `<h2>📋 ${title}</h2>`
+  body += `<p><strong>📅 Data:</strong> ${date} | <strong>⏱️ Duração:</strong> ${duration}</p>`
 
   if (insights) {
+    // Resumo Executivo
     if (insights.executiveContext) {
-      body += `Resumo Executivo\n${insights.executiveContext}\n\n`
+      body += `<h3>💼 Resumo Executivo</h3>`
+      body += `<p>${insights.executiveContext}</p>`
     }
-    if (typeof insights.commercialQuality === 'number') {
-      body += `Score Comercial: ${insights.commercialQuality}/10\n`
+    
+    // Métricas principais
+    if (typeof insights.commercialQuality === 'number' || typeof insights.closingProbability === 'number' || insights.sentiment) {
+      body += `<h3>📊 Métricas</h3><ul>`
+      
+      if (typeof insights.commercialQuality === 'number') {
+        body += `<li><strong>Score Comercial:</strong> ${insights.commercialQuality}/10</li>`
+      }
+      if (typeof insights.closingProbability === 'number') {
+        body += `<li><strong>Probabilidade de Fechamento:</strong> ${insights.closingProbability}%</li>`
+      }
+      const sentimentMap: Record<string, string> = { 
+        positive: '😊 Positivo', 
+        neutral: '😐 Neutro', 
+        negative: '😟 Negativo' 
+      }
+      if (insights.sentiment) {
+        body += `<li><strong>Sentimento:</strong> ${sentimentMap[insights.sentiment] || insights.sentiment}</li>`
+      }
+      body += `</ul>`
     }
-    if (typeof insights.closingProbability === 'number') {
-      body += `Probabilidade de Fechamento: ${insights.closingProbability}%\n`
-    }
-    const sentimentMap: Record<string, string> = { positive: 'Positivo', neutral: 'Neutro', negative: 'Negativo' }
-    if (insights.sentiment) {
-      body += `Sentimento: ${sentimentMap[insights.sentiment] || insights.sentiment}\n`
-    }
-    body += '\n'
 
+    // Action Items
     if (insights.actionItems?.length) {
-      body += `Ações a seguir:\n${(insights.actionItems as string[]).map((a: string) => `• ${a}`).join('\n')}\n\n`
+      body += `<h3>✅ Ações a Seguir</h3><ul>`
+      body += (insights.actionItems as string[]).map((a: string) => `<li>${a}</li>`).join('')
+      body += `</ul>`
     }
+    
+    // Tópicos-chave
     if (insights.keyTopics?.length) {
-      body += `Tópicos-chave: ${(insights.keyTopics as string[]).join(', ')}\n\n`
+      body += `<h3>🔑 Tópicos-Chave</h3>`
+      body += `<p>${(insights.keyTopics as string[]).join(', ')}</p>`
     }
+    
+    // BANT Score
     if (insights.bantScore) {
       const b = insights.bantScore
-      body += `BANT Score\n`
-      body += `• Budget: ${b.budget?.score}/10 — ${b.budget?.evidence || ''}\n`
-      body += `• Authority: ${b.authority?.score}/10 — ${b.authority?.evidence || ''}\n`
-      body += `• Need: ${b.need?.score}/10 — ${b.need?.evidence || ''}\n`
-      body += `• Timeline: ${b.timeline?.score}/10 — ${b.timeline?.evidence || ''}\n\n`
+      body += `<h3>🎯 BANT Score</h3><ul>`
+      body += `<li><strong>Budget:</strong> ${b.budget?.score}/10 — ${b.budget?.evidence || 'N/A'}</li>`
+      body += `<li><strong>Authority:</strong> ${b.authority?.score}/10 — ${b.authority?.evidence || 'N/A'}</li>`
+      body += `<li><strong>Need:</strong> ${b.need?.score}/10 — ${b.need?.evidence || 'N/A'}</li>`
+      body += `<li><strong>Timeline:</strong> ${b.timeline?.score}/10 — ${b.timeline?.evidence || 'N/A'}</li>`
+      body += `</ul>`
     }
   }
 
-  if (meetLink) body += `🔗 Link: ${meetLink}`
+  // Link da reunião
+  if (meetLink) {
+    body += `<hr><p>🔗 <a href="${meetLink}" target="_blank">Link da Reunião</a></p>`
+  }
+  
   return body
 }
 
