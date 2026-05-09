@@ -14,6 +14,7 @@ import { meetingBaasService, type BaasCompletePayload } from '../services/Meetin
 import { insightsService } from '../services/InsightsService.js'
 import { fireWebhookForMeeting } from './integrations.routes.js'
 import { gdriveService } from '../services/GDriveService.js'
+import { resolveMeetingTeamId } from '../utils/teamAccess.js'
 
 const router: RouterType = Router()
 
@@ -234,9 +235,11 @@ async function handleBotCompleted(data: Record<string, any>) {
     if (calIntegration) {
       const { randomUUID } = await import('crypto')
       const newMeetingId = randomUUID()
+      const teamId = await resolveMeetingTeamId(calIntegration.user_id)
       const { data: created, error: createErr } = await supabase.from('meetings').insert({
         id: newMeetingId,
         user_id: calIntegration.user_id,
+        team_id: teamId,
         title: 'Reunião do Calendário',
         platform: 'google_meet',
         source: 'calendar',
@@ -493,10 +496,12 @@ async function handleCalendarSyncEvents(data: Record<string, any>) {
       const meetingId = randomUUID()
       const platform = meetingUrl.includes('meet.google.com') ? 'google_meet'
         : meetingUrl.includes('zoom.us') ? 'zoom' : 'teams'
+      const teamId = await resolveMeetingTeamId(userId)
 
       const { error: insertError } = await supabase.from('meetings').insert({
         id: meetingId,
         user_id: userId,
+        team_id: teamId,
         meet_link: meetingUrl,
         title: instance.title ?? 'Reunião do Calendário',
         platform,

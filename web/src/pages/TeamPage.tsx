@@ -108,6 +108,7 @@ export function TeamPage() {
       console.log('[TeamPage] 📊 Times encontrados:', data.teams?.length ?? 0)
       
       const loadedTeams = data.teams ?? []
+      const activeOwnerTeamId = data.activeOwnerTeamId ?? null
       setTeams(loadedTeams)
       
       if (loadedTeams.length === 0) {
@@ -117,12 +118,20 @@ export function TeamPage() {
       // Seleciona o primeiro time por padrão se ainda não há nenhum selecionado
       if (loadedTeams.length > 0) {
         setSelectedTeamId(prev => {
-          if (!prev) {
-            console.log('[TeamPage] ✅ Selecionando primeiro time:', loadedTeams[0].id, loadedTeams[0].name)
-            return loadedTeams[0].id
+          if (prev && loadedTeams.some((team: Team) => team.id === prev)) {
+            return prev
           }
-          return prev
+
+          if (activeOwnerTeamId && loadedTeams.some((team: Team) => team.id === activeOwnerTeamId)) {
+            console.log('[TeamPage] ✅ Restaurando time ativo do owner:', activeOwnerTeamId)
+            return activeOwnerTeamId
+          }
+
+          console.log('[TeamPage] ✅ Selecionando primeiro time:', loadedTeams[0].id, loadedTeams[0].name)
+          return loadedTeams[0].id
         })
+      } else {
+        setSelectedTeamId(null)
       }
     } catch (err) {
       console.error('[TeamPage] ❌ Erro ao carregar times:', err)
@@ -130,6 +139,30 @@ export function TeamPage() {
       setLoading(false)
     }
   }, [session])
+
+  useEffect(() => {
+    const persistActiveOwnerTeam = async () => {
+      if (!session || !selectedTeamId) return
+
+      const selectedTeam = teams.find(team => team.id === selectedTeamId)
+      if (!selectedTeam?.isOwner) return
+
+      try {
+        const data = await apiFetch('/api/teams/active', session, {
+          method: 'POST',
+          body: JSON.stringify({ teamId: selectedTeamId }),
+        })
+
+        if (!data.success) {
+          console.warn('[TeamPage] ⚠️ Não foi possível persistir time ativo:', data.message)
+        }
+      } catch (err) {
+        console.error('[TeamPage] ❌ Erro ao persistir time ativo:', err)
+      }
+    }
+
+    persistActiveOwnerTeam()
+  }, [selectedTeamId, session, teams])
 
   // Detecta quando retorna de um convite aceito e força reload TOTAL
   useEffect(() => {

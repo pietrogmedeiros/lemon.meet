@@ -13,6 +13,7 @@ import { randomUUID } from 'crypto'
 import { supabase } from '../config/supabase.js'
 import { logger } from '../utils/logger.js'
 import { meetingBaasService } from './MeetingBaasService.js'
+import { resolveMeetingTeamId } from '../utils/teamAccess.js'
 import {
   getValidAccessToken,
   extractMeetingUrl,
@@ -213,9 +214,11 @@ export class CalendarCronService {
 
     // Persiste a reunião no banco
     const platform = detectPlatformFromUrl(meetingUrl)
+    const teamId = await resolveMeetingTeamId(userId)
     const { error: insertError } = await supabase.from('meetings').insert({
       id:                meetingId,
       user_id:           userId,
+      team_id:           teamId,
       meet_link:         meetingUrl,
       title,
       platform,

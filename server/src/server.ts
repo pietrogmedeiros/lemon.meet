@@ -146,8 +146,12 @@ httpServer.listen(PORT, () => {
 ╚══════════════════════════════════════════════════════════╝
   `)
 
-  // Inicia o cron de auto-dispatch de bots via Google Calendar
-  calendarCronService.start()
+  if (process.env.DISABLE_CALENDAR_CRON === 'true') {
+    console.log('[CalendarCron] Desabilitado por DISABLE_CALENDAR_CRON=true')
+  } else {
+    // Inicia o cron de auto-dispatch de bots via Google Calendar
+    calendarCronService.start()
+  }
 })
 
 // Graceful shutdown

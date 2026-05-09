@@ -1,25 +1,140 @@
 import { supabase } from '../config/supabase.js'
 
+export interface UserTeamScope {
+  ownedTeamIds: string[]
+  memberTeamIds: string[]
+  activeOwnerTeamId: string | null
+}
+
+async function getUserTeamScope(userId: string): Promise<UserTeamScope> {
+  const [
+    { data: ownedTeams },
+    { data: memberships },
+    { data: userProfile },
+  ] = await Promise.all([
+    supabase
+      .from('teams')
+      .select('id')
+      .eq('owner_id', userId),
+    supabase
+      .from('team_members')
+      .select('team_id')
+      .eq('user_id', userId)
+      .eq('status', 'active')
+      .not('team_id', 'is', null),
+    supabase.auth.admin.getUserById(userId),
+  ])
+
+  const ownedTeamIds = (ownedTeams ?? []).map(team => team.id)
+  const ownedTeamIdSet = new Set(ownedTeamIds)
+  const memberTeamIds = [...new Set(
+    (memberships ?? [])
+      .map(membership => membership.team_id)
+      .filter((teamId): teamId is string => Boolean(teamId) && !ownedTeamIdSet.has(teamId))
+  )]
+
+  const rawActiveOwnerTeamId = userProfile.user?.user_metadata?.active_owner_team_id
+  const activeOwnerTeamId = typeof rawActiveOwnerTeamId === 'string' && ownedTeamIdSet.has(rawActiveOwnerTeamId)
+    ? rawActiveOwnerTeamId
+    : null
+
+  return {
+    ownedTeamIds,
+    memberTeamIds,
+    activeOwnerTeamId,
+  }
+}
+
+export async function getPreferredOwnerTeamId(userId: string): Promise<string | null> {
+  const scope = await getUserTeamScope(userId)
+
+  if (scope.activeOwnerTeamId) return scope.activeOwnerTeamId
+  return scope.ownedTeamIds[0] ?? null
+}
+
+export async function resolveMeetingTeamId(userId: string, explicitTeamId?: string | null): Promise<string | null> {
+  const scope = await getUserTeamScope(userId)
+  const allowedTeamIds = new Set([...scope.ownedTeamIds, ...scope.memberTeamIds])
+
+  if (explicitTeamId) {
+    return allowedTeamIds.has(explicitTeamId) ? explicitTeamId : null
+  }
+
+  if (scope.ownedTeamIds.length === 1) {
+    return scope.ownedTeamIds[0]
+  }
+
+  if (scope.activeOwnerTeamId) {
+    return scope.activeOwnerTeamId
+  }
+
+  if (scope.ownedTeamIds.length > 0) {
+    return scope.ownedTeamIds[0]
+  }
+
+  if (scope.memberTeamIds.length > 0) {
+    return scope.memberTeamIds[0]
+  }
+
+  return null
+}
+
+export async function canCreateOwnedTeam(userId: string): Promise<{ ok: boolean; message?: string }> {
+  const scope = await getUserTeamScope(userId)
+
+  if (scope.memberTeamIds.length > 0) {
+    return {
+      ok: false,
+      message: 'Usuário já participa de outro time e não pode criar um novo time próprio.',
+    }
+  }
+
+  return { ok: true }
+}
+
+export async function canJoinTeamAsMember(userId: string, targetTeamId: string): Promise<{ ok: boolean; message?: string }> {
+  const scope = await getUserTeamScope(userId)
+
+  if (scope.ownedTeamIds.length > 0 && !scope.ownedTeamIds.includes(targetTeamId)) {
+    return {
+      ok: false,
+      message: 'Usuário já participa de outro time como owner.',
+    }
+  }
+
+  const otherMemberTeamIds = scope.memberTeamIds.filter(teamId => teamId !== targetTeamId)
+  if (otherMemberTeamIds.length > 0) {
+    return {
+      ok: false,
+      message: 'Usuário já participa de outro time.',
+    }
+  }
+
+  return { ok: true }
+}
+
 /**
  * Retorna os user_ids acessíveis pelo usuário:
  * - Se for owner ou admin de um time → retorna todos os membros ativos do time
  * - Caso contrário → retorna apenas o próprio userId
  */
 export async function getAccessibleMemberIds(userId: string): Promise<string[]> {
-  // Busca todos os times onde o usuário é owner
-  const { data: ownedTeams } = await supabase
-    .from('teams')
-    .select('id')
-    .eq('owner_id', userId)
-
-  // Busca todos os times onde o usuário é admin membro
-  const { data: adminMemberships } = await supabase
-    .from('team_members')
-    .select('team_id')
-    .eq('user_id', userId)
-    .eq('role', 'admin')
-    .eq('status', 'active')
-    .not('team_id', 'is', null)
+  const [
+    { data: ownedTeams },
+    { data: adminMemberships },
+  ] = await Promise.all([
+    supabase
+      .from('teams')
+      .select('id')
+      .eq('owner_id', userId),
+    supabase
+      .from('team_members')
+      .select('team_id')
+      .eq('user_id', userId)
+      .eq('role', 'admin')
+      .eq('status', 'active')
+      .not('team_id', 'is', null),
+  ])
 
   const teamIds = [...new Set([
     ...(ownedTeams ?? []).map(team => team.id),

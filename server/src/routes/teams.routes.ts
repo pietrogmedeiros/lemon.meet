@@ -18,6 +18,7 @@ import { supabase } from '../config/supabase.js'
 import { authMiddleware, type AuthRequest } from '../middleware/auth.middleware.js'
 import { logger } from '../utils/logger.js'
 import { nanoid } from 'nanoid'
+import { canCreateOwnedTeam, canJoinTeamAsMember, getPreferredOwnerTeamId } from '../utils/teamAccess.js'
 
 const router: express.Router = Router()
 
@@ -28,6 +29,21 @@ const supabaseAnon = createClient(
   { auth: { persistSession: false, autoRefreshToken: false } }
 )
 
+async function setActiveOwnerTeam(userId: string, teamId: string): Promise<void> {
+  const { data: userProfile, error } = await supabase.auth.admin.getUserById(userId)
+  if (error) throw error
+
+  const currentMetadata = userProfile.user?.user_metadata ?? {}
+  const { error: updateError } = await supabase.auth.admin.updateUserById(userId, {
+    user_metadata: {
+      ...currentMetadata,
+      active_owner_team_id: teamId,
+    },
+  })
+
+  if (updateError) throw updateError
+}
+
 // ── POST /api/teams ───────────────────────────────────────────
 router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
@@ -36,6 +52,11 @@ router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
 
     if (!name || typeof name !== 'string' || !name.trim()) {
       return res.status(400).json({ success: false, message: 'name is required' })
+    }
+
+    const createPermission = await canCreateOwnedTeam(userId)
+    if (!createPermission.ok) {
+      return res.status(409).json({ success: false, message: createPermission.message })
     }
 
     // Verifica quantos times o usuário já possui
@@ -71,6 +92,8 @@ router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
       status: 'active',
     })
 
+    await setActiveOwnerTeam(userId, team.id)
+
     logger.info(`Team created: ${team.id} by ${userId}`)
     return res.status(201).json({ success: true, team })
   } catch (err) {
@@ -84,6 +107,7 @@ router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
 router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.id
+    const activeOwnerTeamId = await getPreferredOwnerTeamId(userId)
     logger.info(`📋 GET /api/teams - Usuario ${userId} solicitando lista de times`)
 
     // Times onde é owner
@@ -129,9 +153,39 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
     const teams = Array.from(allTeamsMap.values())
     logger.info(`📋 Total de times retornados: ${teams.length}`)
 
-    return res.json({ success: true, teams })
+    return res.json({ success: true, teams, activeOwnerTeamId })
   } catch (err) {
     logger.error('Error fetching teams:', err)
+    return res.status(500).json({ success: false, message: 'Internal server error' })
+  }
+})
+
+// ── POST /api/teams/active ───────────────────────────────────
+// Define qual time do owner será usado por padrão nas novas reuniões
+router.post('/active', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id
+    const { teamId } = req.body
+
+    if (!teamId || typeof teamId !== 'string') {
+      return res.status(400).json({ success: false, message: 'teamId is required' })
+    }
+
+    const { data: team } = await supabase
+      .from('teams')
+      .select('id')
+      .eq('id', teamId)
+      .eq('owner_id', userId)
+      .maybeSingle()
+
+    if (!team) {
+      return res.status(403).json({ success: false, message: 'Apenas owners podem definir o time ativo.' })
+    }
+
+    await setActiveOwnerTeam(userId, teamId)
+    return res.json({ success: true, activeOwnerTeamId: teamId })
+  } catch (err) {
+    logger.error('Error setting active owner team:', err)
     return res.status(500).json({ success: false, message: 'Internal server error' })
   }
 })
@@ -318,6 +372,17 @@ router.post('/:id/invite', authMiddleware, async (req: AuthRequest, res: Respons
     const alreadyRegistered = existingUsers?.users?.some(
       (u) => u.email?.toLowerCase() === email.toLowerCase()
     )
+
+    const existingUser = existingUsers?.users?.find(
+      (u) => u.email?.toLowerCase() === email.toLowerCase()
+    )
+
+    if (existingUser?.id) {
+      const joinPermission = await canJoinTeamAsMember(existingUser.id, teamId)
+      if (!joinPermission.ok) {
+        return res.status(409).json({ success: false, message: joinPermission.message })
+      }
+    }
 
     if (alreadyRegistered) {
       // Usuário já existe → signInWithOtp envia magic link por e-mail
@@ -548,17 +613,26 @@ router.post('/accept-invite', authMiddleware, async (req: AuthRequest, res: Resp
       .eq('status', 'invited')
       .is('user_id', null)
 
-    if (!pending?.length) return res.json({ success: true, activated: 0 })
+    if (!pending?.length) return res.json({ success: true, activated: 0, skipped: 0 })
 
+    let activated = 0
+    let skipped = 0
     for (const invite of pending) {
+      const joinPermission = await canJoinTeamAsMember(userId, invite.team_id)
+      if (!joinPermission.ok) {
+        skipped++
+        continue
+      }
+
       await supabase
         .from('team_members')
         .update({ user_id: userId, status: 'active' })
         .eq('id', invite.id)
+      activated++
     }
 
-    logger.info(`Activated ${pending.length} invite(s) for ${email}`)
-    return res.json({ success: true, activated: pending.length })
+    logger.info(`Activated ${activated} invite(s) for ${email}; skipped=${skipped}`)
+    return res.json({ success: true, activated, skipped })
   } catch (err) {
     logger.error('Error accepting invite:', err)
     return res.status(500).json({ success: false })
@@ -683,6 +757,11 @@ router.post('/join/:token', authMiddleware, async (req: AuthRequest, res: Respon
     }
 
     const teamId = inviteLink.team_id
+
+    const joinPermission = await canJoinTeamAsMember(userId, teamId)
+    if (!joinPermission.ok) {
+      return res.status(409).json({ success: false, message: joinPermission.message })
+    }
 
     // Verifica se já é membro do time
     const { data: existingMember } = await supabase
