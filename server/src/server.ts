@@ -21,6 +21,7 @@ import { calendarCronService } from './services/CalendarCronService.js'
 // Load environment variables
 dotenv.config()
 
+// Force redeploy: 2026-05-09T02:50:00Z
 const app: Express = express()
 const httpServer = createServer(app)
 const PORT = process.env.PORT || 3000
