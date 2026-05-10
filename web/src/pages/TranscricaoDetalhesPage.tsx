@@ -525,10 +525,13 @@ export function TranscricaoDetalhesPage() {
         const data = await res.json();
         setMeeting(data.meeting);
         
-        // Remove duplicatas baseado no ID único
+        // Remove duplicatas baseado em text + start_seconds
         const segmentsMap = new Map<string, TranscriptSegment>();
         (data.segments || []).forEach((seg: TranscriptSegment) => {
-          segmentsMap.set(seg.id, seg);
+          const key = `${seg.text.trim()}_${seg.start_seconds}`;
+          if (!segmentsMap.has(key)) {
+            segmentsMap.set(key, seg);
+          }
         });
         const uniqueSegments = Array.from(segmentsMap.values()).sort((a, b) => a.sequence - b.sequence);
         
@@ -1186,7 +1189,14 @@ export function TranscricaoDetalhesPage() {
                   <span className="text-xs text-secondary font-mono mt-0.5 w-12 flex-shrink-0">
                     {formatSeconds(seg.start_seconds)}
                   </span>
-                  <p className="text-sm text-secondary leading-relaxed">{seg.text}</p>
+                  <div className="flex-1">
+                    {seg.speaker && (
+                      <span className="text-xs font-semibold text-primary mb-1 block">
+                        {seg.speaker}
+                      </span>
+                    )}
+                    <p className="text-sm text-secondary leading-relaxed">{seg.text}</p>
+                  </div>
                 </div>
               ))}
             </div>
