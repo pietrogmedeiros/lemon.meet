@@ -4,7 +4,7 @@ import { MainLayout } from '../components/layout/MainLayout';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
-import { ArrowLeft, Clock, Calendar, Mic, Target, CheckCircle, Mail, BookOpen, Sparkles, X, Copy, Check, Trash2, Lock, Users, RefreshCw, Download } from 'lucide-react';
+import { ArrowLeft, Clock, Calendar, Mic, Target, CheckCircle, Mail, BookOpen, Sparkles, X, Copy, Check, Trash2, Lock, Users, RefreshCw, Download, Phone, Edit2, Save, MessageCircle } from 'lucide-react';
 import { RapportSection } from '../components/ui/RapportSection';
 import { supabase } from '../lib/supabase';
 import { useSubscription, useAuth } from '../contexts';
@@ -92,9 +92,10 @@ interface FollowUpSectionProps {
   copiedIndex: number | null;
   onCopy: (text: string, idx: number) => void;
   meetingId: string;
+  contactPhone: string | null;
 }
 
-function FollowUpSection({ suggestions, emailLoading, onGenerateEmail, copiedIndex, onCopy, meetingId }: FollowUpSectionProps) {
+function FollowUpSection({ suggestions, emailLoading, onGenerateEmail, copiedIndex, onCopy, meetingId, contactPhone }: FollowUpSectionProps) {
   const { subscription } = useSubscription();
   const isPro = subscription?.plan === 'professional' || subscription?.plan === 'trial';
   const { session } = useAuth();
@@ -437,6 +438,19 @@ function FollowUpSection({ suggestions, emailLoading, onGenerateEmail, copiedInd
                           </>
                         )}
                       </button>
+
+                      {/* Botão WhatsApp */}
+                      {contactPhone && (
+                        <a
+                          href={`https://wa.me/${contactPhone}?text=${encodeURIComponent(currentFup)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-md border bg-green-500 text-white border-green-600 hover:bg-green-600 transition-all"
+                        >
+                          <MessageCircle className="h-3 w-3" />
+                          WhatsApp
+                        </a>
+                      )}
                     </div>
                   )}
                 </div>
@@ -506,6 +520,12 @@ export function TranscricaoDetalhesPage() {
   const [hubspotConnected, setHubspotConnected] = useState(false);
   const [hubspotSyncing, setHubspotSyncing] = useState(false);
   const [hubspotSynced, setHubspotSynced] = useState(false);
+
+  // Contact phone state
+  const [contactPhone, setContactPhone] = useState<string | null>(null);
+  const [phoneEditing, setPhoneEditing] = useState(false);
+  const [phoneInput, setPhoneInput] = useState('');
+  const [phoneSaving, setPhoneSaving] = useState(false);
 
   const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
@@ -625,6 +645,27 @@ export function TranscricaoDetalhesPage() {
     loadBriefing();
   }, [id, meeting?.status, apiUrl, getAuthHeader]);
 
+  // Load contact phone
+  useEffect(() => {
+    if (!id || !meeting) return;
+    const loadPhone = async () => {
+      try {
+        const headers = await getAuthHeader();
+        const res = await fetch(`${apiUrl}/api/meetings/${id}/contact-phone`, { headers });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && data.phone) {
+            setContactPhone(data.phone);
+            setPhoneInput(data.phone);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading contact phone:', error);
+      }
+    };
+    loadPhone();
+  }, [id, meeting, apiUrl, getAuthHeader]);
+
   // Check if Pipedrive is connected
   useEffect(() => {
     const check = async () => {
@@ -692,6 +733,28 @@ export function TranscricaoDetalhesPage() {
       // Silent fail
     } finally {
       setHubspotSyncing(false);
+    }
+  };
+
+  const saveContactPhone = async () => {
+    if (!phoneInput.trim()) return;
+    setPhoneSaving(true);
+    try {
+      const headers = await getAuthHeader();
+      const res = await fetch(`${apiUrl}/api/meetings/${id}/contact-phone`, {
+        method: 'PUT',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: phoneInput }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setContactPhone(data.phone);
+        setPhoneEditing(false);
+      }
+    } catch (error) {
+      console.error('Error saving contact phone:', error);
+    } finally {
+      setPhoneSaving(false);
     }
   };
 
@@ -846,6 +909,63 @@ export function TranscricaoDetalhesPage() {
                 </div>
               </div>
             )}
+            
+            {/* Campo de telefone do contato */}
+            <div className="mt-2 flex items-center gap-2 flex-wrap">
+              <span className="flex items-center gap-1 text-xs text-secondary flex-shrink-0">
+                <Phone className="h-3.5 w-3.5" />
+                Telefone:
+              </span>
+              {phoneEditing ? (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={phoneInput}
+                    onChange={(e) => setPhoneInput(e.target.value)}
+                    placeholder="DDI+DD+TELEFONE (ex: 5511999999999)"
+                    className="text-xs border border-neutral-300 rounded px-2 py-1 w-64"
+                    disabled={phoneSaving}
+                  />
+                  <button
+                    onClick={saveContactPhone}
+                    disabled={phoneSaving}
+                    className="text-xs text-primary hover:text-primary-dark disabled:opacity-50"
+                  >
+                    <Save className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    onClick={() => {
+                      setPhoneEditing(false);
+                      setPhoneInput(contactPhone || '');
+                    }}
+                    disabled={phoneSaving}
+                    className="text-xs text-secondary hover:text-primary disabled:opacity-50"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ) : contactPhone ? (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs bg-neutral-100 text-secondary px-2 py-0.5 rounded-full">
+                    +{contactPhone}
+                  </span>
+                  <button
+                    onClick={() => setPhoneEditing(true)}
+                    className="text-xs text-secondary hover:text-primary"
+                  >
+                    <Edit2 className="h-3 w-3" />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setPhoneEditing(true)}
+                  className="text-xs text-primary hover:underline"
+                >
+                  Adicionar telefone
+                </button>
+              )}
+            </div>
+
             {(meeting.user_name || meeting.user_email) && (
               <div className="mt-2 flex items-center gap-2">
                 <span className="text-xs text-secondary flex-shrink-0">Gravada por:</span>
@@ -1107,6 +1227,7 @@ export function TranscricaoDetalhesPage() {
             onGenerateEmail={generateEmail}
             copiedIndex={copiedSuggestionIndex}
             onCopy={copySuggestion}
+            contactPhone={contactPhone}
           />
         )}
 

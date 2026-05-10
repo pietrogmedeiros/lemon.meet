@@ -799,4 +799,232 @@ router.get('/:id/fup-versions', authMiddleware, async (req: AuthRequest, res: Re
   }
 });
 
+// ── Helper: busca telefone de contato no HubSpot ──────────────────────────
+async function getPhoneFromHubspot(userId: string, participantEmails: string[]): Promise<string | null> {
+  try {
+    const { data: integration } = await supabase
+      .from('hubspot_integrations')
+      .select('access_token')
+      .eq('user_id', userId)
+      .single();
+
+    if (!integration?.access_token) return null;
+
+    const HUBSPOT_API_BASE = 'https://api.hubapi.com';
+
+    // Busca contatos pelos emails dos participantes
+    for (const email of participantEmails) {
+      try {
+        const searchRes = await fetch(
+          `${HUBSPOT_API_BASE}/crm/v3/objects/contacts/search`,
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${integration.access_token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              filterGroups: [{
+                filters: [{
+                  propertyName: 'email',
+                  operator: 'EQ',
+                  value: email,
+                }]
+              }],
+              properties: ['phone', 'mobilephone'],
+              limit: 1,
+            }),
+          }
+        );
+
+        if (searchRes.ok) {
+          const searchData = await searchRes.json() as { results: Array<{ properties: { phone?: string; mobilephone?: string } }> };
+          
+          if (searchData.results.length > 0) {
+            const contact = searchData.results[0].properties;
+            const phone = contact.mobilephone || contact.phone;
+            if (phone) {
+              // Remove caracteres não numéricos e retorna
+              return phone.replace(/\D/g, '');
+            }
+          }
+        }
+      } catch (err) {
+        logger.error(`[HubSpot] Erro ao buscar telefone do contato ${email}:`, err);
+      }
+    }
+
+    return null;
+  } catch (err) {
+    logger.error('[HubSpot] Erro ao buscar telefone:', err);
+    return null;
+  }
+}
+
+// ── Helper: busca telefone de contato no Pipedrive ────────────────────────
+async function getPhoneFromPipedrive(userId: string, participantEmails: string[]): Promise<string | null> {
+  try {
+    const { data: integration } = await supabase
+      .from('pipedrive_integrations')
+      .select('access_token')
+      .eq('user_id', userId)
+      .single();
+
+    if (!integration?.access_token) return null;
+
+    const PIPEDRIVE_API_BASE = 'https://api.pipedrive.com/v1';
+
+    // Busca pessoas pelos emails dos participantes
+    for (const email of participantEmails) {
+      try {
+        const searchRes = await fetch(
+          `${PIPEDRIVE_API_BASE}/persons/search?term=${encodeURIComponent(email)}&fields=email&exact_match=1`,
+          {
+            headers: {
+              Authorization: `Bearer ${integration.access_token}`,
+            },
+          }
+        );
+
+        if (searchRes.ok) {
+          const searchData = await searchRes.json() as { data?: { items?: Array<{ item: { id: number } }> } };
+          
+          if (searchData.data?.items && searchData.data.items.length > 0) {
+            const personId = searchData.data.items[0].item.id;
+            
+            // Busca detalhes da pessoa para pegar telefone
+            const personRes = await fetch(
+              `${PIPEDRIVE_API_BASE}/persons/${personId}`,
+              {
+                headers: {
+                  Authorization: `Bearer ${integration.access_token}`,
+                },
+              }
+            );
+
+            if (personRes.ok) {
+              const personData = await personRes.json() as { data?: { phone?: Array<{ value: string }> } };
+              
+              if (personData.data?.phone && personData.data.phone.length > 0) {
+                const phone = personData.data.phone[0].value;
+                // Remove caracteres não numéricos e retorna
+                return phone.replace(/\D/g, '');
+              }
+            }
+          }
+        }
+      } catch (err) {
+        logger.error(`[Pipedrive] Erro ao buscar telefone do contato ${email}:`, err);
+      }
+    }
+
+    return null;
+  } catch (err) {
+    logger.error('[Pipedrive] Erro ao buscar telefone:', err);
+    return null;
+  }
+}
+
+// ── GET /api/meetings/:id/contact-phone ───────────────────────────────────
+// Busca telefone do contato da reunião (do banco, HubSpot ou Pipedrive)
+router.get('/:id/contact-phone', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user!.id;
+    const memberIds = await getAccessibleMemberIds(userId);
+
+    // Busca reunião
+    const { data: meeting, error } = await supabase
+      .from('meetings')
+      .select('contact_phone, participant_emails, user_id')
+      .eq('id', id)
+      .in('user_id', memberIds)
+      .single();
+
+    if (error || !meeting) {
+      return res.status(404).json({ success: false, message: 'Meeting not found' });
+    }
+
+    // Se já tem telefone salvo, retorna
+    if (meeting.contact_phone) {
+      return res.json({ success: true, phone: meeting.contact_phone, source: 'saved' });
+    }
+
+    // Tenta buscar das integrações
+    const participantEmails = (meeting.participant_emails as string[] | null) ?? [];
+    
+    if (participantEmails.length > 0) {
+      // Tenta HubSpot primeiro
+      let phone = await getPhoneFromHubspot(meeting.user_id, participantEmails);
+      if (phone) {
+        // Salva no banco para cache
+        await supabase
+          .from('meetings')
+          .update({ contact_phone: phone })
+          .eq('id', id);
+        
+        return res.json({ success: true, phone, source: 'hubspot' });
+      }
+
+      // Tenta Pipedrive
+      phone = await getPhoneFromPipedrive(meeting.user_id, participantEmails);
+      if (phone) {
+        // Salva no banco para cache
+        await supabase
+          .from('meetings')
+          .update({ contact_phone: phone })
+          .eq('id', id);
+        
+        return res.json({ success: true, phone, source: 'pipedrive' });
+      }
+    }
+
+    // Não encontrou telefone
+    return res.json({ success: true, phone: null, source: null });
+
+  } catch (err) {
+    logger.error('Error in GET /meetings/:id/contact-phone:', err);
+    return res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
+// ── PUT /api/meetings/:id/contact-phone ───────────────────────────────────
+// Salva telefone do contato manualmente
+router.put('/:id/contact-phone', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { phone } = req.body;
+    const userId = req.user!.id;
+    const memberIds = await getAccessibleMemberIds(userId);
+
+    // Valida formato do telefone (apenas números, 8-20 dígitos)
+    if (!phone || typeof phone !== 'string') {
+      return res.status(400).json({ success: false, message: 'Phone is required' });
+    }
+
+    const cleanPhone = phone.replace(/\D/g, '');
+    if (cleanPhone.length < 8 || cleanPhone.length > 20) {
+      return res.status(400).json({ success: false, message: 'Invalid phone format (DDI+DD+PHONE)' });
+    }
+
+    // Atualiza reunião
+    const { error } = await supabase
+      .from('meetings')
+      .update({ contact_phone: cleanPhone })
+      .eq('id', id)
+      .in('user_id', memberIds);
+
+    if (error) {
+      logger.error('Error updating contact phone:', error);
+      return res.status(500).json({ success: false, message: 'Error updating phone' });
+    }
+
+    return res.json({ success: true, phone: cleanPhone });
+
+  } catch (err) {
+    logger.error('Error in PUT /meetings/:id/contact-phone:', err);
+    return res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
 export default router
