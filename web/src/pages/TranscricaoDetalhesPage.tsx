@@ -4,7 +4,7 @@ import { MainLayout } from '../components/layout/MainLayout';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
-import { ArrowLeft, Clock, Calendar, Mic, Target, CheckCircle, Mail, BookOpen, Sparkles, X, Copy, Check, Trash2, Lock, Users, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Clock, Calendar, Mic, Target, CheckCircle, Mail, BookOpen, Sparkles, X, Copy, Check, Trash2, Lock, Users, RefreshCw, Download } from 'lucide-react';
 import { RapportSection } from '../components/ui/RapportSection';
 import { supabase } from '../lib/supabase';
 import { useSubscription, useAuth } from '../contexts';
@@ -524,7 +524,15 @@ export function TranscricaoDetalhesPage() {
         if (!res.ok) { navigate('/meetings'); return; }
         const data = await res.json();
         setMeeting(data.meeting);
-        setSegments(data.segments || []);
+        
+        // Remove duplicatas baseado no ID único
+        const segmentsMap = new Map<string, TranscriptSegment>();
+        (data.segments || []).forEach((seg: TranscriptSegment) => {
+          segmentsMap.set(seg.id, seg);
+        });
+        const uniqueSegments = Array.from(segmentsMap.values()).sort((a, b) => a.sequence - b.sequence);
+        
+        setSegments(uniqueSegments);
       } catch {
         navigate('/meetings');
       } finally {
@@ -1132,13 +1140,39 @@ export function TranscricaoDetalhesPage() {
 
         {/* Transcript segments */}
         <Card className="p-5">
-          <h2 className="text-headline-2 text-primary mb-4 flex items-center gap-2">
-            <Mic className="h-5 w-5" />
-            Transcrição
-            <span className="ml-auto text-xs font-normal text-secondary">
-              {segments.length} segmento{segments.length !== 1 ? 's' : ''}
-            </span>
-          </h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-headline-2 text-primary flex items-center gap-2">
+              <Mic className="h-5 w-5" />
+              Transcrição
+              <span className="ml-3 text-xs font-normal text-secondary">
+                {segments.length} segmento{segments.length !== 1 ? 's' : ''}
+              </span>
+            </h2>
+            {segments.length > 0 && (
+              <button
+                onClick={() => {
+                  const transcriptText = segments
+                    .map(seg => `[${formatSeconds(seg.start_seconds)}] ${seg.speaker ? seg.speaker + ': ' : ''}${seg.text}`)
+                    .join('\n\n');
+                  
+                  const blob = new Blob([transcriptText], { type: 'text/plain;charset=utf-8' });
+                  const url = URL.createObjectURL(blob);
+                  const link = document.createElement('a');
+                  link.href = url;
+                  link.download = `transcricao-${meeting?.title?.replace(/[^a-z0-9]/gi, '-').toLowerCase() || id}.txt`;
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                  URL.revokeObjectURL(url);
+                }}
+                className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-[#2D5A27] bg-[#2D5A27]/5 hover:bg-[#2D5A27]/10 rounded-lg transition-colors"
+                title="Exportar transcrição em TXT"
+              >
+                <Download size={14} />
+                Exportar TXT
+              </button>
+            )}
+          </div>
           {segments.length === 0 ? (
             <p className="text-secondary text-sm py-8 text-center">
               {meeting.status === 'recording' ? 'Gravando… os segmentos aparecerão aqui.' :
