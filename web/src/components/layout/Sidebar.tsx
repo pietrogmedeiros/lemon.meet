@@ -25,7 +25,7 @@ export function Sidebar() {
   const { subscription } = useSubscription()
   const navigate = useNavigate()
   const location = useLocation()
-  const [expanded, setExpanded] = useState(false)
+  const [expanded, setExpanded] = useState(true)
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({ integrations: true })
   const { open: onboardingOpen, openModal: openOnboarding, closeModal: closeOnboarding } = useOnboarding()
 
