@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MainLayout } from '@/components/layout';
 import { Card } from '@/components/ui';
+import { useAuth } from '@/contexts';
 import {
   Video, TrendingUp, TrendingDown, Minus,
   ChevronLeft, ChevronRight, BarChart3,
@@ -158,6 +159,7 @@ function ScorePill({ score }: { score: number }) {
 
 export function RelatorioPage() {
   const { t } = useTranslation();
+  const { session } = useAuth();
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [teams, setTeams] = useState<TeamOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -165,12 +167,19 @@ export function RelatorioPage() {
   const [selectedTeamId, setSelectedTeamId] = useState<string>('all');
 
   useEffect(() => {
+    if (!session?.access_token) {
+      setMeetings([]);
+      setTeams([]);
+      setIsLoading(false);
+      return;
+    }
+
     const load = async () => {
       setIsLoading(true);
       try {
         const [meetingsResult, teamsResult] = await Promise.allSettled([
           fetchMeetingsCache(),
-          fetchUserTeams(),
+          fetchUserTeams(session.access_token),
         ]);
 
         setMeetings(meetingsResult.status === 'fulfilled' ? meetingsResult.value as Meeting[] : []);
@@ -179,7 +188,7 @@ export function RelatorioPage() {
       finally { setIsLoading(false); }
     };
     load();
-  }, []);
+  }, [session?.access_token]);
 
   useEffect(() => {
     if (selectedTeamId === 'all') return;

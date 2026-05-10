@@ -1,5 +1,3 @@
-import { supabase } from './supabase'
-
 const API = import.meta.env.VITE_API_URL || 'http://localhost:3000'
 
 export interface TeamOption {
@@ -8,15 +6,13 @@ export interface TeamOption {
   isOwner?: boolean
 }
 
-export async function fetchUserTeams(): Promise<TeamOption[]> {
-  const { data: { session } } = await supabase.auth.getSession()
-
-  if (!session) {
+export async function fetchUserTeams(accessToken?: string | null): Promise<TeamOption[]> {
+  if (!accessToken) {
     return []
   }
 
   const response = await fetch(`${API}/api/teams`, {
-    headers: { Authorization: `Bearer ${session.access_token}` },
+    headers: { Authorization: `Bearer ${accessToken}` },
   })
 
   if (!response.ok) {

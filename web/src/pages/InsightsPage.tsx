@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { MainLayout } from '@/components/layout';
 import { Card } from '@/components/ui';
+import { useAuth } from '@/contexts';
 import {
   TrendingUp, TrendingDown, Minus, BarChart3,
   MessageSquare, Award, Calendar, Video, Hash
@@ -67,6 +68,7 @@ function ScoreTrendIcon({ scores }: { scores: number[] }) {
 
 export function InsightsPage() {
   const { t, i18n } = useTranslation();
+  const { session } = useAuth();
   const navigate = useNavigate();
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [teams, setTeams] = useState<TeamOption[]>([]);
@@ -74,12 +76,19 @@ export function InsightsPage() {
   const [selectedTeamId, setSelectedTeamId] = useState<string>('all');
 
   useEffect(() => {
+    if (!session?.access_token) {
+      setMeetings([]);
+      setTeams([]);
+      setIsLoading(false);
+      return;
+    }
+
     const load = async () => {
       setIsLoading(true);
       try {
         const [meetingsResult, teamsResult] = await Promise.allSettled([
           fetchMeetingsCache(),
-          fetchUserTeams(),
+          fetchUserTeams(session.access_token),
         ]);
 
         setMeetings(meetingsResult.status === 'fulfilled' ? meetingsResult.value as any : []);
@@ -88,7 +97,7 @@ export function InsightsPage() {
       finally { setIsLoading(false); }
     };
     load();
-  }, []);
+  }, [session?.access_token]);
 
   useEffect(() => {
     if (selectedTeamId === 'all') return;
