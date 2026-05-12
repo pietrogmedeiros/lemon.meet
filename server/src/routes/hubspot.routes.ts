@@ -307,6 +307,14 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
                   dealId = dealsData.results[0].id
                   console.log(`[HubSpot] Atualizando deal existente: ${dealId}`)
                   
+                  // Adicionar proprietário do contato ao deal (se houver)
+                  if (contactOwnerId) {
+                    dealProperties.hubspot_owner_id = contactOwnerId
+                    console.log(`[HubSpot] ✅ Deal será atualizado com o mesmo proprietário do contato: ${contactOwnerId}`)
+                  }
+                  
+                  console.log(`[HubSpot] Enviando properties:`, JSON.stringify(dealProperties, null, 2))
+                  
                   const updateRes = await fetch(
                     `${HUBSPOT_API_BASE}/crm/v3/objects/deals/${dealId}`,
                     {
