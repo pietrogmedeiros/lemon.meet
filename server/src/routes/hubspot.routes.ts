@@ -235,6 +235,7 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
 
     // Obter emails dos participantes da reunião
     const participantEmails = (meeting.participant_emails as string[] | null) ?? []
+    console.log(`[HubSpot] Emails dos participantes:`, participantEmails)
     
     let dealId: string | undefined
     let contactId: string | undefined
@@ -242,8 +243,12 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
 
     // Se houver emails de participantes, verificar se existem contatos no Hubspot
     if (participantEmails.length > 0) {
+      console.log(`[HubSpot] Buscando contatos para ${participantEmails.length} email(s)...`)
+      
       for (const email of participantEmails) {
         try {
+          console.log(`[HubSpot] Procurando contato com email: ${email}`)
+          
           // Buscar contato pelo email
           const searchRes = await fetch(
             `${HUBSPOT_API_BASE}/crm/v3/objects/contacts/search`,
@@ -272,8 +277,10 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
             
             if (searchData.results.length > 0) {
               contactId = searchData.results[0].id
+              console.log(`[HubSpot] ✅ Contato encontrado: ${contactId}`)
               
               // Buscar deals associados a este contato
+              console.log(`[HubSpot] Buscando deals do contato ${contactId}...`)
               const dealsRes = await fetch(
                 `${HUBSPOT_API_BASE}/crm/v3/objects/contacts/${contactId}/associations/deals`,
                 {
@@ -283,10 +290,12 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
 
               if (dealsRes.ok) {
                 const dealsData = await dealsRes.json() as { results: Array<{ id: string }> }
+                console.log(`[HubSpot] Contato tem ${dealsData.results.length} deal(s) associado(s)`)
                 
                 if (dealsData.results.length > 0) {
                   // Atualizar o primeiro deal encontrado
                   dealId = dealsData.results[0].id
+                  console.log(`[HubSpot] Atualizando deal existente: ${dealId}`)
                   
                   const updateRes = await fetch(
                     `${HUBSPOT_API_BASE}/crm/v3/objects/deals/${dealId}`,
@@ -302,23 +311,36 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
 
                   if (updateRes.ok) {
                     wasUpdated = true
-                    console.log(`[HubSpot] Deal ${dealId} atualizado para contato ${email}`)
+                    console.log(`[HubSpot] ✅ Deal ${dealId} atualizado com sucesso`)
                     break // Encontrou e atualizou, não precisa verificar outros emails
+                  } else {
+                    const errText = await updateRes.text()
+                    console.error(`[HubSpot] ❌ Erro ao atualizar deal:`, errText)
                   }
+                } else {
+                  console.log(`[HubSpot] Contato sem deals, será criado novo deal`)
                 }
               }
               
               // Se encontrou contato mas não tem deal, criar deal e associar
               if (!dealId) {
+                console.log(`[HubSpot] Saindo do loop para criar deal para contato ${contactId}`)
                 break // Sai do loop para criar deal e associar ao contato encontrado
               }
+            } else {
+              console.log(`[HubSpot] ⚠️  Contato não encontrado para email: ${email}`)
             }
+          } else {
+            const errText = await searchRes.text()
+            console.error(`[HubSpot] Erro ao buscar contato ${email}:`, errText)
           }
         } catch (err) {
-          console.error(`[HubSpot] Erro ao buscar contato ${email}:`, err)
+          console.error(`[HubSpot] Exceção ao buscar contato ${email}:`, err)
           // Continua tentando outros emails
         }
       }
+    } else {
+      console.log(`[HubSpot] ⚠️  Nenhum email de participante na reunião`)
     }
 
     // Se não encontrou deal existente para atualizar, criar novo
