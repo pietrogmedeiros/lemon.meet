@@ -422,13 +422,85 @@ function buildDealDescription(params: {
   insights: any
   meetLink: string | null
 }): string {
-  const { insights, date, duration } = params
-  let desc = `Data: ${date} | Duração: ${duration}\n`
-  if (insights) {
-    if (typeof insights.commercialQuality === 'number') desc += `Score Comercial: ${insights.commercialQuality}/10\n`
-    if (typeof insights.closingProbability === 'number') desc += `Probabilidade de fechamento: ${insights.closingProbability}%\n`
-    if (insights.executiveContext) desc += `\n${insights.executiveContext}`
+  const { insights, date, duration, meetLink } = params
+  
+  let desc = `📅 Data: ${date} | ⏱️ Duração: ${duration}\n`
+  
+  if (!insights) {
+    if (meetLink) desc += `\n🔗 Link: ${meetLink}`
+    return desc
   }
+
+  // Métricas principais
+  desc += `\n📊 MÉTRICAS\n`
+  if (typeof insights.commercialQuality === 'number') {
+    desc += `• Score Comercial: ${insights.commercialQuality}/10\n`
+  }
+  if (typeof insights.closingProbability === 'number') {
+    desc += `• Probabilidade de Fechamento: ${insights.closingProbability}%\n`
+  }
+  if (insights.sentiment) {
+    const sentimentMap: Record<string, string> = {
+      positive: '😊 Positivo',
+      neutral: '😐 Neutro',
+      negative: '😟 Negativo'
+    }
+    desc += `• Sentimento: ${sentimentMap[insights.sentiment] || insights.sentiment}\n`
+  }
+
+  // Resumo Executivo
+  if (insights.executiveContext) {
+    desc += `\n💼 RESUMO EXECUTIVO\n${insights.executiveContext}\n`
+  }
+
+  // BANT Score
+  if (insights.bantScore) {
+    const b = insights.bantScore
+    desc += `\n🎯 BANT SCORE\n`
+    if (b.budget) {
+      desc += `• Budget: ${b.budget.score}/10 — ${b.budget.evidence || 'N/A'}\n`
+    }
+    if (b.authority) {
+      desc += `• Authority: ${b.authority.score}/10 — ${b.authority.evidence || 'N/A'}\n`
+    }
+    if (b.need) {
+      desc += `• Need: ${b.need.score}/10 — ${b.need.evidence || 'N/A'}\n`
+    }
+    if (b.timeline) {
+      desc += `• Timeline: ${b.timeline.score}/10 — ${b.timeline.evidence || 'N/A'}\n`
+    }
+  }
+
+  // Action Items
+  if (insights.actionItems?.length) {
+    desc += `\n✅ AÇÕES A SEGUIR\n`
+    desc += (insights.actionItems as string[]).map((item: string, i: number) => 
+      `${i + 1}. ${item}`
+    ).join('\n')
+    desc += `\n`
+  }
+
+  // Tópicos-chave
+  if (insights.keyTopics?.length) {
+    desc += `\n🔑 TÓPICOS-CHAVE\n`
+    desc += (insights.keyTopics as string[]).map((topic: string) => `• ${topic}`).join('\n')
+    desc += `\n`
+  }
+
+  // Follow-ups (sugestões da IA)
+  if (insights.followUpSuggestions?.length) {
+    desc += `\n💬 SUGESTÕES DE FOLLOW-UP\n`
+    const followUps = insights.followUpSuggestions as Array<{ content: string; tone?: string }>
+    followUps.slice(0, 5).forEach((followUp: { content: string; tone?: string }, i: number) => {
+      desc += `\n${i + 1}. ${followUp.content}\n`
+    })
+  }
+
+  // Link da reunião
+  if (meetLink) {
+    desc += `\n🔗 LINK DA REUNIÃO\n${meetLink}\n`
+  }
+
   return desc
 }
 
