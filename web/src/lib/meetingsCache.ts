@@ -37,7 +37,7 @@ export function invalidateMeetingsCache(): void {
   cache = null
 }
 
-export async function fetchMeetings(limit = 1000): Promise<Meeting[]> {
+export async function fetchMeetings(limit = 100): Promise<Meeting[]> {
   const now = Date.now()
   
   console.log('[MeetingsCache] 🔍 Iniciando fetchMeetings...')
@@ -50,8 +50,17 @@ export async function fetchMeetings(limit = 1000): Promise<Meeting[]> {
   }
 
   const currentUserId = session.user.id
+  const userEmail = session.user.email
+  
+  // 🔧 DEV USER: sem limite
+  const isDevUser = userEmail?.toLowerCase().trim() === 'pietrogoncalvesmedeiros@gmail.com'
+  if (isDevUser) {
+    limit = 9999
+    console.log('[MeetingsCache] 🔧 DEV USER detectado - removendo limite')
+  }
+  
   console.log('[MeetingsCache] 👤 Current user ID:', currentUserId)
-  console.log('[MeetingsCache] 📧 Current user email:', session.user.email)
+  console.log('[MeetingsCache] 📧 Current user email:', userEmail)
 
   // SEGURANÇA REFORÇADA: SEMPRE invalida cache se não for do usuário atual
   if (cache) {
