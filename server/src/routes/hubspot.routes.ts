@@ -239,6 +239,7 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
     
     let dealId: string | undefined
     let contactId: string | undefined
+    let contactOwnerId: string | undefined
     let wasUpdated = false
 
     // Se houver emails de participantes, verificar se existem contatos no Hubspot
@@ -249,7 +250,7 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
         try {
           console.log(`[HubSpot] Procurando contato com email: ${email}`)
           
-          // Buscar contato pelo email
+          // Buscar contato pelo email (incluindo owner)
           const searchRes = await fetch(
             `${HUBSPOT_API_BASE}/crm/v3/objects/contacts/search`,
             {
@@ -266,18 +267,27 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
                     value: email,
                   }]
                 }],
-                properties: ['email', 'firstname', 'lastname'],
+                properties: ['email', 'firstname', 'lastname', 'hubspot_owner_id'],
                 limit: 1,
               }),
             }
           )
 
           if (searchRes.ok) {
-            const searchData = await searchRes.json() as { results: Array<{ id: string }> }
+            const searchData = await searchRes.json() as { 
+              results: Array<{ 
+                id: string
+                properties: { hubspot_owner_id?: string }
+              }> 
+            }
             
             if (searchData.results.length > 0) {
               contactId = searchData.results[0].id
+              contactOwnerId = searchData.results[0].properties.hubspot_owner_id
               console.log(`[HubSpot] ✅ Contato encontrado: ${contactId}`)
+              if (contactOwnerId) {
+                console.log(`[HubSpot] 👤 Proprietário do contato: ${contactOwnerId}`)
+              }
               
               // Buscar deals associados a este contato
               console.log(`[HubSpot] Buscando deals do contato ${contactId}...`)
@@ -345,6 +355,14 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
 
     // Se não encontrou deal existente para atualizar, criar novo
     if (!dealId) {
+      // Adicionar proprietário do contato ao deal (se houver)
+      if (contactOwnerId) {
+        dealProperties.hubspot_owner_id = contactOwnerId
+        console.log(`[HubSpot] ✅ Deal será criado com o mesmo proprietário do contato: ${contactOwnerId}`)
+      } else {
+        console.log(`[HubSpot] ⚠️  Contato sem proprietário, deal será criado sem owner específico`)
+      }
+      
       console.log('[HubSpot] Criando novo deal com properties:', JSON.stringify(dealProperties, null, 2))
       
       const dealRes = await fetch(`${HUBSPOT_API_BASE}/crm/v3/objects/deals`, {
@@ -453,24 +471,27 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
               const taskData = await taskRes.json() as { id: string }
               tasksCreated.push(taskData.id)
               
-              // Associar task ao DEAL (negócio) - principal
+              // Associar task ao DEAL (negócio) usando API v4
               try {
                 const assocRes = await fetch(
-                  `${HUBSPOT_API_BASE}/crm/v3/objects/tasks/${taskData.id}/associations/deal/${dealId}/214`,
+                  `${HUBSPOT_API_BASE}/crm/v4/objects/tasks/${taskData.id}/associations/default/deals/${dealId}`,
                   {
                     method: 'PUT',
-                    headers: { Authorization: `Bearer ${token}` },
+                    headers: {
+                      Authorization: `Bearer ${token}`,
+                      'Content-Type': 'application/json',
+                    },
                   }
                 )
                 
                 if (assocRes.ok) {
-                  console.log(`[HubSpot] Task ${taskData.id} associada ao deal ${dealId}`)
+                  console.log(`[HubSpot] ✅ Task ${taskData.id} associada ao deal ${dealId}`)
                 } else {
                   const errText = await assocRes.text()
-                  console.error(`[HubSpot] Erro ao associar task ao deal:`, errText)
+                  console.error(`[HubSpot] ❌ Erro ao associar task ao deal:`, errText)
                 }
               } catch (assocErr) {
-                console.error(`[HubSpot] Erro ao associar task ${taskData.id} ao deal:`, assocErr)
+                console.error(`[HubSpot] ❌ Exceção ao associar task ${taskData.id} ao deal:`, assocErr)
               }
 
               console.log(`[HubSpot] Task ${i + 1} criada: ${taskData.id}`)
