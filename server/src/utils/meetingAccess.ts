@@ -22,7 +22,9 @@ export async function getAccessContext(userId: string, memberIds: string[]): Pro
   // Busca informações do usuário primeiro para verificar se é dev
   const { data: authUser } = await supabase.auth.admin.getUserById(userId)
   const email = authUser.user?.email ?? null
-  const isDevUser = email === DEV_USER_EMAIL
+  const isDevUser = email?.toLowerCase().trim() === DEV_USER_EMAIL.toLowerCase()
+  
+  console.log(`[Access] 🔍 Verificando acesso - Email: "${email}" | UserId: ${userId} | IsDevUser: ${isDevUser}`)
   
   // 🔧 DEV USER: Acesso total a tudo
   if (isDevUser) {
@@ -36,6 +38,8 @@ export async function getAccessContext(userId: string, memberIds: string[]): Pro
       isDevUser: true
     }
   }
+  
+  console.log(`[Access] 👤 Usuário normal: ${email}`)
   
   // Verifica se é owner ou admin de algum time
   const [
