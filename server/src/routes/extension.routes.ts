@@ -17,7 +17,6 @@ import { meetingBaasService } from '../services/MeetingBaasService.js'
 import { insightsService } from '../services/InsightsService.js'
 import { rapportService } from '../services/RapportService.js'
 import { getAccessibleMemberIds } from '../utils/teamAccess.js'
-import { getMeetingsAccessQuery } from '../utils/meetingAccess.js'
 
 const router: express.Router = Router()
 

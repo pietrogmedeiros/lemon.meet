@@ -4,17 +4,18 @@
 
 import { supabase } from '../config/supabase.js'
 
+interface AccessContext {
+  isAdmin: boolean
+  teamId: string | null
+  email: string | null
+  userId: string
+  memberIds: string[]
+}
+
 /**
- * Retorna query builder para buscar reuniões acessíveis ao usuário.
- * 
- * REGRAS DE ACESSO:
- * - Owner/Admin do time: vê TODAS as reuniões do time (monitoramento total)
- * - Membro comum: vê apenas reuniões onde está presente (user_id ou participant_emails)
- * 
- * Isso permite que admins monitorem tudo, mas membros comuns só vejam
- * reuniões relevantes para eles.
+ * Busca contexto de acesso do usuário para construir queries de reuniões.
  */
-export async function getMeetingsAccessQuery(userId: string, memberIds: string[]) {
+export async function getAccessContext(userId: string, memberIds: string[]): Promise<AccessContext> {
   // Verifica se é owner ou admin de algum time
   const [
     { data: ownedTeams },
@@ -32,7 +33,7 @@ export async function getMeetingsAccessQuery(userId: string, memberIds: string[]
       .eq('status', 'active'),
   ])
   
-  const isOwnerOrAdmin = (ownedTeams?.length ?? 0) > 0 || (adminMemberships?.length ?? 0) > 0
+  const isAdmin = (ownedTeams?.length ?? 0) > 0 || (adminMemberships?.length ?? 0) > 0
   
   // Busca team_id e email do usuário
   const [
@@ -48,29 +49,33 @@ export async function getMeetingsAccessQuery(userId: string, memberIds: string[]
     supabase.auth.admin.getUserById(userId),
   ])
   
-  const myTeamId = teamMemberships?.[0]?.team_id
-  const myEmail = authUser.user?.email
+  return {
+    isAdmin,
+    teamId: teamMemberships?.[0]?.team_id ?? null,
+    email: authUser.user?.email ?? null,
+    userId,
+    memberIds
+  }
+}
+
+/**
+ * Aplica filtros de acesso a uma query de reuniões baseado no contexto.
+ */
+export function applyAccessFilters(query: any, context: AccessContext) {
+  const { isAdmin, teamId, email, userId, memberIds } = context
   
   // Owner/Admin: vê tudo do time
-  if (isOwnerOrAdmin && myTeamId) {
-    return supabase
-      .from('meetings')
-      .select('*')
-      .or(`user_id.in.(${memberIds.join(',')}),team_id.eq.${myTeamId}`)
+  if (isAdmin && teamId) {
+    return query.or(`user_id.in.(${memberIds.join(',')}),team_id.eq.${teamId}`)
   }
   
   // Membro comum: vê apenas onde participa
-  if (myTeamId && myEmail) {
-    return supabase
-      .from('meetings')
-      .select('*')
-      .eq('team_id', myTeamId)
-      .or(`user_id.eq.${userId},participant_emails.cs.{"${myEmail}"}`)
+  if (teamId && email) {
+    return query
+      .eq('team_id', teamId)
+      .or(`user_id.eq.${userId},participant_emails.cs.{"${email}"}`)
   }
   
   // Sem team, só busca por user_id
-  return supabase
-    .from('meetings')
-    .select('*')
-    .in('user_id', memberIds)
+  return query.in('user_id', memberIds)
 }

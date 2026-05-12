@@ -6,7 +6,7 @@ import { supabase } from '../config/supabase.js';
 import { logger } from '../utils/logger.js';
 import { randomUUID as uuidv4 } from 'crypto';
 import { getAccessibleMemberIds } from '../utils/teamAccess.js';
-import { getMeetingsAccessQuery } from '../utils/meetingAccess.js';
+import { getAccessContext, applyAccessFilters } from '../utils/meetingAccess.js';
 
 const router: express.Router = Router();
 
@@ -15,10 +15,10 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.id;
     const memberIds = await getAccessibleMemberIds(userId);
+    const context = await getAccessContext(userId, memberIds);
 
-    const query = await getMeetingsAccessQuery(userId, memberIds);
-    const { data: meetings, error } = await query
-      .select('*, team_id')
+    const query = supabase.from('meetings').select('*');
+    const { data: meetings, error } = await applyAccessFilters(query, context)
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -30,7 +30,7 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
     }
 
     // Enriquece com nome e avatar de cada membro (uma única chamada)
-    const uniqueUserIds = [...new Set((meetings ?? []).map(m => m.user_id).filter(Boolean))];
+    const uniqueUserIds = [...new Set((meetings ?? []).map((m: any) => m.user_id).filter(Boolean))];
     const userMap = new Map<string, { name: string; avatar_url: string | null }>();
     try {
       const { data: listData, error: listError } = await supabase.auth.admin.listUsers({ perPage: 1000 });
@@ -53,7 +53,7 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
       logger.error('Unexpected error enriching users:', err);
     }
 
-    const enriched = (meetings ?? []).map(m => ({
+    const enriched = (meetings ?? []).map((m: any) => ({
       ...m,
       user_name: userMap.get(m.user_id)?.name ?? m.user_id,
       user_avatar_url: userMap.get(m.user_id)?.avatar_url ?? null,
@@ -200,11 +200,11 @@ router.get('/:id/insights', authMiddleware, async (req: AuthRequest, res: Respon
     const userId = req.user!.id;
     const { generate } = req.query; // ?generate=true para forçar geração
     const memberIds = await getAccessibleMemberIds(userId);
+    const context = await getAccessContext(userId, memberIds);
 
     // Verifica se a reunião existe e o usuário tem acesso (próprio ou admin do time)
-    const query = await getMeetingsAccessQuery(userId, memberIds);
-    const { data: meeting, error } = await query
-      .select('*')
+    const query = supabase.from('meetings').select('*');
+    const { data: meeting, error } = await applyAccessFilters(query, context)
       .eq('id', id)
       .single();
 
@@ -274,13 +274,30 @@ router.get('/:id/transcript', authMiddleware, async (req: AuthRequest, res: Resp
     const { id } = req.params;
     const userId = req.user!.id;
     const memberIds = await getAccessibleMemberIds(userId);
+    const context = await getAccessContext(userId, memberIds);
 
     // Verifica se a reunião existe e o usuário tem acesso (próprio ou admin do time)
-    const query = await getMeetingsAccessQuery(userId, memberIds);
-    const { data: meeting, error } = await query
-      .select('transcript, status')
+    const query = supabase.from('meetings').select('*');
+    const { data: meeting, error } = await applyAccessFilters(query, context)
       .eq('id', id)
-      .single();
+      .maybeSingle();
+    
+    if (error) {
+      return res.status(404).json({
+        success: false,
+        message: 'Meeting not found'
+      });
+    }
+    
+    // Extrai apenas transcript e status
+    if (!meeting) {
+      return res.status(404).json({
+        success: false,
+        message: 'Meeting not found'
+      });
+    }
+    
+    const { transcript, status } = meeting;
 
     if (error || !meeting) {
       return res.status(404).json({
@@ -329,11 +346,11 @@ router.post('/:id/regenerate-fup', authMiddleware, async (req: AuthRequest, res:
     }
 
     // Busca a reunião
-    const query = await getMeetingsAccessQuery(userId, memberIds);
-    const { data: meeting, error: meetingError } = await query
-      .select('transcript, insights')
+    const context = await getAccessContext(userId, memberIds);
+    const query = supabase.from('meetings').select('*');
+    const { data: meeting, error: meetingError } = await applyAccessFilters(query, context)
       .eq('id', id)
-      .single();
+      .maybeSingle();
 
     if (meetingError || !meeting) {
       return res.status(404).json({
@@ -341,8 +358,10 @@ router.post('/:id/regenerate-fup', authMiddleware, async (req: AuthRequest, res:
         message: 'Meeting not found'
       });
     }
+    
+    const { transcript, insights } = meeting;
 
-    if (!meeting.transcript) {
+    if (!transcript) {
       return res.status(400).json({
         success: false,
         message: 'Meeting has no transcript'
@@ -398,11 +417,11 @@ router.get('/:id/fup-versions', authMiddleware, async (req: AuthRequest, res: Re
     const { id } = req.params;
     const userId = req.user!.id;
     const memberIds = await getAccessibleMemberIds(userId);
+    const context = await getAccessContext(userId, memberIds);
 
     // Verifica acesso à reunião
-    const query = await getMeetingsAccessQuery(userId, memberIds);
-    const { data: meeting, error: meetingError } = await query
-      .select('id')
+    const query = supabase.from('meetings').select('*');
+    const { data: meeting, error: meetingError } = await applyAccessFilters(query, context)
       .eq('id', id)
       .single();
 
