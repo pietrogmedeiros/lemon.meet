@@ -323,6 +323,8 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
 
     // Se não encontrou deal existente para atualizar, criar novo
     if (!dealId) {
+      console.log('[HubSpot] Criando novo deal com properties:', JSON.stringify(dealProperties, null, 2))
+      
       const dealRes = await fetch(`${HUBSPOT_API_BASE}/crm/v3/objects/deals`, {
         method: 'POST',
         headers: {
@@ -334,13 +336,15 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
 
       if (!dealRes.ok) {
         const err = await dealRes.text()
-        console.error('[HubSpot] create deal failed', err)
-        res.status(502).json({ error: 'Failed to create deal in HubSpot' })
+        console.error('[HubSpot] Erro ao criar deal:', err)
+        console.error('[HubSpot] Deal properties:', dealProperties)
+        res.status(502).json({ error: 'Failed to create deal in HubSpot', details: err })
         return
       }
 
       const dealData = await dealRes.json() as { id: string }
       dealId = dealData.id
+      console.log(`[HubSpot] Deal criado com sucesso: ${dealId}`)
       
       // Se encontrou um contato mas não tinha deal, associar o deal criado ao contato
       if (contactId) {
