@@ -110,6 +110,23 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
     const activeOwnerTeamId = await getPreferredOwnerTeamId(userId)
     logger.info(`📋 GET /api/teams - Usuario ${userId} solicitando lista de times`)
 
+    // 🔧 DEV USER: retorna TODOS os times
+    const { data: { user } } = await supabase.auth.admin.getUserById(userId)
+    const userEmail = user?.email?.toLowerCase().trim()
+    const isDevUser = userEmail === 'pietrogoncalvesmedeiros@gmail.com'
+
+    if (isDevUser) {
+      logger.info(`🔧 DEV USER detectado - retornando TODOS os times`)
+      const { data: allTeams } = await supabase
+        .from('teams')
+        .select('*')
+        .order('created_at', { ascending: false })
+      
+      const teams = (allTeams ?? []).map(t => ({ ...t, isOwner: t.owner_id === userId }))
+      logger.info(`🔧 DEV USER: Total de times retornados: ${teams.length}`)
+      return res.json({ success: true, teams, activeOwnerTeamId, isDevUser: true })
+    }
+
     // Times onde é owner
     const { data: ownedTeams } = await supabase
       .from('teams')

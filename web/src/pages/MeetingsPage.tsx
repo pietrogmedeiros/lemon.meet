@@ -181,10 +181,11 @@ export function MeetingsPage() {
         (m.platform ?? '').toLowerCase().includes(q);
       const matchesStatus = statusFilter === 'all' || m.status === statusFilter;
       const matchesUser = userFilter === 'all' || m.user_id === userFilter;
+      const matchesTeam = selectedTeamId === 'all' || m.team_id === selectedTeamId;
       
-      return matchesSearch && matchesStatus && matchesUser;
+      return matchesSearch && matchesStatus && matchesUser && matchesTeam;
     });
-  }, [meetings, search, statusFilter, userFilter]);
+  }, [meetings, search, statusFilter, userFilter, selectedTeamId]);
 
   return (
     <MainLayout>
@@ -229,9 +230,9 @@ export function MeetingsPage() {
           </div>
         )}
 
-        {!isLoading && viewMode === 'team' && teams.length > 0 && (
+        {!isLoading && teams.length > 1 && (
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs font-semibold text-[#666666] mr-1">Time:</span>
+            <span className="text-xs font-semibold text-[#666666] mr-1">Filtrar por time:</span>
             <button
               onClick={() => setSelectedTeamId('all')}
               className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition ${
