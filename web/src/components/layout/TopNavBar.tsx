@@ -3,6 +3,7 @@ import { Globe } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { clsx } from 'clsx'
 import { useAuth, useSubscription } from '@/contexts'
+import { NotificationBell } from './NotificationBell'
 
 const languages = [
   { code: 'pt-BR', label: 'Português', flag: '🇧🇷' },
@@ -60,6 +61,10 @@ export function TopNavBar() {
             </span>
           ) : null
         })()}
+        
+        {/* Notification Bell */}
+        <NotificationBell />
+        
         {/* Language Selector */}
         <div className="relative" ref={langMenuRef}>
           <button

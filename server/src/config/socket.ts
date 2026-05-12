@@ -17,6 +17,12 @@ export function setupSocketIO(httpServer: HTTPServer): SocketIOServer {
   io.on('connection', (socket) => {
     console.log(`[Socket.io] Client connected: ${socket.id}`)
 
+    // Join user room (para notificações individuais)
+    socket.on('join-user-room', (userId: string) => {
+      socket.join(`user:${userId}`)
+      console.log(`[Socket.io] Client ${socket.id} joined user room: ${userId}`)
+    })
+
     // Join meeting room
     socket.on('join-meeting', (meetingId: string) => {
       socket.join(`meeting:${meetingId}`)
@@ -49,4 +55,10 @@ export function getIO(): SocketIOServer {
 // Helper function to emit to a specific meeting room
 export function emitToMeeting(io: SocketIOServer, meetingId: string, event: string, data: any) {
   io.to(`meeting:${meetingId}`).emit(event, data)
+}
+
+// Helper function to emit to a specific user
+export function emitToUser(io: SocketIOServer, userId: string, event: string, data: any) {
+  io.to(`user:${userId}`).emit(event, data)
+  console.log(`[Socket.io] Emitted ${event} to user:${userId}`)
 }

@@ -15,6 +15,7 @@ import { insightsService } from '../services/InsightsService.js'
 import { fireWebhookForMeeting } from './integrations.routes.js'
 import { gdriveService } from '../services/GDriveService.js'
 import { resolveMeetingTeamId } from '../utils/teamAccess.js'
+import { notificationService } from '../services/NotificationService.js'
 
 const router: RouterType = Router()
 
@@ -146,6 +147,10 @@ async function handleComplete(data: BaasCompletePayload & { event_uuid?: string 
   if (!transcript || transcript.length === 0) {
     logger.warn(`[MeetingBaas] Nenhum transcript para meeting ${meetingId}`)
     await supabase.from('meetings').update({ status: 'completed' }).eq('id', meetingId)
+    
+    // Notifica usuário
+    await notificationService.notifyMeetingNoTranscription(meeting.user_id, meetingId, meeting.title)
+    
     return
   }
 
@@ -272,6 +277,10 @@ async function handleBotCompleted(data: Record<string, any>) {
   if (!transcriptionUrl) {
     logger.warn(`[MeetingBaas] bot.completed: sem URL de transcrição para meeting ${meetingId}`)
     await supabase.from('meetings').update({ status: 'completed', ended_at: data.exited_at ?? new Date().toISOString() }).eq('id', meetingId)
+    
+    // Notifica usuário
+    await notificationService.notifyMeetingNoTranscription(meeting.user_id, meetingId, meeting.title)
+    
     return
   }
 
@@ -303,6 +312,10 @@ async function handleBotCompleted(data: Record<string, any>) {
   } catch (err) {
     logger.error(`[MeetingBaas] Erro ao baixar transcrição para meeting ${meetingId}:`, err)
     await supabase.from('meetings').update({ status: 'completed', ended_at: data.exited_at ?? new Date().toISOString() }).eq('id', meetingId)
+    
+    // Notifica usuário
+    await notificationService.notifyMeetingNoTranscription(meeting.user_id, meetingId, meeting.title)
+    
     return
   }
 
