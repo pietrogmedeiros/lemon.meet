@@ -14,8 +14,11 @@ const router: express.Router = Router();
 router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.id;
+    console.log(`[Meetings API] 📋 GET /meetings - userId: ${userId}`);
     const memberIds = await getAccessibleMemberIds(userId);
+    console.log(`[Meetings API] 👥 memberIds: ${memberIds.join(', ')}`);
     const context = await getAccessContext(userId, memberIds);
+    console.log(`[Meetings API] 🔍 Context - isDevUser: ${context.isDevUser}, email: ${context.email}`);
 
     const query = supabase.from('meetings').select('*');
     const { data: meetings, error } = await applyAccessFilters(query, context)
