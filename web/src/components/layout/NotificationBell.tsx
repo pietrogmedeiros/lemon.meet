@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Bell } from 'lucide-react';
-import { io, Socket } from 'socket.io-client';
+import { io } from 'socket.io-client';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface Notification {
@@ -14,11 +14,10 @@ interface Notification {
 }
 
 export function NotificationBell() {
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
-  const [socket, setSocket] = useState<Socket | null>(null);
 
   const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
@@ -28,7 +27,9 @@ export function NotificationBell() {
 
     const fetchNotifications = async () => {
       try {
-        const token = await user.getIdToken();
+        const token = session?.access_token;
+        if (!token) return;
+        
         const response = await fetch(`${apiUrl}/api/notifications?limit=10`, {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -46,7 +47,7 @@ export function NotificationBell() {
     };
 
     fetchNotifications();
-  }, [user, apiUrl]);
+  }, [user, session, apiUrl]);
 
   // Conecta ao Socket.io
   useEffect(() => {
@@ -59,7 +60,7 @@ export function NotificationBell() {
     newSocket.on('connect', () => {
       console.log('Connected to notification socket');
       // Entra na room do usuário
-      newSocket.emit('join-user-room', user.uid);
+      newSocket.emit('join-user-room', user.id);
     });
 
     // Escuta novas notificações
@@ -77,8 +78,6 @@ export function NotificationBell() {
       }
     });
 
-    setSocket(newSocket);
-
     return () => {
       newSocket.disconnect();
     };
@@ -93,7 +92,9 @@ export function NotificationBell() {
 
   const markAsRead = async (notificationId: string) => {
     try {
-      const token = await user?.getIdToken();
+      const token = session?.access_token;
+      if (!token) return;
+      
       await fetch(`${apiUrl}/api/notifications/${notificationId}/read`, {
         method: 'PATCH',
         headers: {
@@ -114,7 +115,9 @@ export function NotificationBell() {
 
   const markAllAsRead = async () => {
     try {
-      const token = await user?.getIdToken();
+      const token = session?.access_token;
+      if (!token) return;
+      
       await fetch(`${apiUrl}/api/notifications/mark-all-read`, {
         method: 'POST',
         headers: {
