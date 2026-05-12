@@ -665,15 +665,6 @@ function buildDealDescription(params: {
     desc += `\n`
   }
 
-  // Follow-ups (sugestões da IA)
-  if (insights.followUpSuggestions?.length) {
-    desc += `\n💬 SUGESTÕES DE FOLLOW-UP\n`
-    const followUps = insights.followUpSuggestions as Array<{ content: string; tone?: string }>
-    followUps.slice(0, 5).forEach((followUp: { content: string; tone?: string }, i: number) => {
-      desc += `\n${i + 1}. ${followUp.content}\n`
-    })
-  }
-
   // Link da reunião
   if (meetLink) {
     desc += `\n🔗 LINK DA REUNIÃO\n${meetLink}\n`
