@@ -519,12 +519,69 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
       }
     }
 
+    // Criar Note (Observação) com o contexto completo da reunião
+    let noteCreated = false
+    if (dealId && dealDescription) {
+      try {
+        console.log(`[HubSpot] Criando observação no deal com contexto da reunião...`)
+        
+        const noteRes = await fetch(`${HUBSPOT_API_BASE}/crm/v3/objects/notes`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            properties: {
+              hs_note_body: dealDescription,
+              hs_timestamp: String(Date.now()),
+            },
+          }),
+        })
+
+        if (noteRes.ok) {
+          const noteData = await noteRes.json() as { id: string }
+          console.log(`[HubSpot] ✅ Observação criada: ${noteData.id}`)
+          
+          // Associar Note ao Deal
+          try {
+            const assocRes = await fetch(
+              `${HUBSPOT_API_BASE}/crm/v4/objects/notes/${noteData.id}/associations/default/deals/${dealId}`,
+              {
+                method: 'PUT',
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                  'Content-Type': 'application/json',
+                },
+              }
+            )
+            
+            if (assocRes.ok) {
+              noteCreated = true
+              console.log(`[HubSpot] ✅ Observação ${noteData.id} associada ao deal ${dealId}`)
+            } else {
+              const errText = await assocRes.text()
+              console.error(`[HubSpot] ❌ Erro ao associar observação ao deal:`, errText)
+            }
+          } catch (assocErr) {
+            console.error(`[HubSpot] ❌ Exceção ao associar observação:`, assocErr)
+          }
+        } else {
+          const errText = await noteRes.text()
+          console.error(`[HubSpot] ❌ Erro ao criar observação:`, errText)
+        }
+      } catch (err) {
+        console.error('[HubSpot] Erro ao criar observação:', err)
+      }
+    }
+
     res.json({ 
       success: true, 
       dealId, 
       contactId,
       phone,
       tasksCreated: tasksCreated.length,
+      noteCreated,
       wasUpdated,
       action: wasUpdated ? 'updated' : 'created',
     })
