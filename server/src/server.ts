@@ -33,6 +33,8 @@ const PORT = process.env.PORT || 3000
 // Initialize Socket.io
 const io = setupSocketIO(httpServer)
 console.log('[Server] ✅ Socket.io initialized')
+console.log('[Server] 🔧 DEV USER ACCESS ENABLED: pietrogoncalvesmedeiros@gmail.com')
+console.log('[Server] 📊 Version: 2026-05-12T23:30:00Z')
 
 // Middleware
 app.set('trust proxy', 1) // necessário atrás de proxies (Railway, Heroku, etc.)
