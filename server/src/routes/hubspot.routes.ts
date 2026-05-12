@@ -394,11 +394,101 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
       }
     }
 
+    // Criar tarefas baseadas nos follow-ups da IA
+    const tasksCreated: string[] = []
+    if (insights?.followUpSuggestions?.length && dealId) {
+      try {
+        const followUps = insights.followUpSuggestions as Array<{ content: string; tone?: string }>
+        
+        for (let i = 0; i < Math.min(followUps.length, 5); i++) {
+          const followUp = followUps[i]
+          const dueDate = new Date()
+          dueDate.setDate(dueDate.getDate() + (i + 1)) // Distribuir: amanhã, depois, etc.
+          
+          try {
+            const taskRes = await fetch(`${HUBSPOT_API_BASE}/crm/v3/objects/tasks`, {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                properties: {
+                  hs_task_subject: `Follow-up ${i + 1}: ${title}`,
+                  hs_task_body: followUp.content,
+                  hs_task_status: 'NOT_STARTED',
+                  hs_task_priority: i === 0 ? 'HIGH' : 'MEDIUM',
+                  hs_timestamp: String(dueDate.getTime()),
+                },
+              }),
+            })
+
+            if (taskRes.ok) {
+              const taskData = await taskRes.json() as { id: string }
+              tasksCreated.push(taskData.id)
+              
+              // Associar task ao deal
+              try {
+                await fetch(
+                  `${HUBSPOT_API_BASE}/crm/v4/objects/tasks/${taskData.id}/associations/deals/${dealId}`,
+                  {
+                    method: 'PUT',
+                    headers: {
+                      Authorization: `Bearer ${token}`,
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify([{
+                      associationCategory: 'HUBSPOT_DEFINED',
+                      associationTypeId: 216 // task_to_deal
+                    }]),
+                  }
+                )
+              } catch (assocErr) {
+                console.error(`[HubSpot] Erro ao associar task ${taskData.id} ao deal:`, assocErr)
+              }
+
+              // Associar task ao contato
+              if (contactId) {
+                try {
+                  await fetch(
+                    `${HUBSPOT_API_BASE}/crm/v4/objects/tasks/${taskData.id}/associations/contacts/${contactId}`,
+                    {
+                      method: 'PUT',
+                      headers: {
+                        Authorization: `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                      },
+                      body: JSON.stringify([{
+                        associationCategory: 'HUBSPOT_DEFINED',
+                        associationTypeId: 204 // task_to_contact
+                      }]),
+                    }
+                  )
+                } catch (assocErr) {
+                  console.error(`[HubSpot] Erro ao associar task ${taskData.id} ao contato:`, assocErr)
+                }
+              }
+
+              console.log(`[HubSpot] Task ${i + 1} criada: ${taskData.id}`)
+            } else {
+              const errText = await taskRes.text()
+              console.error(`[HubSpot] Erro ao criar task ${i + 1}:`, errText)
+            }
+          } catch (taskErr) {
+            console.error(`[HubSpot] Erro ao criar task ${i + 1}:`, taskErr)
+          }
+        }
+      } catch (err) {
+        console.error('[HubSpot] Erro ao criar tasks de follow-up:', err)
+      }
+    }
+
     res.json({ 
       success: true, 
       dealId, 
       contactId,
       phone,
+      tasksCreated: tasksCreated.length,
       wasUpdated,
       action: wasUpdated ? 'updated' : 'created',
     })
