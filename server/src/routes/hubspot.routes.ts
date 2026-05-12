@@ -427,46 +427,24 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
               const taskData = await taskRes.json() as { id: string }
               tasksCreated.push(taskData.id)
               
-              // Associar task ao deal
+              // Associar task ao DEAL (negócio) - principal
               try {
-                await fetch(
-                  `${HUBSPOT_API_BASE}/crm/v4/objects/tasks/${taskData.id}/associations/deals/${dealId}`,
+                const assocRes = await fetch(
+                  `${HUBSPOT_API_BASE}/crm/v3/objects/tasks/${taskData.id}/associations/deal/${dealId}/214`,
                   {
                     method: 'PUT',
-                    headers: {
-                      Authorization: `Bearer ${token}`,
-                      'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify([{
-                      associationCategory: 'HUBSPOT_DEFINED',
-                      associationTypeId: 216 // task_to_deal
-                    }]),
+                    headers: { Authorization: `Bearer ${token}` },
                   }
                 )
+                
+                if (assocRes.ok) {
+                  console.log(`[HubSpot] Task ${taskData.id} associada ao deal ${dealId}`)
+                } else {
+                  const errText = await assocRes.text()
+                  console.error(`[HubSpot] Erro ao associar task ao deal:`, errText)
+                }
               } catch (assocErr) {
                 console.error(`[HubSpot] Erro ao associar task ${taskData.id} ao deal:`, assocErr)
-              }
-
-              // Associar task ao contato
-              if (contactId) {
-                try {
-                  await fetch(
-                    `${HUBSPOT_API_BASE}/crm/v4/objects/tasks/${taskData.id}/associations/contacts/${contactId}`,
-                    {
-                      method: 'PUT',
-                      headers: {
-                        Authorization: `Bearer ${token}`,
-                        'Content-Type': 'application/json',
-                      },
-                      body: JSON.stringify([{
-                        associationCategory: 'HUBSPOT_DEFINED',
-                        associationTypeId: 204 // task_to_contact
-                      }]),
-                    }
-                  )
-                } catch (assocErr) {
-                  console.error(`[HubSpot] Erro ao associar task ${taskData.id} ao contato:`, assocErr)
-                }
               }
 
               console.log(`[HubSpot] Task ${i + 1} criada: ${taskData.id}`)
