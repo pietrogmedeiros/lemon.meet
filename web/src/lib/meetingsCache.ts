@@ -37,7 +37,7 @@ export function invalidateMeetingsCache(): void {
   cache = null
 }
 
-export async function fetchMeetings(limit = 100): Promise<Meeting[]> {
+export async function fetchMeetings(limit = 1000): Promise<Meeting[]> {
   const now = Date.now()
   
   console.log('[MeetingsCache] 🔍 Iniciando fetchMeetings...')

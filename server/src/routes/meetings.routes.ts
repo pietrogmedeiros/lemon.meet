@@ -21,8 +21,20 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
     console.log(`[Meetings API] 🔍 Context - isDevUser: ${context.isDevUser}, email: ${context.email}`);
 
     const query = supabase.from('meetings').select('*');
-    const { data: meetings, error } = await applyAccessFilters(query, context)
+    let queryWithFilters = applyAccessFilters(query, context)
       .order('created_at', { ascending: false });
+    
+    // Dev user: sem limite
+    // Usuários normais: respeita o limite da query string (padrão 100)
+    if (!context.isDevUser) {
+      const limit = parseInt(req.query.limit as string) || 100;
+      queryWithFilters = queryWithFilters.limit(limit);
+      console.log(`[Meetings API] 📊 Aplicando limite: ${limit}`);
+    } else {
+      console.log('[Meetings API] 🔧 DEV USER: SEM LIMITE de reuniões');
+    }
+    
+    const { data: meetings, error } = await queryWithFilters;
 
     if (error) {
       logger.error('Error fetching meetings:', error);
