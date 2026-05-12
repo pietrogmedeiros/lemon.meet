@@ -178,15 +178,25 @@ export class CalendarCronService {
       const windowStart = new Date(Date.now() - 30 * 60 * 1000).toISOString()
       const { data: sameLink } = await supabase
         .from('meetings')
-        .select('id, user_id')
+        .select('id, user_id, team_id')
         .eq('meet_link', meetingUrl)
         .in('status', ['requesting', 'recording', 'processing'])
         .gte('created_at', windowStart)
         .limit(1)
 
       if (sameLink && sameLink.length > 0) {
-        logger.info(`[CalendarCron] Já existe bot para ${meetingUrl} (meeting ${sameLink[0].id}) — ignorando duplicata de outro usuário`)
-        return
+        // Verifica se o outro usuário é do mesmo time
+        const existingMeeting = sameLink[0]
+        const myTeamId = await resolveMeetingTeamId(userId)
+        
+        if (existingMeeting.team_id && myTeamId && existingMeeting.team_id === myTeamId) {
+          // Mesmo time! A reunião já é acessível para este usuário via team_id
+          logger.info(`[CalendarCron] Já existe bot para ${meetingUrl} (meeting ${existingMeeting.id}) do mesmo time — ignorando duplicata`)
+          return
+        }
+        
+        // Usuários de times diferentes na mesma reunião — permite criar reunião separada
+        logger.info(`[CalendarCron] Já existe bot para ${meetingUrl} mas de time diferente — criando reunião separada`)
       }
     }
 

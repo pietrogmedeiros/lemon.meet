@@ -6,6 +6,7 @@ import { supabase } from '../config/supabase.js';
 import { logger } from '../utils/logger.js';
 import { randomUUID as uuidv4 } from 'crypto';
 import { getAccessibleMemberIds } from '../utils/teamAccess.js';
+import { getMeetingsAccessQuery } from '../utils/meetingAccess.js';
 
 const router: express.Router = Router();
 
@@ -15,10 +16,9 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
     const userId = req.user!.id;
     const memberIds = await getAccessibleMemberIds(userId);
 
-    const { data: meetings, error } = await supabase
-      .from('meetings')
-      .select('*, team_id')  // Garantir que team_id está incluído
-      .in('user_id', memberIds)
+    const query = await getMeetingsAccessQuery(userId, memberIds);
+    const { data: meetings, error } = await query
+      .select('*, team_id')
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -202,11 +202,10 @@ router.get('/:id/insights', authMiddleware, async (req: AuthRequest, res: Respon
     const memberIds = await getAccessibleMemberIds(userId);
 
     // Verifica se a reunião existe e o usuário tem acesso (próprio ou admin do time)
-    const { data: meeting, error } = await supabase
-      .from('meetings')
+    const query = await getMeetingsAccessQuery(userId, memberIds);
+    const { data: meeting, error } = await query
       .select('*')
       .eq('id', id)
-      .in('user_id', memberIds)
       .single();
 
     if (error || !meeting) {
@@ -277,11 +276,10 @@ router.get('/:id/transcript', authMiddleware, async (req: AuthRequest, res: Resp
     const memberIds = await getAccessibleMemberIds(userId);
 
     // Verifica se a reunião existe e o usuário tem acesso (próprio ou admin do time)
-    const { data: meeting, error } = await supabase
-      .from('meetings')
+    const query = await getMeetingsAccessQuery(userId, memberIds);
+    const { data: meeting, error } = await query
       .select('transcript, status')
       .eq('id', id)
-      .in('user_id', memberIds)
       .single();
 
     if (error || !meeting) {
@@ -331,11 +329,10 @@ router.post('/:id/regenerate-fup', authMiddleware, async (req: AuthRequest, res:
     }
 
     // Busca a reunião
-    const { data: meeting, error: meetingError } = await supabase
-      .from('meetings')
+    const query = await getMeetingsAccessQuery(userId, memberIds);
+    const { data: meeting, error: meetingError } = await query
       .select('transcript, insights')
       .eq('id', id)
-      .in('user_id', memberIds)
       .single();
 
     if (meetingError || !meeting) {
@@ -403,11 +400,10 @@ router.get('/:id/fup-versions', authMiddleware, async (req: AuthRequest, res: Re
     const memberIds = await getAccessibleMemberIds(userId);
 
     // Verifica acesso à reunião
-    const { data: meeting, error: meetingError } = await supabase
-      .from('meetings')
+    const query = await getMeetingsAccessQuery(userId, memberIds);
+    const { data: meeting, error: meetingError } = await query
       .select('id')
       .eq('id', id)
-      .in('user_id', memberIds)
       .single();
 
     if (meetingError || !meeting) {
