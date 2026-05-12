@@ -230,12 +230,7 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
       closedate: String(closeDateMs),
       pipeline: 'default',
       dealstage: 'appointmentscheduled',
-    }
-
-    if (insights) {
-      if (typeof insights.commercialQuality === 'number') {
-        dealProperties['description'] = buildDealDescription({ title, date, duration, insights, meetLink: meeting.meet_link })
-      }
+      description: buildDealDescription({ title, date, duration, insights, meetLink: meeting.meet_link }),
     }
 
     // Obter emails dos participantes da reunião
