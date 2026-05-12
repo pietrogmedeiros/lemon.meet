@@ -225,12 +225,15 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
     const closeDateMs = closeDate.getTime()
 
     // Deal properties
+    const dealDescription = buildDealDescription({ title, date, duration, insights, meetLink: meeting.meet_link })
+    console.log(`[HubSpot] 📝 Descrição construída (${dealDescription.length} caracteres):`, dealDescription.substring(0, 200) + '...')
+    
     const dealProperties: Record<string, string> = {
       dealname: title,
       closedate: String(closeDateMs),
       pipeline: 'default',
       dealstage: 'appointmentscheduled',
-      description: buildDealDescription({ title, date, duration, insights, meetLink: meeting.meet_link }),
+      description: dealDescription,
     }
 
     // Obter emails dos participantes da reunião
