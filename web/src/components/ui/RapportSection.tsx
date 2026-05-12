@@ -241,14 +241,22 @@ export function RapportSection({ meetingId, initialRapport, apiUrl, getAuthHeade
   return (
     <Card className="p-5 border-l-4 border-l-[#2D5A27] bg-white">
       {/* Cabeçalho */}
-      <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
-        <h2 className="text-headline-2 text-primary flex items-center gap-2">
-          <Sparkles className="h-5 w-5 text-[#2D5A27]" />
-          Enriquecer Rapport
-          <span className="ml-1 text-xs bg-[#2D5A27]/10 text-[#2D5A27] px-2 py-0.5 rounded-full font-medium">
-            Pré-reunião
-          </span>
-        </h2>
+      <div className="flex items-center justify-between flex-wrap gap-3 mb-2">
+        <div className="flex flex-col gap-1.5">
+          <h2 className="text-headline-2 text-primary flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-[#2D5A27]" />
+            Enriquecer Rapport
+            <span className="ml-1 text-xs bg-[#2D5A27]/10 text-[#2D5A27] px-2 py-0.5 rounded-full font-medium">
+              Pré-reunião
+            </span>
+            <span className="ml-1 text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium border border-amber-200">
+              Beta
+            </span>
+          </h2>
+          <p className="text-xs text-gray-500 italic">
+            Se você está vendo essa funcionalidade, você é especial para nós.
+          </p>
+        </div>
 
         {rapport?.rapport_data && !showForm && (
           <button
