@@ -20,6 +20,7 @@ import hubspotRouter from './routes/hubspot.routes.js'
 import gdriveRouter from './routes/gdrive.routes.js'
 import notificationsRouter from './routes/notifications.routes.js'
 import { calendarCronService } from './services/CalendarCronService.js'
+import { setupSocketIO } from './config/socket.js'
 
 // Load environment variables
 dotenv.config()
@@ -28,6 +29,10 @@ dotenv.config()
 const app: Express = express()
 const httpServer = createServer(app)
 const PORT = process.env.PORT || 3000
+
+// Initialize Socket.io
+const io = setupSocketIO(httpServer)
+console.log('[Server] ✅ Socket.io initialized')
 
 // Middleware
 app.set('trust proxy', 1) // necessário atrás de proxies (Railway, Heroku, etc.)

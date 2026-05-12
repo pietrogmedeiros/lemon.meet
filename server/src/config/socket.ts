@@ -5,14 +5,23 @@ import { Server as SocketIOServer } from 'socket.io'
 let ioInstance: SocketIOServer | null = null;
 
 export function setupSocketIO(httpServer: HTTPServer): SocketIOServer {
+  const allowedOrigins = [
+    process.env.FRONTEND_URL || 'http://localhost:5173',
+    'http://localhost:5173',
+    'https://lemon-meet.web.app',
+    'https://lemon-meet.firebaseapp.com',
+  ]
+  
   const io = new SocketIOServer(httpServer, {
     cors: {
-      origin: process.env.SOCKET_IO_CORS_ORIGIN || 'http://localhost:5173',
+      origin: allowedOrigins,
       methods: ['GET', 'POST'],
       credentials: true,
     },
     transports: ['websocket', 'polling'],
   })
+  
+  console.log('[Socket.io] CORS configured for:', allowedOrigins.join(', '))
 
   io.on('connection', (socket) => {
     console.log(`[Socket.io] Client connected: ${socket.id}`)
