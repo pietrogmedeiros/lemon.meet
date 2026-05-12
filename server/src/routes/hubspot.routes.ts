@@ -23,11 +23,6 @@ const SCOPES = [
   'crm.objects.deals.write',
   'crm.objects.contacts.read',
   'crm.objects.contacts.write',
-  'crm.objects.notes.read',
-  'crm.objects.notes.write',
-  'crm.objects.tasks.read',
-  'crm.objects.tasks.write',
-  'oauth',
 ].join(' ')
 
 // ── Helper: get a valid access token, refreshing if expired ────────────────
@@ -369,155 +364,48 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
       }
     }
 
-    // 2. Create Note (best-effort — requires crm.objects.notes.write)
-    let noteId: string | undefined
-    try {
-      const noteBody = buildNoteBody({ title, date, duration, insights, meetLink: meeting.meet_link })
-      const noteRes = await fetch(`${HUBSPOT_API_BASE}/crm/v3/objects/notes`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          properties: {
-            hs_note_body: noteBody,
-            hs_timestamp: String(Date.now()),
-          },
-        }),
-      })
-
-      if (noteRes.ok) {
-        const noteData = await noteRes.json() as { id: string }
-        noteId = noteData.id
-
-        // Associate note with deal
-        await fetch(
-          `${HUBSPOT_API_BASE}/crm/v3/objects/notes/${noteId}/associations/deals/${dealId}/note_to_deal`,
+    // Buscar telefone automaticamente do contato (se ainda não tiver)
+    let phone: string | null = null
+    if (contactId && participantEmails.length > 0) {
+      try {
+        const contactDetailsRes = await fetch(
+          `${HUBSPOT_API_BASE}/crm/v3/objects/contacts/${contactId}?properties=phone,mobilephone`,
           {
-            method: 'PUT',
             headers: { Authorization: `Bearer ${token}` },
           }
         )
-      }
-    } catch {
-      // Non-critical — note creation is best-effort
-    }
 
-    // 3. Create Tasks for Follow-ups (best-effort)
-    const taskIds: string[] = []
-    if (insights?.followUpSuggestions?.length) {
-      try {
-        // Buscar o owner do deal ou contato para atribuir as tasks
-        let ownerId: string | undefined
-        
-        // Tentar buscar owner do deal
-        if (dealId) {
-          try {
-            const dealDetailsRes = await fetch(
-              `${HUBSPOT_API_BASE}/crm/v3/objects/deals/${dealId}?properties=hubspot_owner_id`,
-              {
-                headers: { Authorization: `Bearer ${token}` },
-              }
-            )
-            if (dealDetailsRes.ok) {
-              const dealDetails = await dealDetailsRes.json() as { properties: { hubspot_owner_id?: string } }
-              ownerId = dealDetails.properties.hubspot_owner_id
-            }
-          } catch (err) {
-            console.error('[HubSpot] Error fetching deal owner:', err)
-          }
-        }
-        
-        // Se não encontrou owner no deal, tentar buscar do contato
-        if (!ownerId && contactId) {
-          try {
-            const contactDetailsRes = await fetch(
-              `${HUBSPOT_API_BASE}/crm/v3/objects/contacts/${contactId}?properties=hubspot_owner_id`,
-              {
-                headers: { Authorization: `Bearer ${token}` },
-              }
-            )
-            if (contactDetailsRes.ok) {
-              const contactDetails = await contactDetailsRes.json() as { properties: { hubspot_owner_id?: string } }
-              ownerId = contactDetails.properties.hubspot_owner_id
-            }
-          } catch (err) {
-            console.error('[HubSpot] Error fetching contact owner:', err)
-          }
-        }
-        
-        const followUps = insights.followUpSuggestions as Array<{ content: string; tone: string }>
-        
-        for (let i = 0; i < Math.min(followUps.length, 5); i++) {
-          const followUp = followUps[i]
-          const dueDate = new Date()
-          dueDate.setDate(dueDate.getDate() + (i + 1)) // Distribuir nos próximos dias
-          
-          const taskProperties: Record<string, string> = {
-            hs_task_subject: `Follow-up ${i + 1}: ${title}`,
-            hs_task_body: followUp.content, // Corpo/descrição da task
-            hs_task_notes: followUp.content, // Observações da task (campo adicional)
-            hs_task_status: 'NOT_STARTED',
-            hs_task_priority: i === 0 ? 'HIGH' : 'MEDIUM',
-            hs_timestamp: String(dueDate.getTime()),
+        if (contactDetailsRes.ok) {
+          const contactDetails = await contactDetailsRes.json() as { 
+            properties: { phone?: string; mobilephone?: string } 
           }
           
-          // Atribuir owner se encontrado
-          if (ownerId) {
-            taskProperties.hubspot_owner_id = ownerId
-          }
-          
-          const taskRes = await fetch(`${HUBSPOT_API_BASE}/crm/v3/objects/tasks`, {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              properties: taskProperties,
-            }),
-          })
-
-          if (taskRes.ok) {
-            const taskData = await taskRes.json() as { id: string }
-            taskIds.push(taskData.id)
+          // Prioriza celular, depois telefone fixo
+          const rawPhone = contactDetails.properties.mobilephone || contactDetails.properties.phone
+          if (rawPhone) {
+            phone = rawPhone.replace(/\D/g, '') // Remove caracteres não numéricos
             
-            // Associate task with deal
-            await fetch(
-              `${HUBSPOT_API_BASE}/crm/v3/objects/tasks/${taskData.id}/associations/deals/${dealId}/task_to_deal`,
-              {
-                method: 'PUT',
-                headers: { Authorization: `Bearer ${token}` },
-              }
-            )
+            // Salva telefone na reunião para cache
+            await supabase
+              .from('meetings')
+              .update({ contact_phone: phone })
+              .eq('id', meetingId)
             
-            // Associate task with contact if available
-            if (contactId) {
-              await fetch(
-                `${HUBSPOT_API_BASE}/crm/v3/objects/tasks/${taskData.id}/associations/contacts/${contactId}/task_to_contact`,
-                {
-                  method: 'PUT',
-                  headers: { Authorization: `Bearer ${token}` },
-                }
-              )
-            }
+            console.log(`[HubSpot] Telefone ${phone} sincronizado para reunião ${meetingId}`)
           }
         }
       } catch (err) {
-        console.error('[HubSpot] Error creating follow-up tasks:', err)
-        // Non-critical — task creation is best-effort
+        console.error('[HubSpot] Erro ao buscar telefone do contato:', err)
       }
     }
 
     res.json({ 
       success: true, 
       dealId, 
-      noteId,
       contactId,
+      phone,
       wasUpdated,
       action: wasUpdated ? 'updated' : 'created',
-      tasksCreated: taskIds.length
     })
   } catch (err) {
     console.error('[HubSpot] sync error', err)
@@ -526,80 +414,6 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
 })
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
-
-function buildNoteBody(params: {
-  title: string
-  date: string
-  duration: string
-  insights: any
-  meetLink: string | null
-}): string {
-  const { title, date, duration, insights, meetLink } = params
-  
-  // Usar HTML para melhor formatação no Hubspot
-  let body = `<h2>📋 ${title}</h2>`
-  body += `<p><strong>📅 Data:</strong> ${date} | <strong>⏱️ Duração:</strong> ${duration}</p>`
-
-  if (insights) {
-    // Resumo Executivo
-    if (insights.executiveContext) {
-      body += `<h3>💼 Resumo Executivo</h3>`
-      body += `<p>${insights.executiveContext}</p>`
-    }
-    
-    // Métricas principais
-    if (typeof insights.commercialQuality === 'number' || typeof insights.closingProbability === 'number' || insights.sentiment) {
-      body += `<h3>📊 Métricas</h3><ul>`
-      
-      if (typeof insights.commercialQuality === 'number') {
-        body += `<li><strong>Score Comercial:</strong> ${insights.commercialQuality}/10</li>`
-      }
-      if (typeof insights.closingProbability === 'number') {
-        body += `<li><strong>Probabilidade de Fechamento:</strong> ${insights.closingProbability}%</li>`
-      }
-      const sentimentMap: Record<string, string> = { 
-        positive: '😊 Positivo', 
-        neutral: '😐 Neutro', 
-        negative: '😟 Negativo' 
-      }
-      if (insights.sentiment) {
-        body += `<li><strong>Sentimento:</strong> ${sentimentMap[insights.sentiment] || insights.sentiment}</li>`
-      }
-      body += `</ul>`
-    }
-
-    // Action Items
-    if (insights.actionItems?.length) {
-      body += `<h3>✅ Ações a Seguir</h3><ul>`
-      body += (insights.actionItems as string[]).map((a: string) => `<li>${a}</li>`).join('')
-      body += `</ul>`
-    }
-    
-    // Tópicos-chave
-    if (insights.keyTopics?.length) {
-      body += `<h3>🔑 Tópicos-Chave</h3>`
-      body += `<p>${(insights.keyTopics as string[]).join(', ')}</p>`
-    }
-    
-    // BANT Score
-    if (insights.bantScore) {
-      const b = insights.bantScore
-      body += `<h3>🎯 BANT Score</h3><ul>`
-      body += `<li><strong>Budget:</strong> ${b.budget?.score}/10 — ${b.budget?.evidence || 'N/A'}</li>`
-      body += `<li><strong>Authority:</strong> ${b.authority?.score}/10 — ${b.authority?.evidence || 'N/A'}</li>`
-      body += `<li><strong>Need:</strong> ${b.need?.score}/10 — ${b.need?.evidence || 'N/A'}</li>`
-      body += `<li><strong>Timeline:</strong> ${b.timeline?.score}/10 — ${b.timeline?.evidence || 'N/A'}</li>`
-      body += `</ul>`
-    }
-  }
-
-  // Link da reunião
-  if (meetLink) {
-    body += `<hr><p>🔗 <a href="${meetLink}" target="_blank">Link da Reunião</a></p>`
-  }
-  
-  return body
-}
 
 function buildDealDescription(params: {
   title: string
