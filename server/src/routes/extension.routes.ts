@@ -16,6 +16,7 @@ import { logger } from '../utils/logger.js'
 import { meetingBaasService } from '../services/MeetingBaasService.js'
 import { insightsService } from '../services/InsightsService.js'
 import { rapportService } from '../services/RapportService.js'
+import { meetingChatService } from '../services/MeetingChatService.js'
 import { getAccessibleMemberIds } from '../utils/teamAccess.js'
 
 const router: express.Router = Router()
@@ -1023,6 +1024,93 @@ router.put('/:id/contact-phone', authMiddleware, async (req: AuthRequest, res: R
 
   } catch (err) {
     logger.error('Error in PUT /meetings/:id/contact-phone:', err);
+    return res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
+// ──────────────────────────────────────────────────────────────
+// 🤖 CHAT DE IA
+// ──────────────────────────────────────────────────────────────
+
+// GET /api/meetings/:id/chat - Busca histórico de chat de IA
+router.get('/:id/chat', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user!.id;
+
+    logger.info(`[CHAT] GET /meetings/${id}/chat - userId: ${userId}`);
+
+    const hasAccess = await meetingChatService.verifyMeetingAccess(id, userId);
+    if (!hasAccess) {
+      logger.warn(`[CHAT] Access denied for user ${userId} to meeting ${id}`);
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+
+    const chats = await meetingChatService.getChatHistory(id, userId);
+    const remainingQuestions = await meetingChatService.getRemainingQuestions(id, userId);
+    
+    logger.info(`[CHAT] Returning ${chats.length} messages, ${remainingQuestions} questions remaining`);
+
+    return res.json({ success: true, chats, remainingQuestions });
+  } catch (error) {
+    logger.error('[CHAT] Error in GET /meetings/:id/chat:', error);
+    return res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
+// POST /api/meetings/:id/chat - Envia nova pergunta
+router.post('/:id/chat', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { question } = req.body;
+    const userId = req.user!.id;
+
+    logger.info(`[CHAT] POST /meetings/${id}/chat - userId: ${userId}`);
+
+    if (!question || typeof question !== 'string' || question.trim().length === 0) {
+      return res.status(400).json({ success: false, message: 'Question is required' });
+    }
+
+    if (question.length > 500) {
+      return res.status(400).json({ success: false, message: 'Question too long (max 500 characters)' });
+    }
+
+    const hasAccess = await meetingChatService.verifyMeetingAccess(id, userId);
+    if (!hasAccess) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+
+    const hasReachedLimit = await meetingChatService.checkRateLimit(id, userId);
+    if (hasReachedLimit) {
+      const remainingQuestions = await meetingChatService.getRemainingQuestions(id, userId);
+      return res.status(429).json({
+        success: false,
+        message: 'Rate limit exceeded',
+        remainingQuestions
+      });
+    }
+
+    const transcript = await meetingChatService.getMeetingTranscript(id);
+    if (!transcript || transcript.trim().length === 0) {
+      return res.status(400).json({ success: false, message: 'Meeting has no transcript' });
+    }
+
+    logger.info(`[CHAT] Generating answer for meeting ${id}`);
+    const { answer, tokensUsed } = await meetingChatService.generateAnswer(question, transcript, id);
+
+    const chatMessage = await meetingChatService.saveChatMessage(id, userId, question, answer, tokensUsed);
+    const remainingQuestions = await meetingChatService.getRemainingQuestions(id, userId);
+
+    logger.info(`[CHAT] Answer generated, ${remainingQuestions} questions remaining`);
+
+    return res.json({ success: true, chat: chatMessage, remainingQuestions });
+  } catch (error: any) {
+    logger.error('[CHAT] Error in POST /meetings/:id/chat:', error);
+    
+    if (error.message?.includes('AI') || error.message?.includes('DeepSeek')) {
+      return res.status(502).json({ success: false, message: 'Error generating answer from AI' });
+    }
+
     return res.status(500).json({ success: false, message: 'Internal server error' });
   }
 });
