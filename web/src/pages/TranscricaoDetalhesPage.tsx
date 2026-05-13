@@ -1345,7 +1345,7 @@ export function TranscricaoDetalhesPage() {
       {meeting && meeting.transcript && meeting.transcript.trim().length > 0 && (
         <div className="fixed bottom-8 right-8 z-30">
           {/* Badge "NOVO" */}
-          <div className="absolute -top-2 -right-2 bg-gradient-to-r from-orange-500 to-red-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg animate-pulse">
+          <div className="absolute -top-1 -right-1 bg-[#FFD700] text-[#1a1a1a] text-[10px] font-bold px-2 py-0.5 rounded-full shadow-md uppercase tracking-wide">
             NOVO
           </div>
           
