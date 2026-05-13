@@ -28,6 +28,7 @@ export interface Meeting {
   user_name?: string | null
   user_avatar_url?: string | null
   team_id?: string | null
+  transcript?: string | null
 }
 
 let cache: CacheEntry | null = null
