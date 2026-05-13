@@ -55,14 +55,21 @@ export function MeetingChatPanel({ meetingId, isOpen, onClose, apiUrl, authToken
     setError(null);
     
     try {
-      const res = await fetch(`${apiUrl}/api/meetings/${meetingId}/chat`, {
+      const url = `${apiUrl}/api/meetings/${meetingId}/chat`;
+      console.log('[MeetingChatPanel] Loading chat history from:', url);
+      
+      const res = await fetch(url, {
         headers: {
           Authorization: `Bearer ${authToken}`,
         },
       });
 
+      console.log('[MeetingChatPanel] Response status:', res.status);
+
       if (!res.ok) {
-        throw new Error('Erro ao carregar histórico');
+        const errorData = await res.json().catch(() => ({}));
+        console.error('[MeetingChatPanel] Error response:', errorData);
+        throw new Error(errorData.message || 'Erro ao carregar histórico');
       }
 
       const data = await res.json();
@@ -95,7 +102,11 @@ export function MeetingChatPanel({ meetingId, isOpen, onClose, apiUrl, authToken
     setError(null);
 
     try {
-      const res = await fetch(`${apiUrl}/api/meetings/${meetingId}/chat`, {
+      const url = `${apiUrl}/api/meetings/${meetingId}/chat`;
+      console.log('[MeetingChatPanel] Sending question to:', url);
+      console.log('[MeetingChatPanel] Question:', question.trim());
+      
+      const res = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -104,7 +115,10 @@ export function MeetingChatPanel({ meetingId, isOpen, onClose, apiUrl, authToken
         body: JSON.stringify({ question: question.trim() }),
       });
 
+      console.log('[MeetingChatPanel] Response status:', res.status);
+
       const data = await res.json();
+      console.log('[MeetingChatPanel] Response data:', data);
 
       if (!res.ok) {
         throw new Error(data.message || 'Erro ao enviar pergunta');
