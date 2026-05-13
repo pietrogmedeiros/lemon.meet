@@ -2,6 +2,8 @@ import { lazy, Suspense } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { ThemeProvider, AuthProvider, SubscriptionProvider } from '@/contexts'
 import { ProtectedRoute } from '@/components/auth'
+import { FeedbackSurveyModal } from '@/components/FeedbackSurveyModal'
+import { useFeedbackSurvey } from '@/hooks/useFeedbackSurvey'
 
 // Eager — carregam no bundle inicial (login + dashboard são as primeiras telas)
 import { LoginPage, DashboardPage } from '@/pages'
@@ -24,6 +26,8 @@ const CalendarPage            = lazy(() => import('@/pages/CalendarPage').then(m
 const JoinTeamPage            = lazy(() => import('@/pages/JoinTeamPage').then(m => ({ default: m.JoinTeamPage })))
 
 function App() {
+  const { shouldShow, dismiss } = useFeedbackSurvey();
+
   return (
     <ThemeProvider>
       <AuthProvider>
@@ -158,6 +162,10 @@ function App() {
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
+        
+        {/* Modal de pesquisa de satisfação */}
+        <FeedbackSurveyModal isOpen={shouldShow} onClose={dismiss} />
+        
         </Suspense>
         </SubscriptionProvider>
       </AuthProvider>
