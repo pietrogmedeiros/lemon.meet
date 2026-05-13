@@ -6,6 +6,7 @@ import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { ArrowLeft, Clock, Calendar, Mic, Target, CheckCircle, Mail, BookOpen, Sparkles, X, Copy, Check, Trash2, Lock, Users, RefreshCw, Download, Phone, Edit2, Save, MessageCircle } from 'lucide-react';
 import { RapportSection } from '../components/ui/RapportSection';
+import { MeetingChatPanel } from '../components/MeetingChatPanel';
 import { supabase } from '../lib/supabase';
 import { useSubscription, useAuth } from '../contexts';
 
@@ -527,6 +528,10 @@ export function TranscricaoDetalhesPage() {
   const [phoneInput, setPhoneInput] = useState('');
   const [phoneSaving, setPhoneSaving] = useState(false);
 
+  // Chat AI state
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [authToken, setAuthToken] = useState<string>('');
+
   const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
   const getAuthHeader = useCallback(async () => {
@@ -564,6 +569,17 @@ export function TranscricaoDetalhesPage() {
     };
     load();
   }, [id, navigate, apiUrl, getAuthHeader]);
+
+  // Load auth token for chat
+  useEffect(() => {
+    const loadToken = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.access_token) {
+        setAuthToken(session.access_token);
+      }
+    };
+    loadToken();
+  }, []);
 
   // Load action items once meeting is ready
   useEffect(() => {
@@ -1324,6 +1340,28 @@ export function TranscricaoDetalhesPage() {
           )}
         </Card>
       </div>
+
+      {/* Botão flutuante de chat - só aparece se houver transcrição */}
+      {meeting && meeting.transcript && meeting.transcript.trim().length > 0 && (
+        <button
+          onClick={() => setIsChatOpen(true)}
+          className="fixed bottom-8 right-8 w-14 h-14 bg-[#2D5A27] text-white rounded-full shadow-lg hover:bg-[#234520] transition-all hover:scale-110 flex items-center justify-center z-30"
+          title="Abrir Chat de IA"
+        >
+          <MessageCircle className="w-6 h-6" />
+        </button>
+      )}
+
+      {/* Painel de Chat */}
+      {meeting && id && authToken && (
+        <MeetingChatPanel
+          meetingId={id}
+          isOpen={isChatOpen}
+          onClose={() => setIsChatOpen(false)}
+          apiUrl={apiUrl}
+          authToken={authToken}
+        />
+      )}
     </MainLayout>
   );
 }

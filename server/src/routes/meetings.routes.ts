@@ -487,4 +487,141 @@ router.get('/:id/fup-versions', authMiddleware, async (req: AuthRequest, res: Re
   }
 });
 
+// ── GET /api/meetings/:id/chat ────────────────────────────────
+// Busca histórico de chat de IA da reunião
+router.get('/:id/chat', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user!.id;
+
+    const { meetingChatService } = await import('../services/MeetingChatService.js');
+
+    // Verifica acesso à reunião
+    const hasAccess = await meetingChatService.verifyMeetingAccess(id, userId);
+    if (!hasAccess) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied'
+      });
+    }
+
+    // Busca histórico de chat
+    const chats = await meetingChatService.getChatHistory(id, userId);
+    
+    // Busca perguntas restantes
+    const remainingQuestions = await meetingChatService.getRemainingQuestions(id, userId);
+
+    return res.json({
+      success: true,
+      chats,
+      remainingQuestions
+    });
+
+  } catch (error) {
+    logger.error('Error in GET /meetings/:id/chat:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+});
+
+// ── POST /api/meetings/:id/chat ───────────────────────────────
+// Envia nova pergunta para o chat de IA da reunião
+router.post('/:id/chat', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { question } = req.body;
+    const userId = req.user!.id;
+
+    const { meetingChatService } = await import('../services/MeetingChatService.js');
+
+    // Validações básicas
+    if (!question || typeof question !== 'string' || question.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Question is required'
+      });
+    }
+
+    if (question.length > 500) {
+      return res.status(400).json({
+        success: false,
+        message: 'Question too long (max 500 characters)'
+      });
+    }
+
+    // Verifica acesso à reunião
+    const hasAccess = await meetingChatService.verifyMeetingAccess(id, userId);
+    if (!hasAccess) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied'
+      });
+    }
+
+    // Verifica rate limit
+    const hasReachedLimit = await meetingChatService.checkRateLimit(id, userId);
+    if (hasReachedLimit) {
+      const remainingQuestions = await meetingChatService.getRemainingQuestions(id, userId);
+      return res.status(429).json({
+        success: false,
+        message: 'Rate limit exceeded. Maximum 10 questions per meeting every 24 hours.',
+        remainingQuestions
+      });
+    }
+
+    // Busca transcrição da reunião
+    const transcript = await meetingChatService.getMeetingTranscript(id);
+    if (!transcript || transcript.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Meeting has no transcript available'
+      });
+    }
+
+    // Gera resposta usando IA
+    logger.info(`Generating answer for meeting ${id}, user ${userId}`);
+    const { answer, tokensUsed } = await meetingChatService.generateAnswer(
+      question,
+      transcript,
+      id
+    );
+
+    // Salva no banco
+    const chatMessage = await meetingChatService.saveChatMessage(
+      id,
+      userId,
+      question,
+      answer,
+      tokensUsed
+    );
+
+    // Busca perguntas restantes atualizadas
+    const remainingQuestions = await meetingChatService.getRemainingQuestions(id, userId);
+
+    return res.json({
+      success: true,
+      chat: chatMessage,
+      remainingQuestions
+    });
+
+  } catch (error: any) {
+    logger.error('Error in POST /meetings/:id/chat:', error);
+    
+    // Erro específico da IA
+    if (error.message?.includes('AI') || error.message?.includes('DeepSeek')) {
+      return res.status(502).json({
+        success: false,
+        message: 'Error generating answer from AI'
+      });
+    }
+
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+});
+
 export default router;
