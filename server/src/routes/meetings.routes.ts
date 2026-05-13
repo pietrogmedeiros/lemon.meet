@@ -11,6 +11,8 @@ import { getAccessContext, applyAccessFilters } from '../utils/meetingAccess.js'
 
 const router: express.Router = Router();
 
+logger.info('[MEETINGS ROUTES] meetingChatService loaded:', !!meetingChatService);
+
 // GET /api/meetings - Lista reuniões do usuário (admins veem todos do time)
 router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
@@ -495,9 +497,12 @@ router.get('/:id/chat', authMiddleware, async (req: AuthRequest, res: Response) 
     const { id } = req.params;
     const userId = req.user!.id;
 
+    logger.info(`[CHAT] GET /meetings/${id}/chat - userId: ${userId}`);
+
     // Verifica acesso à reunião
     const hasAccess = await meetingChatService.verifyMeetingAccess(id, userId);
     if (!hasAccess) {
+      logger.warn(`[CHAT] Access denied for user ${userId} to meeting ${id}`);
       return res.status(403).json({
         success: false,
         message: 'Access denied'
@@ -506,9 +511,11 @@ router.get('/:id/chat', authMiddleware, async (req: AuthRequest, res: Response) 
 
     // Busca histórico de chat
     const chats = await meetingChatService.getChatHistory(id, userId);
+    logger.info(`[CHAT] Found ${chats.length} chat messages for meeting ${id}`);
     
     // Busca perguntas restantes
     const remainingQuestions = await meetingChatService.getRemainingQuestions(id, userId);
+    logger.info(`[CHAT] User ${userId} has ${remainingQuestions} questions remaining for meeting ${id}`);
 
     return res.json({
       success: true,
@@ -532,6 +539,8 @@ router.post('/:id/chat', authMiddleware, async (req: AuthRequest, res: Response)
     const { id } = req.params;
     const { question } = req.body;
     const userId = req.user!.id;
+
+    logger.info(`[CHAT] POST /meetings/${id}/chat - userId: ${userId}, question: ${question?.substring(0, 50)}...`);
 
     // Validações básicas
     if (!question || typeof question !== 'string' || question.trim().length === 0) {
