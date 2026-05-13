@@ -5,6 +5,7 @@
 import OpenAI from 'openai';
 import { logger } from '../utils/logger.js';
 import { supabase } from '../config/supabase.js';
+import { getAccessibleMemberIds } from '../utils/teamAccess.js';
 
 // DeepSeek usa a mesma interface do OpenAI SDK
 const deepseek = new OpenAI({
@@ -270,10 +271,19 @@ Responda de forma clara e objetiva com base na transcrição acima:`;
         .single();
 
       if (error || !data) {
+        logger.warn(`Meeting not found: ${meetingId}`);
         return false;
       }
 
-      return data.user_id === userId;
+      // Busca IDs de membros acessíveis (inclui membros do time)
+      const accessibleMemberIds = await getAccessibleMemberIds(userId);
+      
+      // Verifica se o dono da reunião está na lista de membros acessíveis
+      const hasAccess = accessibleMemberIds.includes(data.user_id);
+      
+      logger.info(`Access check for meeting ${meetingId}: user ${userId} -> owner ${data.user_id} -> hasAccess: ${hasAccess}`);
+      
+      return hasAccess;
 
     } catch (error) {
       logger.error('Error verifying meeting access:', error);
