@@ -1343,13 +1343,31 @@ export function TranscricaoDetalhesPage() {
 
       {/* Botão flutuante de chat - só aparece se houver transcrição */}
       {meeting && meeting.transcript && meeting.transcript.trim().length > 0 && (
-        <button
-          onClick={() => setIsChatOpen(true)}
-          className="fixed bottom-8 right-8 w-14 h-14 bg-[#2D5A27] text-white rounded-full shadow-lg hover:bg-[#234520] transition-all hover:scale-110 flex items-center justify-center z-30"
-          title="Abrir Chat de IA"
-        >
-          <MessageCircle className="w-6 h-6" />
-        </button>
+        <div className="fixed bottom-8 right-8 z-30">
+          {/* Badge "NOVO" */}
+          <div className="absolute -top-2 -right-2 bg-gradient-to-r from-orange-500 to-red-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg animate-pulse">
+            NOVO
+          </div>
+          
+          {/* Tooltip informativo */}
+          <div className="absolute bottom-full right-0 mb-3 w-56 bg-[#2D5A27] text-white text-xs px-4 py-3 rounded-xl shadow-xl opacity-0 hover:opacity-100 transition-opacity pointer-events-none">
+            <div className="font-semibold mb-1">💡 Nova Feature: Chat de IA</div>
+            <div className="text-[10px] leading-relaxed opacity-90">
+              Faça perguntas sobre esta reunião e receba insights instantâneos!
+            </div>
+            <div className="absolute top-full right-6 -mt-1">
+              <div className="w-2 h-2 bg-[#2D5A27] transform rotate-45"></div>
+            </div>
+          </div>
+          
+          <button
+            onClick={() => setIsChatOpen(true)}
+            className="w-14 h-14 bg-[#2D5A27] text-white rounded-full shadow-lg hover:bg-[#234520] transition-all hover:scale-110 flex items-center justify-center"
+            title="Abrir Chat de IA"
+          >
+            <MessageCircle className="w-6 h-6" />
+          </button>
+        </div>
       )}
 
       {/* Painel de Chat */}
