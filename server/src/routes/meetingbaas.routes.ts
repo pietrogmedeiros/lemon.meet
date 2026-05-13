@@ -487,7 +487,6 @@ async function handleCalendarSyncEvents(data: Record<string, any>) {
             event_id: eventId,
             series_id: instance.series_id,
             bot_name: 'Lemon Notetaker',
-            bot_image: 'https://lemon-meet.web.app/limonudo.png',
             recording_mode: 'audio_only',
             transcription_enabled: true,
             transcription_config: { provider: 'gladia' },
