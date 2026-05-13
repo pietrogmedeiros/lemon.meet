@@ -2,6 +2,7 @@ import { Router, type Response } from 'express';
 import type express from 'express';
 import { authMiddleware, AuthRequest } from '../middleware/auth.middleware.js';
 import { meetBotService } from '../services/MeetBotService.js';
+import { meetingChatService } from '../services/MeetingChatService.js';
 import { supabase } from '../config/supabase.js';
 import { logger } from '../utils/logger.js';
 import { randomUUID as uuidv4 } from 'crypto';
@@ -494,8 +495,6 @@ router.get('/:id/chat', authMiddleware, async (req: AuthRequest, res: Response) 
     const { id } = req.params;
     const userId = req.user!.id;
 
-    const { meetingChatService } = await import('../services/MeetingChatService.js');
-
     // Verifica acesso à reunião
     const hasAccess = await meetingChatService.verifyMeetingAccess(id, userId);
     if (!hasAccess) {
@@ -533,8 +532,6 @@ router.post('/:id/chat', authMiddleware, async (req: AuthRequest, res: Response)
     const { id } = req.params;
     const { question } = req.body;
     const userId = req.user!.id;
-
-    const { meetingChatService } = await import('../services/MeetingChatService.js');
 
     // Validações básicas
     if (!question || typeof question !== 'string' || question.trim().length === 0) {
