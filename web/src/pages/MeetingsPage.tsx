@@ -29,9 +29,23 @@ export function MeetingsPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [userFilter, setUserFilter] = useState<string>('all');
-  const [viewMode, setViewMode] = useState<'mine' | 'team'>('mine');
+  const [viewMode, setViewMode] = useState<'mine' | 'team'>(() => {
+    return (localStorage.getItem('meetings-view-mode') as 'mine' | 'team') || 'mine';
+  });
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [selectedTeamId, setSelectedTeamId] = useState<string>('all');
+  const [selectedTeamId, setSelectedTeamId] = useState<string>(() => {
+    return localStorage.getItem('meetings-selected-team') || 'all';
+  });
+
+  // Persiste viewMode no localStorage
+  useEffect(() => {
+    localStorage.setItem('meetings-view-mode', viewMode);
+  }, [viewMode]);
+
+  // Persiste selectedTeamId no localStorage
+  useEffect(() => {
+    localStorage.setItem('meetings-selected-team', selectedTeamId);
+  }, [selectedTeamId]);
 
   useEffect(() => {
     const loadSessionAndTeams = async () => {
@@ -230,7 +244,7 @@ export function MeetingsPage() {
           </div>
         )}
 
-        {!isLoading && teams.length > 1 && (
+        {!isLoading && viewMode === 'team' && teams.length > 1 && (
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs font-semibold text-[#666666] mr-1">Filtrar por time:</span>
             <button
