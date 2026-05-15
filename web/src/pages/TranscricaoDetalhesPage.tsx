@@ -512,11 +512,6 @@ export function TranscricaoDetalhesPage() {
   const [briefing, setBriefing] = useState<string | null>(null);
   const [briefingLoading, setBriefingLoading] = useState(false);
 
-  // Pipedrive state
-  const [pipedriveConnected, setPipedriveConnected] = useState(false);
-  const [pipedriveSyncing, setPipedriveSyncing] = useState(false);
-  const [pipedriveSynced, setPipedriveSynced] = useState(false);
-
   // HubSpot state
   const [hubspotConnected, setHubspotConnected] = useState(false);
   const [hubspotSyncing, setHubspotSyncing] = useState(false);
@@ -682,21 +677,6 @@ export function TranscricaoDetalhesPage() {
     loadPhone();
   }, [id, meeting, apiUrl, getAuthHeader]);
 
-  // Check if Pipedrive is connected
-  useEffect(() => {
-    const check = async () => {
-      try {
-        const headers = await getAuthHeader();
-        const res = await fetch(`${apiUrl}/api/pipedrive/status`, { headers });
-        if (res.ok) {
-          const data = await res.json();
-          setPipedriveConnected(data.connected);
-        }
-      } catch {}
-    };
-    check();
-  }, [apiUrl, getAuthHeader]);
-
   // Check if HubSpot is connected
   useEffect(() => {
     const check = async () => {
@@ -711,26 +691,6 @@ export function TranscricaoDetalhesPage() {
     };
     check();
   }, [apiUrl, getAuthHeader]);
-
-  const handleSyncPipedrive = async () => {
-    if (!id || pipedriveSyncing) return;
-    setPipedriveSyncing(true);
-    try {
-      const headers = await getAuthHeader();
-      const res = await fetch(`${apiUrl}/api/pipedrive/sync/${id}`, {
-        method: 'POST',
-        headers,
-      });
-      if (res.ok) {
-        setPipedriveSynced(true);
-        setTimeout(() => setPipedriveSynced(false), 4000);
-      }
-    } catch {
-      // Silent fail
-    } finally {
-      setPipedriveSyncing(false);
-    }
-  };
 
   const handleSyncHubspot = async () => {
     if (!id || hubspotSyncing) return;
@@ -1006,28 +966,6 @@ export function TranscricaoDetalhesPage() {
               </div>
             )}
           </div>
-          {/* Pipedrive sync button */}
-          {pipedriveConnected && meeting.status === 'completed' && meeting.insights && (
-            <button
-              onClick={handleSyncPipedrive}
-              disabled={pipedriveSyncing || pipedriveSynced}
-              className={`flex items-center gap-2 text-[13px] font-medium px-3 py-2 rounded-lg border transition-all mt-1 ${
-                pipedriveSynced
-                  ? 'border-[#2D5A27] text-[#2D5A27] bg-[#2D5A27]/8'
-                  : 'border-[#E0E0E0] text-[#555] hover:border-[#2D5A27] hover:text-[#2D5A27] bg-white'
-              }`}
-              title="Enviar resumo e follow-up para o Pipedrive"
-            >
-              {pipedriveSyncing ? (
-                <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-r-transparent" />
-              ) : pipedriveSynced ? (
-                <CheckCircle className="h-4 w-4" />
-              ) : (
-                <img src="/pipedrivep.png" alt="Pipedrive" className="w-4 h-4 object-contain" />
-              )}
-              {pipedriveSynced ? 'Enviado!' : 'Enviar para Pipedrive'}
-            </button>
-          )}
           {/* HubSpot sync button */}
           {hubspotConnected && meeting.status === 'completed' && meeting.insights && (
             <button
