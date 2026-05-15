@@ -588,10 +588,15 @@ router.post('/:id/chat', authMiddleware, async (req: AuthRequest, res: Response)
 
     // Busca segmentos estruturados com timestamps (se disponível)
     const segments = await meetingChatService.getMeetingSegments(id);
-    logger.info(`Found ${segments.length} segments for meeting ${id}`);
+    
+    if (segments.length > 0) {
+      logger.info(`[MeetingChat] ✅ Usando ${segments.length} segmentos com timestamps para meeting ${id}`);
+    } else {
+      logger.warn(`[MeetingChat] ⚠️  Nenhum segmento encontrado, usando transcrição completa sem timestamps para meeting ${id}`);
+    }
 
     // Gera resposta usando IA (com timestamps se tiver segmentos)
-    logger.info(`Generating answer for meeting ${id}, user ${userId}`);
+    logger.info(`[MeetingChat] 🤖 Gerando resposta para meeting ${id}, user ${userId}`);
     const { answer, tokensUsed } = await meetingChatService.generateAnswer(
       question,
       transcript,

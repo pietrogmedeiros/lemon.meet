@@ -168,38 +168,51 @@ export class MeetingChatService {
       if (segments && segments.length > 0) {
         contextTranscript = this.formatSegmentsWithTimestamps(segments);
         hasTimestamps = true;
-        logger.info(`Using ${segments.length} segments with timestamps`);
+        logger.info(`[MeetingChat] ✅ Usando ${segments.length} segmentos COM TIMESTAMPS`);
+        logger.info(`[MeetingChat] 📝 Exemplo do contexto: ${contextTranscript.substring(0, 200)}...`);
       } else {
         contextTranscript = this.compressTranscript(transcript);
+        logger.warn(`[MeetingChat] ⚠️  SEM segmentos - usando transcrição completa SEM timestamps`);
       }
 
       const systemPrompt = `Você é um assistente de IA especializado em analisar reuniões de vendas e negócios.
 
 Sua função é responder perguntas sobre uma reunião específica com base EXCLUSIVAMENTE na transcrição fornecida.
 
-FORMATO DE RESPOSTA OBRIGATÓRIO:
-1. **Organize SEMPRE em tópicos usando bullet points (•)** quando houver múltiplas informações
-2. **Seja direto e assertivo** - vá direto ao ponto sem rodeios
-3. **Cite dados específicos**: nomes, valores, datas, números, percentuais mencionados na reunião
-4. **Use negrito** para destacar informações-chave (nomes, valores, datas, decisões)
-5. **Extraia evidências concretas** da transcrição - não generalize
-${hasTimestamps ? '6. **SEMPRE INCLUA TIMESTAMPS** quando citar trechos específicos - formato: **MM:SS**' : ''}
+${hasTimestamps ? `ATENÇÃO: A transcrição contém timestamps [MM:SS] no início de cada fala. Você DEVE incluir esses timestamps nas suas respostas.
+
+FORMATO OBRIGATÓRIO COM TIMESTAMPS:
+Cada bullet point DEVE começar com o timestamp em negrito seguido de hífen:
+
+• **10:23** - Descrição do que foi dito nesse momento
+• **15:45** - Outra informação com dados específicos
+
+EXEMPLO DE RESPOSTA CORRETA:
+Pergunta: "Quando falaram sobre preço?"
+Resposta:
+**O preço foi discutido em 2 momentos:**
+
+• **10:23** - Cliente perguntou sobre valores, mencionou orçamento de R$ 50 mil
+• **25:17** - Vendedor apresentou proposta de R$ 15.000/mês com desconto de 10%
+
+FORMATO INCORRETO (NÃO FAÇA ASSIM):
+• Mencionou R$ 15.000/mês - 10:23 ❌
+• Cliente perguntou sobre valores 10:23 ❌
+• 10:23 Cliente perguntou ❌
+
+FORMATO CORRETO (FAÇA ASSIM):
+• **10:23** - Cliente perguntou sobre valores ✅
+` : `FORMATO DE RESPOSTA:
+Organize em tópicos com bullet points quando houver múltiplas informações.
+`}
 
 REGRAS IMPORTANTES:
 • Responda APENAS com base na transcrição fornecida
 • Se a informação não estiver na transcrição, diga: "❌ Essa informação não foi mencionada nesta reunião"
-• NÃO use frases genéricas como "o cliente demonstrou interesse" - cite O QUE foi dito
-• NÃO faça suposições - apenas fatos explícitos da transcrição
+• Seja específico com dados: nomes, valores, datas, números exatos
+• Use negrito para destacar informações-chave
 • Máximo 5-6 tópicos por resposta
-• Seja específico: em vez de "falaram sobre preço", diga "mencionaram R$ 15.000/mês"
-• Use emojis ocasionalmente para destacar pontos importantes (✅ ⚠️ 💰 📅 👤 🕐)
-${hasTimestamps ? '• Quando mencionar trechos da reunião, SEMPRE inclua o timestamp no formato: **10:23** ou **1:45**' : ''}
-
-ESTRUTURA DE RESPOSTA IDEAL${hasTimestamps ? ' (COM TIMESTAMPS)' : ''}:
-**[Resposta direta em 1 frase]**
-
-• **${hasTimestamps ? 'MM:SS' : 'Tópico 1'}** - ${hasTimestamps ? 'Descrição do que foi dito nesse momento' : 'Dado específico'}
-• **${hasTimestamps ? 'MM:SS' : 'Tópico 2'}** - ${hasTimestamps ? 'Descrição do que foi dito nesse momento' : 'Dado específico'}
+• Use emojis ocasionalmente (✅ ⚠️ 💰 📅 👤 🕐)
 
 Seja um analista preciso e orientado a dados.`;
 
@@ -365,6 +378,8 @@ Analise a transcrição e responda de forma estruturada e assertiva${hasTimestam
    */
   async getMeetingSegments(meetingId: string): Promise<TranscriptSegment[]> {
     try {
+      logger.info(`[MeetingChat] Buscando segmentos para meeting ${meetingId}...`);
+      
       const { data, error } = await supabase
         .from('transcript_segments')
         .select('text, start_seconds, end_seconds, speaker, sequence')
@@ -372,14 +387,22 @@ Analise a transcrição e responda de forma estruturada e assertiva${hasTimestam
         .order('sequence', { ascending: true });
 
       if (error) {
-        logger.error('Error fetching transcript segments:', error);
+        logger.error('[MeetingChat] ❌ Erro ao buscar segmentos:', error);
         return [];
       }
 
+      if (!data || data.length === 0) {
+        logger.warn(`[MeetingChat] ⚠️  Nenhum segmento encontrado para meeting ${meetingId}`);
+        return [];
+      }
+
+      logger.info(`[MeetingChat] ✅ ${data.length} segmentos encontrados para meeting ${meetingId}`);
+      logger.info(`[MeetingChat] 📊 Primeiro segmento: [${this.formatTimestamp(data[0].start_seconds)}] ${data[0].speaker}: ${data[0].text.substring(0, 50)}...`);
+      
       return (data as TranscriptSegment[]) ?? [];
 
     } catch (error) {
-      logger.error('Error in getMeetingSegments:', error);
+      logger.error('[MeetingChat] ❌ Exceção ao buscar segmentos:', error);
       return [];
     }
   }
