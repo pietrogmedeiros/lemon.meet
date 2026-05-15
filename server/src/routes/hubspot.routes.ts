@@ -1,6 +1,7 @@
 import { Router, Response, IRouter } from 'express'
 import { authMiddleware, AuthRequest } from '../middleware/auth.middleware.js'
 import { supabase } from '../config/supabase.js'
+import { logger } from '../utils/logger.js'
 
 const router: IRouter = Router()
 
@@ -89,7 +90,7 @@ router.get('/connect', authMiddleware, async (req: AuthRequest, res: Response): 
 
     res.json({ url: `${HUBSPOT_AUTH_URL}?${params}` })
   } catch (err) {
-    console.error('[HubSpot] connect error', err)
+    logger.error('[HubSpot] connect error', err)
     res.status(500).json({ error: 'Internal server error' })
   }
 })
@@ -119,7 +120,8 @@ router.get('/callback', async (req: AuthRequest, res: Response): Promise<void> =
     })
 
     if (!tokenRes.ok) {
-      console.error('[HubSpot] token exchange failed', await tokenRes.text())
+      const errorText = await tokenRes.text()
+      logger.error('[HubSpot] token exchange failed', errorText)
       res.redirect(`${FRONTEND_URL}/integrations/permissions?hubspot=error`)
       return
     }
@@ -145,7 +147,7 @@ router.get('/callback', async (req: AuthRequest, res: Response): Promise<void> =
 
     res.redirect(`${FRONTEND_URL}/integrations/permissions?hubspot=success`)
   } catch (err) {
-    console.error('[HubSpot] callback error', err)
+    logger.error('[HubSpot] callback error', err)
     res.redirect(`${FRONTEND_URL}/integrations/permissions?hubspot=error`)
   }
 })
@@ -166,7 +168,7 @@ router.get('/status', authMiddleware, async (req: AuthRequest, res: Response): P
 
     res.json({ connected: true, connectedAt: data.connected_at, hubId: data.hub_id })
   } catch (err) {
-    console.error('[HubSpot] status error', err)
+    logger.error('[HubSpot] status error', err)
     res.status(500).json({ error: 'Internal server error' })
   }
 })
@@ -181,7 +183,7 @@ router.delete('/disconnect', authMiddleware, async (req: AuthRequest, res: Respo
 
     res.json({ success: true })
   } catch (err) {
-    console.error('[HubSpot] disconnect error', err)
+    logger.error('[HubSpot] disconnect error', err)
     res.status(500).json({ error: 'Internal server error' })
   }
 })
@@ -190,6 +192,8 @@ router.delete('/disconnect', authMiddleware, async (req: AuthRequest, res: Respo
 router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
   const { meetingId } = req.params
   const userId = req.user!.id
+
+  logger.info(`[HubSpot] 🚀 Iniciando sync para meeting ${meetingId}, user ${userId}`)
 
   try {
     const { data: meeting, error: meetingError } = await supabase
@@ -200,15 +204,21 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
       .single()
 
     if (meetingError || !meeting) {
+      logger.error(`[HubSpot] ❌ Meeting ${meetingId} not found for user ${userId}`, meetingError)
       res.status(404).json({ error: 'Meeting not found' })
       return
     }
 
+    logger.info(`[HubSpot] ✅ Meeting found: ${meeting.title || meeting.id}`)
+
     const token = await getValidToken(userId)
     if (!token) {
-      res.status(401).json({ error: 'HubSpot not connected' })
+      logger.error(`[HubSpot] ❌ Token inválido ou HubSpot não conectado para user ${userId}`)
+      res.status(401).json({ error: 'HubSpot not connected or invalid token' })
       return
     }
+
+    logger.info(`[HubSpot] ✅ Token válido obtido para user ${userId}`)
 
     const insights = meeting.insights as any
     const title = meeting.title || `Reunião ${meeting.id.slice(0, 8)}`
@@ -226,7 +236,7 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
 
     // Deal properties
     const dealDescription = buildDealDescription({ title, date, duration, insights, meetLink: meeting.meet_link })
-    console.log(`[HubSpot] 📝 Descrição construída (${dealDescription.length} caracteres):`, dealDescription.substring(0, 200) + '...')
+    logger.info(`[HubSpot] 📝 Descrição construída (${dealDescription.length} caracteres):`, dealDescription.substring(0, 200) + '...')
     
     const dealProperties: Record<string, string> = {
       dealname: title,
@@ -238,7 +248,7 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
 
     // Obter emails dos participantes da reunião
     const participantEmails = (meeting.participant_emails as string[] | null) ?? []
-    console.log(`[HubSpot] Emails dos participantes:`, participantEmails)
+    logger.info(`[HubSpot] 📧 Emails dos participantes (${participantEmails.length}):`, participantEmails)
     
     let dealId: string | undefined
     let contactId: string | undefined
@@ -247,11 +257,11 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
 
     // Se houver emails de participantes, verificar se existem contatos no Hubspot
     if (participantEmails.length > 0) {
-      console.log(`[HubSpot] Buscando contatos para ${participantEmails.length} email(s)...`)
+      logger.info(`[HubSpot] 🔍 Buscando contatos para ${participantEmails.length} email(s)...`)
       
       for (const email of participantEmails) {
         try {
-          console.log(`[HubSpot] Procurando contato com email: ${email}`)
+          logger.info(`[HubSpot] 🔎 Procurando contato com email: ${email}`)
           
           // Buscar contato pelo email (incluindo owner)
           const searchRes = await fetch(
@@ -287,13 +297,13 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
             if (searchData.results.length > 0) {
               contactId = searchData.results[0].id
               contactOwnerId = searchData.results[0].properties.hubspot_owner_id
-              console.log(`[HubSpot] ✅ Contato encontrado: ${contactId}`)
+              logger.info(`[HubSpot] ✅ Contato encontrado: ${contactId}`)
               if (contactOwnerId) {
-                console.log(`[HubSpot] 👤 Proprietário do contato: ${contactOwnerId}`)
+                logger.info(`[HubSpot] 👤 Proprietário do contato: ${contactOwnerId}`)
               }
               
               // Buscar deals associados a este contato
-              console.log(`[HubSpot] Buscando deals do contato ${contactId}...`)
+              logger.info(`[HubSpot] 🔍 Buscando deals do contato ${contactId}...`)
               const dealsRes = await fetch(
                 `${HUBSPOT_API_BASE}/crm/v3/objects/contacts/${contactId}/associations/deals`,
                 {
@@ -303,20 +313,20 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
 
               if (dealsRes.ok) {
                 const dealsData = await dealsRes.json() as { results: Array<{ id: string }> }
-                console.log(`[HubSpot] Contato tem ${dealsData.results.length} deal(s) associado(s)`)
+                logger.info(`[HubSpot] 📊 Contato tem ${dealsData.results.length} deal(s) associado(s)`)
                 
                 if (dealsData.results.length > 0) {
                   // Atualizar o primeiro deal encontrado
                   dealId = dealsData.results[0].id
-                  console.log(`[HubSpot] Atualizando deal existente: ${dealId}`)
+                  logger.info(`[HubSpot] 🔄 Atualizando deal existente: ${dealId}`)
                   
                   // Adicionar proprietário do contato ao deal (se houver)
                   if (contactOwnerId) {
                     dealProperties.hubspot_owner_id = contactOwnerId
-                    console.log(`[HubSpot] ✅ Deal será atualizado com o mesmo proprietário do contato: ${contactOwnerId}`)
+                    logger.info(`[HubSpot] ✅ Deal será atualizado com o mesmo proprietário do contato: ${contactOwnerId}`)
                   }
                   
-                  console.log(`[HubSpot] Enviando properties:`, JSON.stringify(dealProperties, null, 2))
+                  logger.info(`[HubSpot] 📦 Enviando properties:`, JSON.stringify(dealProperties, null, 2))
                   
                   const updateRes = await fetch(
                     `${HUBSPOT_API_BASE}/crm/v3/objects/deals/${dealId}`,
@@ -332,36 +342,36 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
 
                   if (updateRes.ok) {
                     wasUpdated = true
-                    console.log(`[HubSpot] ✅ Deal ${dealId} atualizado com sucesso`)
+                    logger.info(`[HubSpot] ✅ Deal ${dealId} atualizado com sucesso`)
                     break // Encontrou e atualizou, não precisa verificar outros emails
                   } else {
                     const errText = await updateRes.text()
-                    console.error(`[HubSpot] ❌ Erro ao atualizar deal:`, errText)
+                    logger.error(`[HubSpot] ❌ Erro ao atualizar deal:`, errText)
                   }
                 } else {
-                  console.log(`[HubSpot] Contato sem deals, será criado novo deal`)
+                  logger.info(`[HubSpot] 🆕 Contato sem deals, será criado novo deal`)
                 }
               }
               
               // Se encontrou contato mas não tem deal, criar deal e associar
               if (!dealId) {
-                console.log(`[HubSpot] Saindo do loop para criar deal para contato ${contactId}`)
+                logger.info(`[HubSpot] ➡️ Saindo do loop para criar deal para contato ${contactId}`)
                 break // Sai do loop para criar deal e associar ao contato encontrado
               }
             } else {
-              console.log(`[HubSpot] ⚠️  Contato não encontrado para email: ${email}`)
+              logger.warn(`[HubSpot] ⚠️  Contato não encontrado para email: ${email}`)
             }
           } else {
             const errText = await searchRes.text()
-            console.error(`[HubSpot] Erro ao buscar contato ${email}:`, errText)
+            logger.error(`[HubSpot] ❌ Erro ao buscar contato ${email}:`, errText)
           }
         } catch (err) {
-          console.error(`[HubSpot] Exceção ao buscar contato ${email}:`, err)
+          logger.error(`[HubSpot] ❌ Exceção ao buscar contato ${email}:`, err)
           // Continua tentando outros emails
         }
       }
     } else {
-      console.log(`[HubSpot] ⚠️  Nenhum email de participante na reunião`)
+      logger.warn(`[HubSpot] ⚠️  Nenhum email de participante na reunião`)
     }
 
     // Se não encontrou deal existente para atualizar, criar novo
@@ -369,12 +379,12 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
       // Adicionar proprietário do contato ao deal (se houver)
       if (contactOwnerId) {
         dealProperties.hubspot_owner_id = contactOwnerId
-        console.log(`[HubSpot] ✅ Deal será criado com o mesmo proprietário do contato: ${contactOwnerId}`)
+        logger.info(`[HubSpot] ✅ Deal será criado com o mesmo proprietário do contato: ${contactOwnerId}`)
       } else {
-        console.log(`[HubSpot] ⚠️  Contato sem proprietário, deal será criado sem owner específico`)
+        logger.warn(`[HubSpot] ⚠️  Contato sem proprietário, deal será criado sem owner específico`)
       }
       
-      console.log('[HubSpot] Criando novo deal com properties:', JSON.stringify(dealProperties, null, 2))
+      logger.info('[HubSpot] 🆕 Criando novo deal com properties:', JSON.stringify(dealProperties, null, 2))
       
       const dealRes = await fetch(`${HUBSPOT_API_BASE}/crm/v3/objects/deals`, {
         method: 'POST',
@@ -387,29 +397,42 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
 
       if (!dealRes.ok) {
         const err = await dealRes.text()
-        console.error('[HubSpot] Erro ao criar deal:', err)
-        console.error('[HubSpot] Deal properties:', dealProperties)
+        logger.error('[HubSpot] ❌ Erro ao criar deal:', err)
+        logger.error('[HubSpot] ❌ Deal properties:', dealProperties)
         res.status(502).json({ error: 'Failed to create deal in HubSpot', details: err })
         return
       }
 
       const dealData = await dealRes.json() as { id: string }
       dealId = dealData.id
-      console.log(`[HubSpot] Deal criado com sucesso: ${dealId}`)
+      
+      if (!dealId) {
+        logger.error('[HubSpot] ❌ ERRO CRÍTICO: Deal criado mas sem ID retornado!')
+        res.status(502).json({ error: 'Deal created but no ID returned from HubSpot' })
+        return
+      }
+      
+      logger.info(`[HubSpot] ✅ Deal criado com sucesso: ${dealId}`)
       
       // Se encontrou um contato mas não tinha deal, associar o deal criado ao contato
       if (contactId) {
         try {
-          await fetch(
+          const assocRes = await fetch(
             `${HUBSPOT_API_BASE}/crm/v3/objects/deals/${dealId}/associations/contacts/${contactId}/deal_to_contact`,
             {
               method: 'PUT',
               headers: { Authorization: `Bearer ${token}` },
             }
           )
-          console.log(`[HubSpot] Deal ${dealId} associado ao contato ${contactId}`)
+          
+          if (assocRes.ok) {
+            logger.info(`[HubSpot] ✅ Deal ${dealId} associado ao contato ${contactId}`)
+          } else {
+            const errText = await assocRes.text()
+            logger.error('[HubSpot] ❌ Erro ao associar deal ao contato:', errText)
+          }
         } catch (err) {
-          console.error('[HubSpot] Erro ao associar deal ao contato:', err)
+          logger.error('[HubSpot] ❌ Exceção ao associar deal ao contato:', err)
         }
       }
     }
@@ -441,11 +464,11 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
               .update({ contact_phone: phone })
               .eq('id', meetingId)
             
-            console.log(`[HubSpot] Telefone ${phone} sincronizado para reunião ${meetingId}`)
+            logger.info(`[HubSpot] 📞 Telefone ${phone} sincronizado para reunião ${meetingId}`)
           }
         }
       } catch (err) {
-        console.error('[HubSpot] Erro ao buscar telefone do contato:', err)
+        logger.error('[HubSpot] ❌ Erro ao buscar telefone do contato:', err)
       }
     }
 
@@ -496,26 +519,26 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
                 )
                 
                 if (assocRes.ok) {
-                  console.log(`[HubSpot] ✅ Task ${taskData.id} associada ao deal ${dealId}`)
+                  logger.info(`[HubSpot] ✅ Task ${taskData.id} associada ao deal ${dealId}`)
                 } else {
                   const errText = await assocRes.text()
-                  console.error(`[HubSpot] ❌ Erro ao associar task ao deal:`, errText)
+                  logger.error(`[HubSpot] ❌ Erro ao associar task ao deal:`, errText)
                 }
               } catch (assocErr) {
-                console.error(`[HubSpot] ❌ Exceção ao associar task ${taskData.id} ao deal:`, assocErr)
+                logger.error(`[HubSpot] ❌ Exceção ao associar task ${taskData.id} ao deal:`, assocErr)
               }
 
-              console.log(`[HubSpot] Task ${i + 1} criada: ${taskData.id}`)
+              logger.info(`[HubSpot] ✅ Task ${i + 1} criada: ${taskData.id}`)
             } else {
               const errText = await taskRes.text()
-              console.error(`[HubSpot] Erro ao criar task ${i + 1}:`, errText)
+              logger.error(`[HubSpot] ❌ Erro ao criar task ${i + 1}:`, errText)
             }
           } catch (taskErr) {
-            console.error(`[HubSpot] Erro ao criar task ${i + 1}:`, taskErr)
+            logger.error(`[HubSpot] ❌ Erro ao criar task ${i + 1}:`, taskErr)
           }
         }
       } catch (err) {
-        console.error('[HubSpot] Erro ao criar tasks de follow-up:', err)
+        logger.error('[HubSpot] ❌ Erro ao criar tasks de follow-up:', err)
       }
     }
 
@@ -523,7 +546,7 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
     let noteCreated = false
     if (dealId && dealDescription) {
       try {
-        console.log(`[HubSpot] Criando observação no deal com contexto da reunião...`)
+        logger.info(`[HubSpot] 📝 Criando observação no deal com contexto da reunião...`)
         
         const noteRes = await fetch(`${HUBSPOT_API_BASE}/crm/v3/objects/notes`, {
           method: 'POST',
@@ -541,7 +564,7 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
 
         if (noteRes.ok) {
           const noteData = await noteRes.json() as { id: string }
-          console.log(`[HubSpot] ✅ Observação criada: ${noteData.id}`)
+          logger.info(`[HubSpot] ✅ Observação criada: ${noteData.id}`)
           
           // Associar Note ao Deal
           try {
@@ -558,24 +581,58 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
             
             if (assocRes.ok) {
               noteCreated = true
-              console.log(`[HubSpot] ✅ Observação ${noteData.id} associada ao deal ${dealId}`)
+              logger.info(`[HubSpot] ✅ Observação ${noteData.id} associada ao deal ${dealId}`)
             } else {
               const errText = await assocRes.text()
-              console.error(`[HubSpot] ❌ Erro ao associar observação ao deal:`, errText)
+              logger.error(`[HubSpot] ❌ Erro ao associar observação ao deal:`, errText)
             }
           } catch (assocErr) {
-            console.error(`[HubSpot] ❌ Exceção ao associar observação:`, assocErr)
+            logger.error(`[HubSpot] ❌ Exceção ao associar observação:`, assocErr)
           }
         } else {
           const errText = await noteRes.text()
-          console.error(`[HubSpot] ❌ Erro ao criar observação:`, errText)
+          logger.error(`[HubSpot] ❌ Erro ao criar observação:`, errText)
         }
       } catch (err) {
-        console.error('[HubSpot] Erro ao criar observação:', err)
+        logger.error('[HubSpot] ❌ Erro ao criar observação:', err)
       }
     }
 
-    res.json({ 
+    // ✅ VALIDAÇÃO FINAL CRÍTICA: Verificar se o deal realmente existe no HubSpot
+    if (dealId) {
+      try {
+        logger.info(`[HubSpot] 🔍 Validando se deal ${dealId} foi realmente criado no HubSpot...`)
+        
+        const verifyRes = await fetch(
+          `${HUBSPOT_API_BASE}/crm/v3/objects/deals/${dealId}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        )
+        
+        if (!verifyRes.ok) {
+          const errText = await verifyRes.text()
+          logger.error(`[HubSpot] ❌ ERRO CRÍTICO: Deal ${dealId} não foi encontrado no HubSpot após criação/atualização!`, errText)
+          res.status(502).json({ 
+            error: 'Deal was not properly created/updated in HubSpot',
+            dealId,
+            details: errText
+          })
+          return
+        }
+        
+        logger.info(`[HubSpot] ✅ Validação OK: Deal ${dealId} confirmado no HubSpot`)
+      } catch (err) {
+        logger.error(`[HubSpot] ❌ Erro ao validar deal no HubSpot:`, err)
+        res.status(502).json({ 
+          error: 'Failed to verify deal in HubSpot',
+          dealId
+        })
+        return
+      }
+    }
+
+    const result = { 
       success: true, 
       dealId, 
       contactId,
@@ -584,10 +641,14 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
       noteCreated,
       wasUpdated,
       action: wasUpdated ? 'updated' : 'created',
-    })
+    }
+    
+    logger.info(`[HubSpot] 🎉 Sync concluído com sucesso para meeting ${meetingId}:`, JSON.stringify(result, null, 2))
+    
+    res.json(result)
   } catch (err) {
-    console.error('[HubSpot] sync error', err)
-    res.status(500).json({ error: 'Internal server error' })
+    logger.error('[HubSpot] ❌ Erro geral no sync', err)
+    res.status(500).json({ error: 'Internal server error', details: String(err) })
   }
 })
 
