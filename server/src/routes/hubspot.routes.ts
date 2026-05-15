@@ -320,13 +320,15 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
                   dealId = dealsData.results[0].id
                   logger.info(`[HubSpot] 🔄 Atualizando deal existente: ${dealId}`)
                   
-                  // Adicionar proprietário do contato ao deal (se houver)
-                  if (contactOwnerId) {
-                    dealProperties.hubspot_owner_id = contactOwnerId
-                    logger.info(`[HubSpot] ✅ Deal será atualizado com o mesmo proprietário do contato: ${contactOwnerId}`)
+                  // Ao atualizar, NÃO mudar o nome do deal nem o proprietário
+                  // Apenas atualizar descrição, closedate e stage
+                  const updateProperties: Record<string, string> = {
+                    closedate: dealProperties.closedate,
+                    dealstage: dealProperties.dealstage,
+                    description: dealProperties.description,
                   }
                   
-                  logger.info(`[HubSpot] 📦 Enviando properties:`, JSON.stringify(dealProperties, null, 2))
+                  logger.info(`[HubSpot] 📦 Atualizando deal (sem mudar nome/proprietário):`, JSON.stringify(updateProperties, null, 2))
                   
                   const updateRes = await fetch(
                     `${HUBSPOT_API_BASE}/crm/v3/objects/deals/${dealId}`,
@@ -336,7 +338,7 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
                         Authorization: `Bearer ${token}`,
                         'Content-Type': 'application/json',
                       },
-                      body: JSON.stringify({ properties: dealProperties }),
+                      body: JSON.stringify({ properties: updateProperties }),
                     }
                   )
 
@@ -376,15 +378,9 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
 
     // Se não encontrou deal existente para atualizar, criar novo
     if (!dealId) {
-      // Adicionar proprietário do contato ao deal (se houver)
-      if (contactOwnerId) {
-        dealProperties.hubspot_owner_id = contactOwnerId
-        logger.info(`[HubSpot] ✅ Deal será criado com o mesmo proprietário do contato: ${contactOwnerId}`)
-      } else {
-        logger.warn(`[HubSpot] ⚠️  Contato sem proprietário, deal será criado sem owner específico`)
-      }
-      
-      logger.info('[HubSpot] 🆕 Criando novo deal com properties:', JSON.stringify(dealProperties, null, 2))
+      // NÃO copiar proprietário do contato para o deal
+      // O HubSpot atribuirá automaticamente ao usuário que está fazendo a integração
+      logger.info('[HubSpot] 🆕 Criando novo deal (proprietário será definido pelo HubSpot):', JSON.stringify(dealProperties, null, 2))
       
       const dealRes = await fetch(`${HUBSPOT_API_BASE}/crm/v3/objects/deals`, {
         method: 'POST',
