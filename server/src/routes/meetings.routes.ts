@@ -586,12 +586,17 @@ router.post('/:id/chat', authMiddleware, async (req: AuthRequest, res: Response)
       });
     }
 
-    // Gera resposta usando IA
+    // Busca segmentos estruturados com timestamps (se disponível)
+    const segments = await meetingChatService.getMeetingSegments(id);
+    logger.info(`Found ${segments.length} segments for meeting ${id}`);
+
+    // Gera resposta usando IA (com timestamps se tiver segmentos)
     logger.info(`Generating answer for meeting ${id}, user ${userId}`);
     const { answer, tokensUsed } = await meetingChatService.generateAnswer(
       question,
       transcript,
-      id
+      id,
+      segments.length > 0 ? segments : undefined
     );
 
     // Salva no banco

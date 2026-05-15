@@ -28,6 +28,14 @@ export interface ChatMessage {
   created_at: string;
 }
 
+export interface TranscriptSegment {
+  text: string;
+  start_seconds: number;
+  end_seconds: number;
+  speaker: string | null;
+  sequence: number;
+}
+
 export class MeetingChatService {
   /**
    * Verifica se o usuário atingiu o limite de perguntas para a reunião
@@ -115,9 +123,29 @@ export class MeetingChatService {
   }
 
   /**
+   * Formata segundos em MM:SS
+   */
+  private formatTimestamp(seconds: number): string {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  }
+
+  /**
+   * Formata segmentos com timestamps para contexto da IA
+   */
+  private formatSegmentsWithTimestamps(segments: TranscriptSegment[]): string {
+    return segments.map(seg => {
+      const timestamp = this.formatTimestamp(seg.start_seconds);
+      const speaker = seg.speaker ? `${seg.speaker}` : 'Speaker';
+      return `[${timestamp}] ${speaker}: ${seg.text}`;
+    }).join('\n');
+  }
+
+  /**
    * Gera resposta usando IA com contexto da transcrição
    */
-  async generateAnswer(question: string, transcript: string, meetingId: string): Promise<{ answer: string; tokensUsed: number }> {
+  async generateAnswer(question: string, transcript: string, meetingId: string, segments?: TranscriptSegment[]): Promise<{ answer: string; tokensUsed: number }> {
     try {
       if (!question || question.trim().length === 0) {
         throw new Error('Question cannot be empty');
@@ -131,10 +159,19 @@ export class MeetingChatService {
         throw new Error('Transcript is empty');
       }
 
-      // Comprimir transcrição se necessário
-      const contextTranscript = this.compressTranscript(transcript);
-
       logger.info(`Generating answer for meeting ${meetingId}, question length: ${question.length}`);
+
+      // Se tiver segmentos estruturados, usar formato com timestamps
+      let contextTranscript: string;
+      let hasTimestamps = false;
+      
+      if (segments && segments.length > 0) {
+        contextTranscript = this.formatSegmentsWithTimestamps(segments);
+        hasTimestamps = true;
+        logger.info(`Using ${segments.length} segments with timestamps`);
+      } else {
+        contextTranscript = this.compressTranscript(transcript);
+      }
 
       const systemPrompt = `Você é um assistente de IA especializado em analisar reuniões de vendas e negócios.
 
@@ -146,6 +183,7 @@ FORMATO DE RESPOSTA OBRIGATÓRIO:
 3. **Cite dados específicos**: nomes, valores, datas, números, percentuais mencionados na reunião
 4. **Use negrito** para destacar informações-chave (nomes, valores, datas, decisões)
 5. **Extraia evidências concretas** da transcrição - não generalize
+${hasTimestamps ? '6. **SEMPRE INCLUA TIMESTAMPS** quando citar trechos específicos - formato: **MM:SS**' : ''}
 
 REGRAS IMPORTANTES:
 • Responda APENAS com base na transcrição fornecida
@@ -154,18 +192,18 @@ REGRAS IMPORTANTES:
 • NÃO faça suposições - apenas fatos explícitos da transcrição
 • Máximo 5-6 tópicos por resposta
 • Seja específico: em vez de "falaram sobre preço", diga "mencionaram R$ 15.000/mês"
-• Use emojis ocasionalmente para destacar pontos importantes (✅ ⚠️ 💰 📅 👤)
+• Use emojis ocasionalmente para destacar pontos importantes (✅ ⚠️ 💰 📅 👤 🕐)
+${hasTimestamps ? '• Quando mencionar trechos da reunião, SEMPRE inclua o timestamp no formato: **10:23** ou **1:45**' : ''}
 
-ESTRUTURA DE RESPOSTA IDEAL:
+ESTRUTURA DE RESPOSTA IDEAL${hasTimestamps ? ' (COM TIMESTAMPS)' : ''}:
 **[Resposta direta em 1 frase]**
 
-• Tópico 1 com dado específico
-• Tópico 2 com dado específico
-• Tópico 3 com dado específico
+• **${hasTimestamps ? 'MM:SS' : 'Tópico 1'}** - ${hasTimestamps ? 'Descrição do que foi dito nesse momento' : 'Dado específico'}
+• **${hasTimestamps ? 'MM:SS' : 'Tópico 2'}** - ${hasTimestamps ? 'Descrição do que foi dito nesse momento' : 'Dado específico'}
 
 Seja um analista preciso e orientado a dados.`;
 
-      const userPrompt = `Transcrição da reunião:
+      const userPrompt = `Transcrição da reunião${hasTimestamps ? ' (com timestamps [MM:SS])' : ''}:
 
 ${contextTranscript}
 
@@ -173,7 +211,7 @@ ${contextTranscript}
 
 Pergunta: "${question}"
 
-Analise a transcrição e responda de forma estruturada e assertiva:`;
+Analise a transcrição e responda de forma estruturada e assertiva${hasTimestamps ? ', incluindo timestamps quando mencionar momentos específicos' : ''}:`;
 
       // Chama DeepSeek
       const response = await deepseek.chat.completions.create({
@@ -319,6 +357,30 @@ Analise a transcrição e responda de forma estruturada e assertiva:`;
     } catch (error) {
       logger.error('Error fetching meeting transcript:', error);
       return null;
+    }
+  }
+
+  /**
+   * Busca segmentos estruturados da transcrição com timestamps
+   */
+  async getMeetingSegments(meetingId: string): Promise<TranscriptSegment[]> {
+    try {
+      const { data, error } = await supabase
+        .from('transcript_segments')
+        .select('text, start_seconds, end_seconds, speaker, sequence')
+        .eq('meeting_id', meetingId)
+        .order('sequence', { ascending: true });
+
+      if (error) {
+        logger.error('Error fetching transcript segments:', error);
+        return [];
+      }
+
+      return (data as TranscriptSegment[]) ?? [];
+
+    } catch (error) {
+      logger.error('Error in getMeetingSegments:', error);
+      return [];
     }
   }
 }

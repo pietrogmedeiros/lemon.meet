@@ -178,7 +178,7 @@ export function MeetingChatPanel({ meetingId, isOpen, onClose, apiUrl, authToken
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-lg font-semibold text-[#333333]">Chat de IA</h2>
-                <span className="text-[10px] text-[#999999] font-mono">v1.1.3</span>
+                <span className="text-[10px] text-[#999999] font-mono">v1.2.0</span>
               </div>
               <p className="text-xs text-[#666666]">
                 {remainingQuestions} {remainingQuestions === 1 ? 'pergunta restante' : 'perguntas restantes'}
