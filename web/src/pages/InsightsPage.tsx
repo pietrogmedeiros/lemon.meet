@@ -452,7 +452,7 @@ export function InsightsPage() {
 
               {/* Reuniões que Precisam de Atenção */}
               {lowQ > 0 && (
-                <Card className="p-5 border-l-4 border-l-[#DC3545] h-full">
+                <Card className="p-5 border-l-4 border-l-[#DC3545] lg:col-span-2">
                   <div className="flex items-center gap-2 mb-4">
                     <div className="w-7 h-7 rounded-lg bg-[#DC3545]/10 flex items-center justify-center">
                       <TrendingDown size={15} className="text-[#DC3545]" />
@@ -461,7 +461,7 @@ export function InsightsPage() {
                       {t('insights.aggregate.stats.needsAttention')} ({lowQ})
                     </h2>
                   </div>
-                  <div className="space-y-1 max-h-[600px] overflow-y-auto">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-[400px] overflow-y-auto">
                     {withScores
                       .filter(m => m.score <= 5)
                       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
