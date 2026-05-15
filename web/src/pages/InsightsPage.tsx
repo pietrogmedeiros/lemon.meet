@@ -38,7 +38,7 @@ interface Meeting {
 function ScorePill({ score }: { score: number }) {
   const cls =
     score >= 8 ? 'bg-[#2D5A27]/10 text-[#2D5A27]' :
-    score >= 5 ? 'bg-[#FFD700]/30 text-[#7A5C00]' :
+    score > 5 ? 'bg-[#FFD700]/30 text-[#7A5C00]' :
     'bg-[#DC3545]/10 text-[#DC3545]';
   return (
     <span className={`inline-flex items-center justify-center min-w-[2.25rem] px-2 h-7 rounded-lg text-sm font-bold tabular-nums ${cls}`}>
@@ -49,7 +49,7 @@ function ScorePill({ score }: { score: number }) {
 
 function ScoreBar({ score, max = 10 }: { score: number; max?: number }) {
   const pct = (score / max) * 100;
-  const color = score >= 8 ? 'bg-[#2D5A27]' : score >= 5 ? 'bg-[#FFD700]' : 'bg-[#DC3545]';
+  const color = score >= 8 ? 'bg-[#2D5A27]' : score > 5 ? 'bg-[#FFD700]' : 'bg-[#DC3545]';
   return (
     <div className="flex-1 h-2 rounded-full bg-neutral-100 overflow-hidden">
       <div className={`h-full rounded-full ${color} transition-all duration-500`} style={{ width: `${pct}%` }} />
@@ -130,8 +130,8 @@ export function InsightsPage() {
 
   const scores = withScores.map(m => m.score);
   const highQ = withScores.filter(m => m.score >= 8).length;
-  const medQ  = withScores.filter(m => m.score >= 5 && m.score < 8).length;
-  const lowQ  = withScores.filter(m => m.score < 5).length;
+  const medQ  = withScores.filter(m => m.score > 5 && m.score < 8).length;
+  const lowQ  = withScores.filter(m => m.score <= 5).length;
 
   const sortedByScore = [...withScores].sort((a, b) => b.score - a.score);
 
@@ -284,6 +284,41 @@ export function InsightsPage() {
                 </div>
               </Card>
             </div>
+
+            {/* Reuniões que Precisam de Atenção */}
+            {lowQ > 0 && (
+              <Card className="p-5 border-l-4 border-l-[#DC3545]">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-7 h-7 rounded-lg bg-[#DC3545]/10 flex items-center justify-center">
+                    <TrendingDown size={15} className="text-[#DC3545]" />
+                  </div>
+                  <h2 className="text-[15px] font-semibold text-[#1a1a1a]">
+                    {t('insights.aggregate.stats.needsAttention')} ({lowQ})
+                  </h2>
+                </div>
+                <div className="space-y-1">
+                  {withScores
+                    .filter(m => m.score <= 5)
+                    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                    .map((m) => (
+                      <div
+                        key={m.id}
+                        onClick={() => navigate(`/meetings/${m.id}`)}
+                        className="flex items-center gap-3 cursor-pointer hover:bg-[#DC3545]/5 rounded-lg px-3 py-2.5 transition-colors group border border-transparent hover:border-[#DC3545]/20"
+                      >
+                        <div className="w-2.5 h-2.5 rounded-full flex-shrink-0 bg-[#DC3545]" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[13px] font-medium text-[#222] truncate group-hover:text-[#DC3545] transition-colors">
+                            {m.title || `${t('insights.aggregate.ranking.meeting')} ${m.id.slice(0, 8)}`}
+                          </p>
+                          <p className="text-[11px] text-[#999]">{formatDate(m.created_at, lang)}</p>
+                        </div>
+                        <ScorePill score={m.score} />
+                      </div>
+                    ))}
+                </div>
+              </Card>
+            )}
 
             {/* Main grid */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -471,7 +506,7 @@ export function InsightsPage() {
                         onClick={() => navigate(`/meetings/${m.id}`)}
                         className="flex items-center gap-3 cursor-pointer hover:bg-[#f5f5f5] rounded-lg px-3 py-2.5 transition-colors group"
                       >
-                        <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${m.score >= 8 ? 'bg-[#2D5A27]' : m.score >= 5 ? 'bg-[#FFD700]' : 'bg-[#DC3545]'}`} />
+                        <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${m.score >= 8 ? 'bg-[#2D5A27]' : m.score > 5 ? 'bg-[#FFD700]' : 'bg-[#DC3545]'}`} />
                         <div className="flex-1 min-w-0">
                           <p className="text-[13px] font-medium text-[#222] truncate group-hover:text-[#2D5A27] transition-colors">
                             {m.title || `${t('insights.aggregate.ranking.meeting')} ${m.id.slice(0, 8)}`}
