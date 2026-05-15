@@ -8,6 +8,19 @@ interface ChatMessage {
   created_at: string;
 }
 
+// Função para processar markdown básico (negrito, quebras de linha, etc)
+function processMarkdown(text: string): string {
+  if (!text) return '';
+  
+  return text
+    // Converte **texto** em <strong>texto</strong>
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    // Converte quebras de linha em <br>
+    .replace(/\n/g, '<br>')
+    // Preserva espaços múltiplos
+    .replace(/  /g, '&nbsp;&nbsp;');
+}
+
 interface MeetingChatPanelProps {
   meetingId: string;
   isOpen: boolean;
@@ -208,7 +221,10 @@ export function MeetingChatPanel({ meetingId, isOpen, onClose, apiUrl, authToken
                 {/* Resposta da IA */}
                 <div className="flex justify-start">
                   <div className="bg-[#F5F5F5] text-[#333333] px-4 py-3 rounded-2xl rounded-tl-sm max-w-[85%]">
-                    <p className="text-sm whitespace-pre-wrap leading-relaxed">{chat.answer}</p>
+                    <div 
+                      className="text-sm leading-relaxed [&_strong]:font-bold [&_strong]:text-[#1a1a1a]"
+                      dangerouslySetInnerHTML={{ __html: processMarkdown(chat.answer) }}
+                    />
                     <p className="text-xs text-[#999999] mt-2">
                       {new Date(chat.created_at).toLocaleTimeString('pt-BR', { 
                         hour: '2-digit', 
