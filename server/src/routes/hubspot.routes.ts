@@ -220,6 +220,23 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
 
     logger.info(`[HubSpot] ✅ Token válido obtido para user ${userId}`)
 
+    // Buscar ID do owner (usuário autenticado no HubSpot)
+    let authenticatedOwnerId: string | null = null
+    try {
+      const tokenInfoRes = await fetch(`${HUBSPOT_API_BASE}/oauth/v1/access-tokens/${token}`)
+      if (tokenInfoRes.ok) {
+        const tokenInfo = await tokenInfoRes.json() as { user_id?: number, hub_id?: number }
+        if (tokenInfo.user_id) {
+          authenticatedOwnerId = String(tokenInfo.user_id)
+          logger.info(`[HubSpot] ✅ Owner ID do usuário autenticado: ${authenticatedOwnerId}`)
+        }
+      } else {
+        logger.warn(`[HubSpot] ⚠️  Não foi possível obter owner ID do token`)
+      }
+    } catch (err) {
+      logger.error(`[HubSpot] ❌ Erro ao buscar owner ID:`, err)
+    }
+
     const insights = meeting.insights as any
     const title = meeting.title || `Reunião ${meeting.id.slice(0, 8)}`
     const date = meeting.started_at
@@ -244,6 +261,12 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
       pipeline: 'default',
       dealstage: 'appointmentscheduled',
       description: dealDescription,
+    }
+    
+    // Adicionar proprietário (usuário autenticado que está fazendo a integração)
+    if (authenticatedOwnerId) {
+      dealProperties.hubspot_owner_id = authenticatedOwnerId
+      logger.info(`[HubSpot] 👤 Proprietário definido: ${authenticatedOwnerId} (usuário autenticado)`)
     }
 
     // Obter emails dos participantes da reunião
@@ -320,15 +343,21 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
                   dealId = dealsData.results[0].id
                   logger.info(`[HubSpot] 🔄 Atualizando deal existente: ${dealId}`)
                   
-                  // Ao atualizar, NÃO mudar o nome do deal nem o proprietário
-                  // Apenas atualizar descrição, closedate e stage
+                  // Ao atualizar, NÃO mudar o nome do deal
+                  // Atualizar apenas descrição, closedate, stage e garantir que o proprietário seja o usuário autenticado
                   const updateProperties: Record<string, string> = {
                     closedate: dealProperties.closedate,
                     dealstage: dealProperties.dealstage,
                     description: dealProperties.description,
                   }
                   
-                  logger.info(`[HubSpot] 📦 Atualizando deal (sem mudar nome/proprietário):`, JSON.stringify(updateProperties, null, 2))
+                  // Atribuir proprietário ao usuário autenticado (quem está fazendo a integração)
+                  if (authenticatedOwnerId) {
+                    updateProperties.hubspot_owner_id = authenticatedOwnerId
+                    logger.info(`[HubSpot] 👤 Atualizando proprietário para: ${authenticatedOwnerId} (usuário autenticado)`)
+                  }
+                  
+                  logger.info(`[HubSpot] 📦 Atualizando deal (sem mudar nome):`, JSON.stringify(updateProperties, null, 2))
                   
                   const updateRes = await fetch(
                     `${HUBSPOT_API_BASE}/crm/v3/objects/deals/${dealId}`,
@@ -378,9 +407,7 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
 
     // Se não encontrou deal existente para atualizar, criar novo
     if (!dealId) {
-      // NÃO copiar proprietário do contato para o deal
-      // O HubSpot atribuirá automaticamente ao usuário que está fazendo a integração
-      logger.info('[HubSpot] 🆕 Criando novo deal (proprietário será definido pelo HubSpot):', JSON.stringify(dealProperties, null, 2))
+      logger.info('[HubSpot] 🆕 Criando novo deal:', JSON.stringify(dealProperties, null, 2))
       
       const dealRes = await fetch(`${HUBSPOT_API_BASE}/crm/v3/objects/deals`, {
         method: 'POST',
