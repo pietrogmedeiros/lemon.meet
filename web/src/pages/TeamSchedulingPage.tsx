@@ -24,7 +24,9 @@ import {
   Trash2,
   Power,
   PowerOff,
-  ExternalLink
+  ExternalLink,
+  AlertCircle,
+  Info
 } from 'lucide-react'
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:3000'
@@ -102,6 +104,23 @@ export function TeamSchedulingPage() {
   const [availableMembers, setAvailableMembers] = useState<any[]>([])
   const [addingMember, setAddingMember] = useState(false)
 
+  // Sistema de notificações interno
+  const [notification, setNotification] = useState<{
+    type: 'success' | 'error' | 'warning' | 'info'
+    message: string
+  } | null>(null)
+  
+  // Modal de confirmação
+  const [confirmModal, setConfirmModal] = useState<{
+    message: string
+    onConfirm: () => void
+  } | null>(null)
+
+  const showNotification = (type: 'success' | 'error' | 'warning' | 'info', message: string) => {
+    setNotification({ type, message })
+    setTimeout(() => setNotification(null), 5000)
+  }
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session: s } }) => setSession(s))
   }, [])
@@ -116,7 +135,7 @@ export function TeamSchedulingPage() {
 
       if (!response.ok) {
         if (response.status === 403) {
-          alert('Acesso negado. Apenas admins podem acessar esta página.')
+          showNotification('error', 'Acesso negado. Apenas admins podem acessar esta página.')
           navigate('/teams')
           return
         }
@@ -215,13 +234,13 @@ export function TeamSchedulingPage() {
 
     // Validar tamanho (5MB)
     if (file.size > 5 * 1024 * 1024) {
-      alert('Arquivo muito grande. Máximo 5MB.')
+      showNotification('error', 'Arquivo muito grande. Máximo 5MB.')
       return
     }
 
     // Validar tipo
     if (!['image/png', 'image/jpeg', 'image/jpg'].includes(file.type)) {
-      alert('Apenas PNG e JPEG são permitidos.')
+      showNotification('error', 'Apenas PNG e JPEG são permitidos.')
       return
     }
 
@@ -259,7 +278,7 @@ export function TeamSchedulingPage() {
       // Logo atualizado silenciosamente (visual feedback é suficiente)
     } catch (error: any) {
       console.error('Erro ao fazer upload do logo:', error)
-      alert('Erro ao fazer upload: ' + error.message)
+      showNotification('error', 'Erro ao fazer upload: ' + error.message)
       setLogoPreview(null)
     } finally {
       setUploadingLogo(false)
@@ -268,7 +287,7 @@ export function TeamSchedulingPage() {
 
   const handleSaveConfig = async () => {
     if (!slug.trim()) {
-      alert('Slug é obrigatório')
+      showNotification('error', 'Slug é obrigatório')
       return
     }
 
@@ -296,9 +315,9 @@ export function TeamSchedulingPage() {
 
       const data = await response.json()
       setConfig(data.config)
-      alert('✅ Configuração salva com sucesso!')
+      showNotification('success', 'Configuração salva com sucesso!')
     } catch (err: any) {
-      alert('❌ ' + err.message)
+      showNotification('error', err.message)
     } finally {
       setSaving(false)
     }
@@ -321,10 +340,9 @@ export function TeamSchedulingPage() {
         
         // Verifica se o erro é por falta de integração do calendário
         if (error.needsCalendar) {
-          alert(
-            '📅 ' + error.message + '\n\n' +
-            'Peça para o membro conectar o Google Calendar em:\n' +
-            'Menu → Integrações → Google Calendar'
+          showNotification(
+            'warning',
+            error.message + ' Peça para o membro conectar o Google Calendar em: Menu → Integrações → Google Calendar'
           )
         } else {
           throw new Error(error.message || 'Erro ao adicionar')
@@ -334,7 +352,7 @@ export function TeamSchedulingPage() {
 
       await loadMembers()
     } catch (err: any) {
-      alert('❌ ' + err.message)
+      showNotification('error', err.message)
     } finally {
       setAddingMember(false)
     }
@@ -358,12 +376,19 @@ export function TeamSchedulingPage() {
 
       await loadMembers()
     } catch (err: any) {
-      alert('❌ ' + err.message)
+      showNotification('error', err.message)
     }
   }
 
   const handleRemoveMember = async (memberId: string) => {
-    if (!confirm('Tem certeza que deseja remover este membro?')) return
+    setConfirmModal({
+      message: 'Tem certeza que deseja remover este membro?',
+      onConfirm: () => confirmRemoveMember(memberId)
+    })
+  }
+
+  const confirmRemoveMember = async (memberId: string) => {
+    setConfirmModal(null)
 
     try {
       const response = await fetch(
@@ -378,7 +403,7 @@ export function TeamSchedulingPage() {
 
       await loadMembers()
     } catch (err: any) {
-      alert('❌ ' + err.message)
+      showNotification('error', err.message)
     }
   }
 
@@ -838,6 +863,85 @@ export function TeamSchedulingPage() {
           </div>
         )}
       </div>
+
+      {/* Sistema de Notificações */}
+      {notification && (
+        <div className="fixed bottom-6 right-6 z-50 animate-in slide-in-from-bottom-4">
+          <div
+            className={`flex items-start gap-3 px-4 py-3 rounded-xl shadow-lg border min-w-[300px] max-w-md ${
+              notification.type === 'success'
+                ? 'bg-green-50 border-green-200'
+                : notification.type === 'error'
+                ? 'bg-red-50 border-red-200'
+                : notification.type === 'warning'
+                ? 'bg-yellow-50 border-yellow-200'
+                : 'bg-blue-50 border-blue-200'
+            }`}
+          >
+            <div className="flex-shrink-0 mt-0.5">
+              {notification.type === 'success' ? (
+                <CheckCircle className="w-5 h-5 text-green-600" />
+              ) : notification.type === 'error' ? (
+                <XCircle className="w-5 h-5 text-red-600" />
+              ) : notification.type === 'warning' ? (
+                <AlertCircle className="w-5 h-5 text-yellow-600" />
+              ) : (
+                <Info className="w-5 h-5 text-blue-600" />
+              )}
+            </div>
+            <div className="flex-1">
+              <p
+                className={`text-sm font-medium ${
+                  notification.type === 'success'
+                    ? 'text-green-900'
+                    : notification.type === 'error'
+                    ? 'text-red-900'
+                    : notification.type === 'warning'
+                    ? 'text-yellow-900'
+                    : 'text-blue-900'
+                }`}
+              >
+                {notification.message}
+              </p>
+            </div>
+            <button
+              onClick={() => setNotification(null)}
+              className="flex-shrink-0 text-gray-400 hover:text-gray-600"
+            >
+              <XCircle className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Confirmação */}
+      {confirmModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 animate-in fade-in zoom-in-95">
+            <h3 className="text-lg font-semibold text-gray-900 mb-3">
+              Confirmação
+            </h3>
+            <p className="text-gray-600 mb-6">{confirmModal.message}</p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setConfirmModal(null)}
+                className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 font-medium hover:bg-gray-50 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => {
+                  confirmModal.onConfirm()
+                  setConfirmModal(null)
+                }}
+                className="px-4 py-2 rounded-lg bg-red-600 text-white font-medium hover:bg-red-700 transition-colors"
+              >
+                Confirmar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </MainLayout>
   )
 }

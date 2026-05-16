@@ -763,10 +763,10 @@ router.post('/public/:slug/book', async (req, res) => {
       })
     }
 
-    // Busca config
+    // Busca config com informações do time
     const { data: config } = await supabase
       .from('team_scheduling_config')
-      .select('*')
+      .select('*, teams!inner(id, name)')
       .eq('slug', slug)
       .eq('is_active', true)
       .single()
@@ -836,8 +836,69 @@ router.post('/public/:slug/book', async (req, res) => {
       })
       .eq('id', assignedMember.id)
 
+    // ✅ Cria evento no Google Calendar do membro atribuído
+    try {
+      const { data: integration } = await supabase
+        .from('calendar_integrations')
+        .select('refresh_token, access_token, token_expires_at')
+        .eq('user_id', assignedMember.user_id)
+        .eq('status', 'active')
+        .maybeSingle()
+
+      if (integration && integration.refresh_token) {
+        const accessToken = await getValidAccessToken(assignedMember.user_id, integration as any)
+        
+        // Nome do evento: "Nome do Lead + Nome da Empresa"
+        const eventTitle = `${guest_name} + ${config.teams.name}`
+        
+        // Cria evento no Google Calendar
+        const calendarEvent = {
+          summary: eventTitle,
+          description: guest_notes || `Agendamento via ${config.title}`,
+          start: {
+            dateTime: scheduled_start,
+            timeZone: 'America/Sao_Paulo'
+          },
+          end: {
+            dateTime: scheduledEnd.toISOString(),
+            timeZone: 'America/Sao_Paulo'
+          },
+          attendees: [
+            { email: guest_email, displayName: guest_name }
+          ],
+          reminders: {
+            useDefault: false,
+            overrides: [
+              { method: 'email', minutes: 60 },
+              { method: 'popup', minutes: 15 }
+            ]
+          }
+        }
+
+        const gcalRes = await fetch(GCAL_EVENTS_URL, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(calendarEvent)
+        })
+
+        if (gcalRes.ok) {
+          const createdEvent = await gcalRes.json() as any
+          logger.info(`✅ Evento criado no Google Calendar: ${createdEvent.id}`)
+        } else {
+          logger.warn(`⚠️ Falha ao criar evento no Google Calendar: ${gcalRes.status}`)
+        }
+      } else {
+        logger.warn(`⚠️ Membro ${assignedMember.user_id} não tem calendário integrado`)
+      }
+    } catch (calendarError) {
+      logger.error('Erro ao criar evento no calendário:', calendarError)
+      // Não bloqueia o agendamento se o calendário falhar
+    }
+
     // TODO: Enviar e-mail de confirmação
-    // TODO: Criar evento no Google Calendar do membro atribuído
     // TODO: Enviar notificação para o membro
 
     logger.info(`✅ Created booking ${booking.id} for ${guest_email} assigned to ${assignedMember.user_id}`)

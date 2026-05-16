@@ -155,7 +155,7 @@ export function PublicSchedulingPage() {
             </div>
           </div>
           <p className="text-sm text-[#999999] mt-8">
-            Você receberá um link para a reunião por e-mail
+            O evento já foi adicionado na sua agenda e na agenda do responsável
           </p>
         </div>
       </div>
