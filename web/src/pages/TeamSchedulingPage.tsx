@@ -529,7 +529,6 @@ export function TeamSchedulingPage() {
                     />
                   ) : (
                     <div className="text-center p-2">
-                      <div className="text-3xl mb-1">🖼️</div>
                       <p className="text-xs text-[#999999]">Logo</p>
                     </div>
                   )}
