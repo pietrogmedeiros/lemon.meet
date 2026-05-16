@@ -28,7 +28,18 @@ export function Sidebar() {
   const [expanded, setExpanded] = useState(true)
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({ integrations: true })
   const { open: onboardingOpen, openModal: openOnboarding, closeModal: closeOnboarding } = useOnboarding()
-  const [isTeamOwner, setIsTeamOwner] = useState(false)
+  
+  // Inicializa com valor do cache (se existir) para evitar piscar
+  const getCachedOwnership = () => {
+    try {
+      const cached = localStorage.getItem('isTeamOwner')
+      return cached === 'true'
+    } catch {
+      return false
+    }
+  }
+  
+  const [isTeamOwner, setIsTeamOwner] = useState(getCachedOwnership())
 
   const toggleGroup = (id: string) => setOpenGroups(prev => ({ ...prev, [id]: !prev[id] }))
 
@@ -58,6 +69,13 @@ export function Sidebar() {
         const hasOwnerTeam = data.teams?.some((team: any) => team.isOwner) ?? false
         console.log('[Sidebar] Has owner team?', hasOwnerTeam)
         setIsTeamOwner(hasOwnerTeam)
+        
+        // Cacheia o resultado no localStorage
+        try {
+          localStorage.setItem('isTeamOwner', String(hasOwnerTeam))
+        } catch (err) {
+          console.error('[Sidebar] Erro ao cachear ownership:', err)
+        }
       } else {
         console.error('[Sidebar] Erro na resposta:', response.status)
       }

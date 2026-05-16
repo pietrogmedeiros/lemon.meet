@@ -219,13 +219,20 @@ export function TeamSchedulingPage() {
   }, [session, teamId])
 
   useEffect(() => {
-    if (session && teamId) {
-      loadTeam()
-      loadConfig()
-      loadMembers()
-      loadBookings()
+    const loadAll = async () => {
+      if (!session || !teamId) return
+      
+      setLoading(true)
+      await Promise.all([
+        loadTeam(),
+        loadConfig(),
+        loadMembers(),
+        loadBookings()
+      ])
       setLoading(false)
     }
+
+    loadAll()
   }, [session, teamId, loadTeam, loadConfig, loadMembers, loadBookings])
 
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {

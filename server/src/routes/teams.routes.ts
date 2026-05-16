@@ -122,9 +122,19 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
         .select('*')
         .order('created_at', { ascending: false })
       
-      const teams = (allTeams ?? []).map(t => ({ ...t, isOwner: t.owner_id === userId }))
-      logger.info(`🔧 DEV USER: Total de times retornados: ${teams.length}`)
-      return res.json({ success: true, teams, activeOwnerTeamId, isDevUser: true })
+      // Adiciona contagem de membros e isOwner
+      const teamsWithCount = await Promise.all((allTeams ?? []).map(async (t) => {
+        const { count } = await supabase
+          .from('team_members')
+          .select('*', { count: 'exact', head: true })
+          .eq('team_id', t.id)
+          .eq('status', 'active')
+        
+        return { ...t, isOwner: t.owner_id === userId, member_count: count ?? 0 }
+      }))
+
+      logger.info(`🔧 DEV USER: Total de times retornados: ${teamsWithCount.length}`)
+      return res.json({ success: true, teams: teamsWithCount, activeOwnerTeamId, isDevUser: true })
     }
 
     // Times onde é owner
@@ -167,10 +177,22 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
       }
     })
 
-    const teams = Array.from(allTeamsMap.values())
-    logger.info(`📋 Total de times retornados: ${teams.length}`)
+    let teams = Array.from(allTeamsMap.values())
 
-    return res.json({ success: true, teams, activeOwnerTeamId })
+    // Adiciona contagem de membros ativos para cada time
+    const teamsWithCount = await Promise.all(teams.map(async (team) => {
+      const { count } = await supabase
+        .from('team_members')
+        .select('*', { count: 'exact', head: true })
+        .eq('team_id', team.id)
+        .eq('status', 'active')
+      
+      return { ...team, member_count: count ?? 0 }
+    }))
+
+    logger.info(`📋 Total de times retornados: ${teamsWithCount.length}`)
+
+    return res.json({ success: true, teams: teamsWithCount, activeOwnerTeamId })
   } catch (err) {
     logger.error('Error fetching teams:', err)
     return res.status(500).json({ success: false, message: 'Internal server error' })
