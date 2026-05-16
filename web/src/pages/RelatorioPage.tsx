@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MainLayout } from '@/components/layout';
 import { Card } from '@/components/ui';
@@ -180,7 +180,6 @@ export function RelatorioPage() {
   const [selectedTeamId, setSelectedTeamId] = useState<string>('all');
   const [selectedMemberId, setSelectedMemberId] = useState<string>('all');
   const [isExporting, setIsExporting] = useState(false);
-  const reportRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!session?.access_token) {
@@ -326,42 +325,289 @@ export function RelatorioPage() {
     dominantSentiment === 'negativo' ? 'text-[#DC3545]' : 'text-[#888]';
 
   const handleExportPDF = async () => {
-    if (!reportRef.current || isExporting) return;
+    if (isExporting) return;
 
     setIsExporting(true);
 
     try {
-      // Clone o elemento para não afetar o DOM visível
-      const element = reportRef.current.cloneNode(true) as HTMLElement;
+      // Cria um container temporário para o PDF
+      const pdfContainer = document.createElement('div');
+      pdfContainer.style.cssText = 'position: absolute; left: -9999px; top: 0; width: 210mm; padding: 20px; background: white; font-family: system-ui, -apple-system, sans-serif;';
       
-      // Remove botões de navegação e filtros do PDF
-      const navButtons = element.querySelectorAll('button');
-      navButtons.forEach(btn => btn.remove());
-
-      // Adiciona logo da Lemon no topo
-      const header = document.createElement('div');
-      header.style.cssText = 'text-align: center; margin-bottom: 30px; padding: 20px; border-bottom: 3px solid #2D5A27;';
-      header.innerHTML = `
-        <div style="display: flex; align-items: center; justify-content: center; gap: 12px;">
-          <div style="width: 48px; height: 48px; background: #2D5A27; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 32px;">🍋</div>
-          <h1 style="font-size: 32px; font-weight: bold; color: #2D5A27; margin: 0;">Lemon.meet</h1>
+      // Header com logo limpo (sem fundo verde)
+      pdfContainer.innerHTML = `
+        <div style="text-align: center; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 3px solid #2D5A27;">
+          <div style="display: flex; align-items: center; justify-content: center; gap: 16px; margin-bottom: 12px;">
+            <span style="font-size: 48px;">🍋</span>
+            <h1 style="font-size: 36px; font-weight: bold; color: #2D5A27; margin: 0;">Lemon.meet</h1>
+          </div>
+          <h2 style="font-size: 24px; color: #333; margin: 8px 0;">Relatório Semanal Completo</h2>
+          <p style="font-size: 16px; color: #666; margin: 4px 0;">${formatWeekLabel(start, end)}</p>
+          <p style="font-size: 12px; color: #999; margin: 4px 0;">
+            ${start.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })} até 
+            ${end.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
+          </p>
+          <p style="font-size: 11px; color: #aaa; margin: 8px 0 0 0;">Gerado em ${new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
         </div>
-        <p style="font-size: 14px; color: #666; margin: 8px 0 0 0;">Relatório Semanal - ${formatWeekLabel(start, end)}</p>
-        <p style="font-size: 12px; color: #999; margin: 4px 0 0 0;">Gerado em ${new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-      `;
-      element.insertBefore(header, element.firstChild);
 
-      // Configurações do PDF
+        <!-- Sumário Executivo -->
+        <div style="background: linear-gradient(135deg, #2D5A27 0%, #3a7030 100%); padding: 24px; border-radius: 12px; margin-bottom: 30px; color: white;">
+          <h3 style="font-size: 20px; font-weight: bold; margin: 0 0 16px 0; color: white;">📊 Sumário Executivo</h3>
+          <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;">
+            <div style="background: rgba(255,255,255,0.15); padding: 16px; border-radius: 8px;">
+              <p style="font-size: 12px; margin: 0 0 4px 0; opacity: 0.9;">REUNIÕES</p>
+              <p style="font-size: 32px; font-weight: bold; margin: 0;">${curr.total}</p>
+              <p style="font-size: 13px; margin: 4px 0 0 0; opacity: 0.85;">${curr.completed} concluídas • ${curr.total - curr.completed} em andamento</p>
+            </div>
+            <div style="background: rgba(255,255,255,0.15); padding: 16px; border-radius: 8px;">
+              <p style="font-size: 12px; margin: 0 0 4px 0; opacity: 0.9;">SCORE MÉDIO</p>
+              <p style="font-size: 32px; font-weight: bold; margin: 0;">${curr.avgScore !== null ? curr.avgScore : '—'}</p>
+              <p style="font-size: 13px; margin: 4px 0 0 0; opacity: 0.85;">
+                ${curr.scoreCount > 0 ? `Baseado em ${curr.scoreCount} reuniões` : 'Sem dados disponíveis'}
+              </p>
+            </div>
+            <div style="background: rgba(255,255,255,0.15); padding: 16px; border-radius: 8px;">
+              <p style="font-size: 12px; margin: 0 0 4px 0; opacity: 0.9;">SENTIMENTO</p>
+              <p style="font-size: 24px; font-weight: bold; margin: 0; text-transform: capitalize;">${curr.completed > 0 ? dominantSentiment : '—'}</p>
+              <p style="font-size: 13px; margin: 4px 0 0 0; opacity: 0.85;">
+                ${curr.completed > 0 ? `${curr.positive} positivas • ${curr.neutral} neutras • ${curr.negative} negativas` : ''}
+              </p>
+            </div>
+            <div style="background: rgba(255,255,255,0.15); padding: 16px; border-radius: 8px;">
+              <p style="font-size: 12px; margin: 0 0 4px 0; opacity: 0.9;">ACTION ITEMS</p>
+              <p style="font-size: 32px; font-weight: bold; margin: 0;">${curr.pendingActions}</p>
+              <p style="font-size: 13px; margin: 4px 0 0 0; opacity: 0.85;">Identificados nas reuniões</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Comparação com Semana Anterior -->
+        ${prev.total > 0 ? `
+        <div style="background: #f8f9fa; padding: 20px; border-radius: 12px; margin-bottom: 30px;">
+          <h3 style="font-size: 18px; font-weight: bold; margin: 0 0 16px 0; color: #333;">📈 Comparação com Semana Anterior</h3>
+          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; text-align: center;">
+            <div>
+              <p style="font-size: 11px; color: #666; margin: 0 0 4px 0;">REUNIÕES</p>
+              <p style="font-size: 20px; font-weight: bold; margin: 0; color: ${curr.total >= prev.total ? '#2D5A27' : '#DC3545'};">
+                ${curr.total > prev.total ? '+' : ''}${curr.total - prev.total}
+              </p>
+            </div>
+            <div>
+              <p style="font-size: 11px; color: #666; margin: 0 0 4px 0;">SCORE</p>
+              <p style="font-size: 20px; font-weight: bold; margin: 0; color: ${(curr.avgScore || 0) >= (prev.avgScore || 0) ? '#2D5A27' : '#DC3545'};">
+                ${curr.avgScore !== null && prev.avgScore !== null ? ((curr.avgScore - prev.avgScore) > 0 ? '+' : '') + (curr.avgScore - prev.avgScore).toFixed(1) : '—'}
+              </p>
+            </div>
+            <div>
+              <p style="font-size: 11px; color: #666; margin: 0 0 4px 0;">POSITIVAS</p>
+              <p style="font-size: 20px; font-weight: bold; margin: 0; color: ${curr.positive >= prev.positive ? '#2D5A27' : '#DC3545'};">
+                ${curr.positive > prev.positive ? '+' : ''}${curr.positive - prev.positive}
+              </p>
+            </div>
+            <div>
+              <p style="font-size: 11px; color: #666; margin: 0 0 4px 0;">ACTION ITEMS</p>
+              <p style="font-size: 20px; font-weight: bold; margin: 0; color: ${curr.pendingActions >= prev.pendingActions ? '#2D5A27' : '#DC3545'};">
+                ${curr.pendingActions > prev.pendingActions ? '+' : ''}${curr.pendingActions - prev.pendingActions}
+              </p>
+            </div>
+          </div>
+        </div>
+        ` : ''}
+
+        <!-- Top 5 Melhores Reuniões -->
+        ${curr.topMeetings.length > 0 ? `
+        <div style="margin-bottom: 30px;">
+          <h3 style="font-size: 18px; font-weight: bold; margin: 0 0 16px 0; color: #333;">🏆 Top 5 Melhores Reuniões</h3>
+          <table style="width: 100%; border-collapse: collapse;">
+            <thead>
+              <tr style="background: #f8f9fa; text-align: left;">
+                <th style="padding: 12px 8px; font-size: 12px; color: #666; font-weight: 600;">#</th>
+                <th style="padding: 12px 8px; font-size: 12px; color: #666; font-weight: 600;">REUNIÃO</th>
+                <th style="padding: 12px 8px; font-size: 12px; color: #666; font-weight: 600; text-align: right;">SCORE</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${curr.topMeetings.map((m, i) => `
+                <tr style="border-bottom: 1px solid #e0e0e0;">
+                  <td style="padding: 12px 8px; font-size: 14px; color: #888; font-weight: bold;">${i + 1}</td>
+                  <td style="padding: 12px 8px; font-size: 14px; color: #333;">${m.title || 'Reunião sem título'}</td>
+                  <td style="padding: 12px 8px; text-align: right;">
+                    <span style="display: inline-block; padding: 4px 12px; border-radius: 6px; font-size: 13px; font-weight: bold; background: ${m.score >= 8 ? '#2D5A27' : m.score >= 5 ? '#FFD700' : '#DC3545'}; color: white;">
+                      ${m.score}
+                    </span>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+        ` : ''}
+
+        <!-- Todas as Reuniões Detalhadas -->
+        ${filteredMeetings.filter(m => isInRange(m.created_at, start, end) && m.status === 'completed').length > 0 ? `
+        <div style="margin-bottom: 30px; page-break-before: always;">
+          <h3 style="font-size: 18px; font-weight: bold; margin: 0 0 16px 0; color: #333;">📋 Todas as Reuniões da Semana</h3>
+          ${filteredMeetings
+            .filter(m => isInRange(m.created_at, start, end) && m.status === 'completed')
+            .map(m => `
+              <div style="background: white; border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;">
+                  <div style="flex: 1;">
+                    <h4 style="font-size: 16px; font-weight: bold; margin: 0 0 4px 0; color: #333;">${m.title || 'Reunião sem título'}</h4>
+                    <p style="font-size: 12px; color: #888; margin: 0;">
+                      ${new Date(m.created_at).toLocaleDateString('pt-BR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  </div>
+                  ${m.insights?.commercialQuality ? `
+                    <span style="padding: 6px 16px; border-radius: 8px; font-size: 14px; font-weight: bold; background: ${m.insights.commercialQuality >= 8 ? '#2D5A27' : m.insights.commercialQuality >= 5 ? '#FFD700' : '#DC3545'}; color: white;">
+                      ${m.insights.commercialQuality}/10
+                    </span>
+                  ` : ''}
+                </div>
+                
+                ${m.insights ? `
+                  <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 12px;">
+                    <div>
+                      <p style="font-size: 11px; color: #666; margin: 0 0 4px 0; text-transform: uppercase; font-weight: 600;">Sentimento</p>
+                      <p style="font-size: 14px; margin: 0; color: ${m.insights.sentiment === 'positive' ? '#2D5A27' : m.insights.sentiment === 'negative' ? '#DC3545' : '#888'}; text-transform: capitalize; font-weight: 600;">
+                        ${m.insights.sentiment === 'positive' ? '😊 Positivo' : m.insights.sentiment === 'negative' ? '😞 Negativo' : '😐 Neutro'}
+                      </p>
+                    </div>
+                    <div>
+                      <p style="font-size: 11px; color: #666; margin: 0 0 4px 0; text-transform: uppercase; font-weight: 600;">Prob. Fechamento</p>
+                      <p style="font-size: 14px; margin: 0; font-weight: 600;">${m.insights.closingProbability}%</p>
+                    </div>
+                  </div>
+
+                  ${m.insights.actionItems && m.insights.actionItems.length > 0 ? `
+                    <div style="margin-bottom: 12px;">
+                      <p style="font-size: 11px; color: #666; margin: 0 0 8px 0; text-transform: uppercase; font-weight: 600;">✅ Action Items (${m.insights.actionItems.length})</p>
+                      <ul style="margin: 0; padding-left: 20px; font-size: 13px; color: #333;">
+                        ${m.insights.actionItems.slice(0, 5).map(item => `<li style="margin-bottom: 4px;">${item}</li>`).join('')}
+                      </ul>
+                    </div>
+                  ` : ''}
+
+                  ${m.insights.keyTopics && m.insights.keyTopics.length > 0 ? `
+                    <div>
+                      <p style="font-size: 11px; color: #666; margin: 0 0 8px 0; text-transform: uppercase; font-weight: 600;">🏷️ Tópicos</p>
+                      <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+                        ${m.insights.keyTopics.slice(0, 8).map(topic => `
+                          <span style="padding: 4px 10px; background: #f0f0f0; border-radius: 16px; font-size: 11px; color: #555;">${topic}</span>
+                        `).join('')}
+                      </div>
+                    </div>
+                  ` : ''}
+                ` : ''}
+              </div>
+            `).join('')}
+        </div>
+        ` : ''}
+
+        <!-- Tópicos Mais Discutidos -->
+        ${curr.topics.length > 0 ? `
+        <div style="margin-bottom: 30px;">
+          <h3 style="font-size: 18px; font-weight: bold; margin: 0 0 16px 0; color: #333;">🏷️ Tópicos Mais Discutidos</h3>
+          <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+            ${curr.topics.map(t => `
+              <span style="padding: 8px 16px; background: linear-gradient(135deg, #f0f0f0 0%, #e8e8e8 100%); border-radius: 20px; font-size: 13px; color: #333; font-weight: 500; border: 1px solid #ddd;">
+                ${t}
+              </span>
+            `).join('')}
+          </div>
+        </div>
+        ` : ''}
+
+        <!-- Insights e Recomendações -->
+        <div style="background: #f8f9fa; padding: 20px; border-radius: 12px; margin-bottom: 30px; page-break-before: always;">
+          <h3 style="font-size: 18px; font-weight: bold; margin: 0 0 16px 0; color: #333;">💡 Insights e Recomendações</h3>
+          
+          ${curr.avgScore !== null ? `
+            <div style="margin-bottom: 16px;">
+              <p style="font-size: 14px; font-weight: 600; color: #333; margin: 0 0 8px 0;">Qualidade das Reuniões</p>
+              <p style="font-size: 13px; color: #666; line-height: 1.6; margin: 0;">
+                ${curr.avgScore >= 7.5 
+                  ? `✅ Excelente! Suas reuniões estão com qualidade muito alta (${curr.avgScore}/10). Continue mantendo o foco em preparação e objetivos claros.`
+                  : curr.avgScore >= 5 
+                  ? `⚠️ Atenção: O score médio está em ${curr.avgScore}/10. Considere melhorar a preparação das reuniões e definir objetivos mais claros.`
+                  : `⛔ Crítico: Score médio baixo (${curr.avgScore}/10). Recomendamos revisar o processo de reuniões e focar em qualidade sobre quantidade.`
+                }
+              </p>
+            </div>
+          ` : ''}
+
+          ${curr.positive > 0 && curr.negative > 0 ? `
+            <div style="margin-bottom: 16px;">
+              <p style="font-size: 14px; font-weight: 600; color: #333; margin: 0 0 8px 0;">Análise de Sentimento</p>
+              <p style="font-size: 13px; color: #666; line-height: 1.6; margin: 0;">
+                ${(curr.positive / curr.completed * 100).toFixed(0)}% das reuniões tiveram sentimento positivo. 
+                ${curr.negative > curr.positive 
+                  ? 'Atenção: há mais reuniões negativas que positivas. Considere revisar a abordagem.'
+                  : 'Continue trabalhando para manter o clima positivo nas reuniões.'
+                }
+              </p>
+            </div>
+          ` : ''}
+
+          ${curr.pendingActions > 0 ? `
+            <div style="margin-bottom: 16px;">
+              <p style="font-size: 14px; font-weight: 600; color: #333; margin: 0 0 8px 0;">Action Items</p>
+              <p style="font-size: 13px; color: #666; line-height: 1.6; margin: 0;">
+                ${curr.pendingActions} action items identificados. Certifique-se de criar um plano de acompanhamento para cada um.
+                ${curr.pendingActions > curr.completed * 3 
+                  ? ' ⚠️ Alto número de ações por reunião - considere priorizar os itens mais importantes.'
+                  : ''}
+              </p>
+            </div>
+          ` : ''}
+
+          <div>
+            <p style="font-size: 14px; font-weight: 600; color: #333; margin: 0 0 8px 0;">Próximos Passos</p>
+            <ul style="margin: 0; padding-left: 20px; font-size: 13px; color: #666; line-height: 1.8;">
+              <li>Acompanhar os ${curr.pendingActions} action items identificados</li>
+              <li>Compartilhar insights com o time</li>
+              ${curr.avgScore && curr.avgScore < 7 ? '<li>Revisar preparação e objetivos das reuniões</li>' : ''}
+              ${curr.negative > 2 ? '<li>Analisar reuniões com sentimento negativo e identificar melhorias</li>' : ''}
+              <li>Continuar monitorando métricas semanalmente</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <div style="text-align: center; padding-top: 20px; border-top: 2px solid #e0e0e0; margin-top: 30px;">
+          <p style="font-size: 11px; color: #999; margin: 0;">
+            Relatório gerado automaticamente por Lemon.meet • 
+            ${new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+          </p>
+          <p style="font-size: 11px; color: #aaa; margin: 4px 0 0 0;">
+            Este relatório contém informações confidenciais. Distribua apenas para pessoas autorizadas.
+          </p>
+        </div>
+      `;
+
+      document.body.appendChild(pdfContainer);
+
+      // Configurações otimizadas para alta qualidade
       const opt = {
-        margin: [10, 10, 10, 10] as [number, number, number, number],
-        filename: `relatorio-semanal-${formatWeekLabel(start, end).replace(/\s+/g, '-')}.pdf`,
-        image: { type: 'jpeg' as const, quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+        margin: [15, 15, 15, 15] as [number, number, number, number],
+        filename: `relatorio-completo-${formatWeekLabel(start, end).replace(/\s+/g, '-')}.pdf`,
+        image: { type: 'jpeg' as const, quality: 1.0 },
+        html2canvas: { 
+          scale: 3,
+          useCORS: true,
+          letterRendering: true,
+          logging: false,
+          width: 794,  // A4 width em pixels (210mm)
+          windowWidth: 794
+        },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' as const }
       };
 
       // Gera e baixa o PDF
-      await html2pdf().set(opt).from(element).save();
+      await html2pdf().set(opt).from(pdfContainer).save();
+      
+      // Remove o container temporário
+      document.body.removeChild(pdfContainer);
     } catch (error) {
       console.error('Erro ao exportar PDF:', error);
       alert('Erro ao gerar PDF. Tente novamente.');
@@ -494,8 +740,6 @@ export function RelatorioPage() {
           {end.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
         </p>
 
-        {/* Container para exportação */}
-        <div ref={reportRef}>
         {/* Empty state */}
         {curr.total === 0 && (
           <Card className="p-12 text-center">
@@ -635,7 +879,6 @@ export function RelatorioPage() {
             </div>
           </>
         )}
-        </div>
       </div>
     </MainLayout>
   );
