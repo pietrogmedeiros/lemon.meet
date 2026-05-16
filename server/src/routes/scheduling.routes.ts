@@ -21,6 +21,7 @@ import { Router, type Response } from 'express'
 import { authMiddleware, type AuthRequest } from '../middleware/auth.middleware.js'
 import { supabase } from '../config/supabase.js'
 import { logger } from '../utils/logger.js'
+import { getValidAccessToken, GCAL_EVENTS_URL } from '../utils/calendarTokens.js'
 import multer from 'multer'
 import { nanoid } from 'nanoid'
 
@@ -229,6 +230,59 @@ router.get('/teams/:teamId/members', authMiddleware, requireTeamAdmin, async (re
   }
 })
 
+// ── GET /api/scheduling/teams/:teamId/available-members ────────
+// Lista TODOS os membros do time com informação de calendário integrado
+router.get('/teams/:teamId/available-members', authMiddleware, requireTeamAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const { teamId } = req.params
+
+    // Busca todos os membros ativos do time
+    const { data: teamMembers } = await supabase
+      .from('team_members')
+      .select('user_id, role, status')
+      .eq('team_id', teamId)
+      .eq('status', 'active')
+
+    if (!teamMembers || teamMembers.length === 0) {
+      return res.json({ success: true, members: [] })
+    }
+
+    // Enriquece com dados do usuário E status do calendário
+    const enriched = await Promise.all(
+      teamMembers.map(async (m) => {
+        // Busca dados do usuário
+        const { data: userData } = await supabase.auth.admin.getUserById(m.user_id)
+        
+        // Busca integração do calendário
+        const { data: calendarIntegration } = await supabase
+          .from('calendar_integrations')
+          .select('refresh_token, status, connected_at')
+          .eq('user_id', m.user_id)
+          .eq('status', 'active')
+          .maybeSingle()
+
+        const hasCalendar = !!(calendarIntegration && calendarIntegration.refresh_token)
+
+        return {
+          user_id: m.user_id,
+          name: userData.user?.user_metadata?.full_name ?? 
+                userData.user?.user_metadata?.name ?? 
+                userData.user?.email,
+          email: userData.user?.email,
+          role: m.role,
+          has_calendar: hasCalendar,
+          calendar_connected_at: calendarIntegration?.connected_at ?? null
+        }
+      })
+    )
+
+    return res.json({ success: true, members: enriched })
+  } catch (err) {
+    logger.error('Error fetching available members:', err)
+    return res.status(500).json({ success: false, message: 'Erro ao buscar membros disponíveis' })
+  }
+})
+
 // ── POST /api/scheduling/teams/:teamId/members ────────────────
 router.post('/teams/:teamId/members', authMiddleware, requireTeamAdmin, async (req: AuthRequest, res: Response) => {
   try {
@@ -252,6 +306,29 @@ router.post('/teams/:teamId/members', authMiddleware, requireTeamAdmin, async (r
       return res.status(400).json({
         success: false,
         message: 'Usuário não é membro ativo deste time'
+      })
+    }
+
+    // ✅ VALIDAÇÃO: Verifica se usuário tem Google Calendar integrado
+    const { data: calendarIntegration } = await supabase
+      .from('calendar_integrations')
+      .select('refresh_token, status')
+      .eq('user_id', user_id)
+      .eq('status', 'active')
+      .maybeSingle()
+
+    if (!calendarIntegration || !calendarIntegration.refresh_token) {
+      // Busca dados do usuário para mensagem mais clara
+      const { data: userData } = await supabase.auth.admin.getUserById(user_id)
+      const userName = userData.user?.user_metadata?.full_name ?? 
+                      userData.user?.user_metadata?.name ?? 
+                      userData.user?.email ?? 
+                      'Este usuário'
+      
+      return res.status(400).json({
+        success: false,
+        message: `${userName} não tem Google Calendar integrado. A integração é obrigatória para participar do agendamento Round Robin.`,
+        needsCalendar: true
       })
     }
 
@@ -525,13 +602,121 @@ router.get('/public/:slug/availability', async (req, res) => {
       })
     }
 
-    // TODO: Implementar lógica de disponibilidade
-    // 1. Buscar working_hours do dia da semana
-    // 2. Buscar agendamentos existentes do dia
-    // 3. Calcular slots disponíveis considerando buffers
-    // 4. Retornar lista de horários disponíveis
+    // Busca membros ativos do scheduling
+    const { data: members } = await supabase
+      .from('team_scheduling_members')
+      .select('user_id, is_active')
+      .eq('config_id', config.id)
+      .eq('is_active', true)
+      .order('rotation_order', { ascending: true })
 
-    const availableSlots = ['09:00', '10:00', '11:00', '14:00', '15:00', '16:00'] // Placeholder
+    if (!members || members.length === 0) {
+      return res.json({ success: true, slots: [] })
+    }
+
+    // Determina working hours do dia da semana
+    const dayOfWeek = new Date(date).getDay() // 0=domingo, 1=segunda, etc
+    const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
+    const dayKey = dayNames[dayOfWeek]
+    const workingHours = config.working_hours?.[dayKey]
+
+    if (!workingHours || !workingHours.enabled) {
+      return res.json({ success: true, slots: [] })
+    }
+
+    // Gera slots baseados no working_hours
+    const startTime = workingHours.start // "09:00"
+    const endTime = workingHours.end     // "18:00"
+    const duration = config.meeting_duration_minutes
+    const bufferBefore = config.buffer_before_minutes
+    const bufferAfter = config.buffer_after_minutes
+
+    const allSlots = generateTimeSlots(startTime, endTime, duration + bufferBefore + bufferAfter)
+
+    // Busca agendamentos existentes no sistema para essa data
+    const dateStart = `${date}T00:00:00Z`
+    const dateEnd = `${date}T23:59:59Z`
+    const { data: existingBookings } = await supabase
+      .from('team_bookings')
+      .select('scheduled_start, scheduled_end, assigned_to_user_id')
+      .eq('config_id', config.id)
+      .gte('scheduled_start', dateStart)
+      .lte('scheduled_start', dateEnd)
+      .neq('status', 'cancelled')
+
+    // Busca eventos do calendário de cada membro
+    const memberEvents: Record<string, any[]> = {}
+    
+    for (const member of members) {
+      // Busca integração do calendário
+      const { data: integration } = await supabase
+        .from('calendar_integrations')
+        .select('refresh_token, access_token, token_expires_at')
+        .eq('user_id', member.user_id)
+        .eq('status', 'active')
+        .maybeSingle()
+
+      if (!integration || !integration.refresh_token) {
+        // Membro sem calendário - considera todos os horários como ocupados
+        memberEvents[member.user_id] = []
+        continue
+      }
+
+      // Busca eventos do Google Calendar
+      try {
+        const accessToken = await getValidAccessToken(member.user_id, integration as any)
+        const timeMin = `${date}T00:00:00Z`
+        const timeMax = `${date}T23:59:59Z`
+        
+        const gcalRes = await fetch(
+          `${GCAL_EVENTS_URL}?timeMin=${timeMin}&timeMax=${timeMax}&singleEvents=true`,
+          { headers: { Authorization: `Bearer ${accessToken}` } }
+        )
+
+        if (gcalRes.ok) {
+          const gcalData = await gcalRes.json() as any
+          memberEvents[member.user_id] = gcalData.items ?? []
+        } else {
+          memberEvents[member.user_id] = []
+        }
+      } catch (err) {
+        logger.warn(`[Availability] Erro ao buscar calendário de ${member.user_id}:`, err)
+        memberEvents[member.user_id] = []
+      }
+    }
+
+    // Filtra slots onde pelo menos UM membro está disponível
+    const availableSlots = allSlots.filter((slotStart) => {
+      const slotStartDate = new Date(`${date}T${slotStart}:00`)
+      const slotEndDate = new Date(slotStartDate.getTime() + duration * 60000)
+
+      // Verifica se algum membro está disponível neste horário
+      return members.some((member) => {
+        // Verifica agendamentos existentes
+        const hasBooking = existingBookings?.some((booking) =>
+          booking.assigned_to_user_id === member.user_id &&
+          doTimesOverlap(
+            slotStartDate,
+            slotEndDate,
+            new Date(booking.scheduled_start),
+            new Date(booking.scheduled_end)
+          )
+        )
+        if (hasBooking) return false
+
+        // Verifica eventos do calendário
+        const events = memberEvents[member.user_id] ?? []
+        const hasCalendarEvent = events.some((event: any) => {
+          if (!event.start || !event.end) return false
+          const eventStart = new Date(event.start.dateTime || event.start.date)
+          const eventEnd = new Date(event.end.dateTime || event.end.date)
+          return doTimesOverlap(slotStartDate, slotEndDate, eventStart, eventEnd)
+        })
+        if (hasCalendarEvent) return false
+
+        return true // Membro disponível
+      })
+    })
 
     return res.json({ success: true, slots: availableSlots })
   } catch (err) {
@@ -539,6 +724,30 @@ router.get('/public/:slug/availability', async (req, res) => {
     return res.status(500).json({ success: false, message: 'Erro ao buscar disponibilidade' })
   }
 })
+
+// Helper: gera lista de horários (HH:MM) entre start e end, com intervalo de minutes
+function generateTimeSlots(start: string, end: string, intervalMinutes: number): string[] {
+  const slots: string[] = []
+  const [startHour, startMin] = start.split(':').map(Number)
+  const [endHour, endMin] = end.split(':').map(Number)
+  
+  let currentMinutes = startHour * 60 + startMin
+  const endMinutes = endHour * 60 + endMin
+  
+  while (currentMinutes + intervalMinutes <= endMinutes) {
+    const h = Math.floor(currentMinutes / 60)
+    const m = currentMinutes % 60
+    slots.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`)
+    currentMinutes += intervalMinutes
+  }
+  
+  return slots
+}
+
+// Helper: verifica se dois intervalos de tempo se sobrepõem
+function doTimesOverlap(start1: Date, end1: Date, start2: Date, end2: Date): boolean {
+  return start1 < end2 && end1 > start2
+}
 
 // ── POST /api/scheduling/public/:slug/book ────────────────────
 router.post('/public/:slug/book', async (req, res) => {
