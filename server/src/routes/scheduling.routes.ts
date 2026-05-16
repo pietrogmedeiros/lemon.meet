@@ -687,13 +687,11 @@ router.post(
         .from('public-assets')
         .getPublicUrl(filePath)
 
-      // Substitui host.docker.internal por localhost para funcionar no browser
-      const browserUrl = publicUrl.replace('host.docker.internal', 'localhost')
-
-      // Atualiza configuração com logo_url
+      // Salva URL original no banco (funciona em prod e dev)
+      // A conversão localhost é feita apenas no GET público
       const { error: updateError } = await supabase
         .from('team_scheduling_config')
-        .update({ logo_url: browserUrl })
+        .update({ logo_url: publicUrl })
         .eq('team_id', teamId)
 
       if (updateError) {
@@ -701,6 +699,8 @@ router.post(
         return res.status(500).json({ success: false, message: 'Erro ao salvar logo' })
       }
 
+      // Retorna URL adaptada para o browser (localhost em dev)
+      const browserUrl = publicUrl.replace('host.docker.internal', 'localhost')
       return res.json({ success: true, logo_url: browserUrl })
     } catch (error: any) {
       logger.error('[Scheduling] Erro no upload do logo:', error)
