@@ -27,6 +27,7 @@ const JoinTeamPage            = lazy(() => import('@/pages/JoinTeamPage').then(m
 const TeamSchedulingPage      = lazy(() => import('@/pages/TeamSchedulingPage').then(m => ({ default: m.TeamSchedulingPage })))
 const TeamSchedulingListPage  = lazy(() => import('@/pages/TeamSchedulingListPage').then(m => ({ default: m.TeamSchedulingListPage })))
 const PublicSchedulingPage    = lazy(() => import('@/pages/PublicSchedulingPage').then(m => ({ default: m.PublicSchedulingPage })))
+const FeatureRequestsPage     = lazy(() => import('@/pages/FeatureRequestsPage').then(m => ({ default: m.FeatureRequestsPage })))
 
 function App() {
   const { shouldShow, dismiss } = useFeedbackSurvey();
@@ -174,6 +175,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <CalendarPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/feature-requests"
+            element={
+              <ProtectedRoute>
+                <FeatureRequestsPage />
               </ProtectedRoute>
             }
           />
