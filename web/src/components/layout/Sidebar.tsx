@@ -36,18 +36,30 @@ export function Sidebar() {
 
   // Verifica se usuário é owner de algum time
   const checkTeamOwnership = useCallback(async () => {
-    if (!session) return
+    if (!session) {
+      console.log('[Sidebar] Sem sessão, não pode verificar ownership')
+      return
+    }
+    
+    console.log('[Sidebar] Verificando ownership de times...')
     try {
       const response = await fetch('https://lemon-meet-production.up.railway.app/api/teams', {
         headers: { 'Authorization': `Bearer ${session.access_token}` }
       })
+      
+      console.log('[Sidebar] Response status:', response.status)
+      
       if (response.ok) {
         const data = await response.json()
+        console.log('[Sidebar] Teams data:', data)
         const hasOwnerTeam = data.teams?.some((team: any) => team.isOwner) ?? false
+        console.log('[Sidebar] Has owner team?', hasOwnerTeam)
         setIsTeamOwner(hasOwnerTeam)
+      } else {
+        console.error('[Sidebar] Erro na resposta:', response.status)
       }
     } catch (error) {
-      console.error('Erro ao verificar ownership de times:', error)
+      console.error('[Sidebar] Erro ao verificar ownership de times:', error)
     }
   }, [session])
 
