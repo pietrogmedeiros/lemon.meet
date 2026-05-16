@@ -330,9 +330,14 @@ export function RelatorioPage() {
     setIsExporting(true);
 
     try {
+      // Oculta overflow do body para não mostrar o container
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      
       // Cria um container temporário para o PDF
       const pdfContainer = document.createElement('div');
-      pdfContainer.style.cssText = 'position: fixed; left: 0; top: 0; width: 794px; padding: 40px; background: white; font-family: system-ui, -apple-system, sans-serif; z-index: -9999; opacity: 0; pointer-events: none;';
+      pdfContainer.style.cssText = 'position: absolute; left: 0; top: 0; width: 794px; padding: 40px; background: white; font-family: system-ui, -apple-system, sans-serif;';
+      pdfContainer.id = 'pdf-export-container';
       
       // Header com logo limpo (sem fundo verde)
       pdfContainer.innerHTML = `
@@ -587,40 +592,47 @@ export function RelatorioPage() {
 
       document.body.appendChild(pdfContainer);
 
-      // Aguarda o DOM estar pronto
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Aguarda o DOM estar completamente pronto e renderizado
+      await new Promise(resolve => setTimeout(resolve, 500));
 
       // Configurações otimizadas para alta qualidade
       const opt = {
         margin: [15, 15, 15, 15] as [number, number, number, number],
         filename: `relatorio-completo-${formatWeekLabel(start, end).replace(/\s+/g, '-')}.pdf`,
-        image: { type: 'jpeg' as const, quality: 1.0 },
+        image: { type: 'jpeg' as const, quality: 0.95 },
         html2canvas: { 
-          scale: 3,
+          scale: 2,
           useCORS: true,
           letterRendering: true,
-          logging: false,
-          width: 794,
-          windowWidth: 794,
-          backgroundColor: '#ffffff'
+          logging: true,
+          backgroundColor: '#ffffff',
+          allowTaint: true
         },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' as const }
       };
 
+      console.log('Gerando PDF...');
+      
       // Gera e baixa o PDF
       await html2pdf().set(opt).from(pdfContainer).save();
       
+      console.log('PDF gerado com sucesso!');
+      
       // Remove o container temporário
       document.body.removeChild(pdfContainer);
+      
+      // Restaura o overflow do body
+      document.body.style.overflow = originalOverflow;
     } catch (error) {
       console.error('Erro ao exportar PDF:', error);
       alert('Erro ao gerar PDF. Tente novamente.');
       
-      // Garante remoção do container em caso de erro
-      const existingContainer = document.querySelector('[style*="z-index: -9999"]');
+      // Garante remoção do container e restauração do overflow em caso de erro
+      const existingContainer = document.getElementById('pdf-export-container');
       if (existingContainer) {
         document.body.removeChild(existingContainer);
       }
+      document.body.style.overflow = '';
     } finally {
       setIsExporting(false);
     }
