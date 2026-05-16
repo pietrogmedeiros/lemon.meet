@@ -332,7 +332,7 @@ export function RelatorioPage() {
     try {
       // Cria um container temporário para o PDF
       const pdfContainer = document.createElement('div');
-      pdfContainer.style.cssText = 'position: absolute; left: -9999px; top: 0; width: 210mm; padding: 20px; background: white; font-family: system-ui, -apple-system, sans-serif;';
+      pdfContainer.style.cssText = 'position: fixed; left: 0; top: 0; width: 794px; padding: 40px; background: white; font-family: system-ui, -apple-system, sans-serif; z-index: -9999; opacity: 0; pointer-events: none;';
       
       // Header com logo limpo (sem fundo verde)
       pdfContainer.innerHTML = `
@@ -587,6 +587,9 @@ export function RelatorioPage() {
 
       document.body.appendChild(pdfContainer);
 
+      // Aguarda o DOM estar pronto
+      await new Promise(resolve => setTimeout(resolve, 100));
+
       // Configurações otimizadas para alta qualidade
       const opt = {
         margin: [15, 15, 15, 15] as [number, number, number, number],
@@ -597,8 +600,9 @@ export function RelatorioPage() {
           useCORS: true,
           letterRendering: true,
           logging: false,
-          width: 794,  // A4 width em pixels (210mm)
-          windowWidth: 794
+          width: 794,
+          windowWidth: 794,
+          backgroundColor: '#ffffff'
         },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' as const }
       };
@@ -611,6 +615,12 @@ export function RelatorioPage() {
     } catch (error) {
       console.error('Erro ao exportar PDF:', error);
       alert('Erro ao gerar PDF. Tente novamente.');
+      
+      // Garante remoção do container em caso de erro
+      const existingContainer = document.querySelector('[style*="z-index: -9999"]');
+      if (existingContainer) {
+        document.body.removeChild(existingContainer);
+      }
     } finally {
       setIsExporting(false);
     }
