@@ -28,7 +28,8 @@ export function TeamSchedulingListPage() {
     }
 
     try {
-      const response = await fetch('https://lemon-meet-production.up.railway.app/api/teams', {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+      const response = await fetch(`${apiUrl}/api/teams`, {
         headers: { 'Authorization': `Bearer ${session.access_token}` }
       })
 
