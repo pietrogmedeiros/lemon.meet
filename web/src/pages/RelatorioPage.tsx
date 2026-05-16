@@ -6,11 +6,11 @@ import { useAuth } from '@/contexts';
 import {
   Video, TrendingUp, TrendingDown, Minus,
   ChevronLeft, ChevronRight, BarChart3,
-  CheckSquare, Hash, Calendar, Download
+  CheckSquare, Hash, Calendar
 } from 'lucide-react';
 import { fetchMeetings as fetchMeetingsCache } from '@/lib/meetingsCache';
 import { fetchUserTeams, type TeamOption } from '@/lib/teamScope';
-import html2pdf from 'html2pdf.js';
+// import html2pdf from 'html2pdf.js'; // Temporariamente desabilitado
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:3000'
 
@@ -179,7 +179,7 @@ export function RelatorioPage() {
   const [weekOffset, setWeekOffset] = useState(0); // 0 = current week, -1 = prev…
   const [selectedTeamId, setSelectedTeamId] = useState<string>('all');
   const [selectedMemberId, setSelectedMemberId] = useState<string>('all');
-  const [isExporting, setIsExporting] = useState(false);
+  // const [isExporting, setIsExporting] = useState(false); // Temporariamente desabilitado
 
   useEffect(() => {
     if (!session?.access_token) {
@@ -324,6 +324,7 @@ export function RelatorioPage() {
     dominantSentiment === 'positivo' ? 'text-[#2D5A27]' :
     dominantSentiment === 'negativo' ? 'text-[#DC3545]' : 'text-[#888]';
 
+  /* Temporariamente desabilitado - Exportação de PDF
   const handleExportPDF = async () => {
     if (isExporting) return;
 
@@ -637,6 +638,7 @@ export function RelatorioPage() {
       setIsExporting(false);
     }
   };
+  */
 
   if (isLoading) {
     return (
@@ -660,7 +662,7 @@ export function RelatorioPage() {
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Botão Exportar PDF */}
+            {/* Botão Exportar PDF - Temporariamente desabilitado 
             <button
               onClick={handleExportPDF}
               disabled={isExporting || curr.total === 0}
@@ -669,6 +671,7 @@ export function RelatorioPage() {
               <Download size={16} />
               {isExporting ? 'Gerando PDF...' : 'Exportar PDF'}
             </button>
+            */}
 
             {/* Week navigation */}
             <div className="flex items-center gap-2 bg-white border border-[#E0E0E0] rounded-xl px-3 py-2">
