@@ -24,6 +24,8 @@ const PrivacyPolicyPage       = lazy(() => import('@/pages/PrivacyPolicyPage').t
 const TermosAppPage           = lazy(() => import('@/pages/TermosAppPage').then(m => ({ default: m.TermosAppPage })))
 const CalendarPage            = lazy(() => import('@/pages/CalendarPage').then(m => ({ default: m.CalendarPage })))
 const JoinTeamPage            = lazy(() => import('@/pages/JoinTeamPage').then(m => ({ default: m.JoinTeamPage })))
+const TeamSchedulingPage      = lazy(() => import('@/pages/TeamSchedulingPage').then(m => ({ default: m.TeamSchedulingPage })))
+const PublicSchedulingPage    = lazy(() => import('@/pages/PublicSchedulingPage').then(m => ({ default: m.PublicSchedulingPage })))
 
 function App() {
   const { shouldShow, dismiss } = useFeedbackSurvey();
@@ -40,6 +42,7 @@ function App() {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/join/:token" element={<JoinTeamPage />} />
+          <Route path="/agenda/:slug" element={<PublicSchedulingPage />} />
           <Route
             path="/dashboard"
             element={
@@ -85,6 +88,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <TeamPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/teams/:teamId/scheduling"
+            element={
+              <ProtectedRoute>
+                <TeamSchedulingPage />
               </ProtectedRoute>
             }
           />
