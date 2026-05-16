@@ -45,10 +45,8 @@ export function Sidebar() {
     try {
       const response = await fetch('https://lemon-meet-production.up.railway.app/api/teams', {
         headers: { 
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json'
-        },
-        credentials: 'include'
+          'Authorization': `Bearer ${session.access_token}`
+        }
       })
       
       console.log('[Sidebar] Response status:', response.status)
