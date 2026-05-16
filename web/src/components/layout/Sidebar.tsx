@@ -195,10 +195,15 @@ export function Sidebar() {
 
                   {expanded && (
                     <span className={clsx(
-                      'text-[13.5px] leading-5 font-medium truncate flex-1',
+                      'text-[13.5px] leading-5 font-medium truncate flex-1 flex items-center gap-1.5',
                       isLocked ? 'text-[#aaa]' : active ? 'text-[#2D5A27]' : item.id === 'coaching' ? 'text-[#7A5C00] font-semibold' : 'text-[#444]'
                     )}>
                       {item.label}
+                      {item.id === 'router' && (
+                        <span className="text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded bg-[#2D5A27]/10 text-[#2D5A27] tracking-wide">
+                          Novo
+                        </span>
+                      )}
                     </span>
                   )}
 
