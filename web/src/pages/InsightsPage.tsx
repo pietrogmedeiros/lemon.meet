@@ -12,6 +12,17 @@ import { formatDate } from '@/lib';
 import { fetchMeetings as fetchMeetingsCache } from '@/lib/meetingsCache';
 import { fetchUserTeams, type TeamOption } from '@/lib/teamScope';
 
+const API = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+
+interface TeamMember {
+  id: string
+  user_id: string
+  user_name: string
+  user_email: string
+  user_avatar_url?: string | null
+  status: string
+}
+
 interface MeetingInsights {
   sentiment: 'positive' | 'neutral' | 'negative';
   commercialQuality: number;
@@ -33,6 +44,8 @@ interface Meeting {
   insights: MeetingInsights | null;
   created_at: string;
   team_id?: string | null;
+  user_id?: string | null;
+  user_name?: string | null;
 }
 
 function ScorePill({ score }: { score: number }) {
@@ -72,8 +85,10 @@ export function InsightsPage() {
   const navigate = useNavigate();
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [teams, setTeams] = useState<TeamOption[]>([]);
+  const [members, setMembers] = useState<TeamMember[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedTeamId, setSelectedTeamId] = useState<string>('all');
+  const [selectedMemberId, setSelectedMemberId] = useState<string>('all');
 
   useEffect(() => {
     if (!session?.access_token) {
@@ -106,6 +121,89 @@ export function InsightsPage() {
     }
   }, [selectedTeamId, teams]);
 
+  // Busca membros quando o time muda
+  useEffect(() => {
+    const loadMembers = async () => {
+      if (!session?.access_token) {
+        setMembers([])
+        return
+      }
+
+      // Se "Todos os times" está selecionado, busca membros de todos os times
+      if (selectedTeamId === 'all') {
+        try {
+          const allMembers: TeamMember[] = []
+          const seenUserIds = new Set<string>()
+
+          for (const team of teams) {
+            const response = await fetch(`${API}/api/teams/${team.id}`, {
+              headers: { Authorization: `Bearer ${session.access_token}` }
+            })
+            
+            if (response.ok) {
+              const data = await response.json()
+              const activeMembers = (data.members || [])
+                .filter((m: any) => m.status === 'active' && m.user_id)
+                .map((m: any) => ({
+                  id: m.id,
+                  user_id: m.user_id,
+                  user_name: m.name || m.invited_email || 'Sem nome',
+                  user_email: m.invited_email,
+                  user_avatar_url: null,
+                  status: m.status
+                }))
+              
+              // Evita duplicatas (usuário pode estar em múltiplos times)
+              for (const member of activeMembers) {
+                if (!seenUserIds.has(member.user_id)) {
+                  seenUserIds.add(member.user_id)
+                  allMembers.push(member)
+                }
+              }
+            }
+          }
+          
+          setMembers(allMembers)
+        } catch (error) {
+          console.error('Erro ao buscar membros:', error)
+          setMembers([])
+        }
+      } else {
+        // Busca membros do time específico
+        try {
+          const response = await fetch(`${API}/api/teams/${selectedTeamId}`, {
+            headers: { Authorization: `Bearer ${session.access_token}` }
+          })
+          
+          if (response.ok) {
+            const data = await response.json()
+            const activeMembers = (data.members || [])
+              .filter((m: any) => m.status === 'active' && m.user_id)
+              .map((m: any) => ({
+                id: m.id,
+                user_id: m.user_id,
+                user_name: m.name || m.invited_email || 'Sem nome',
+                user_email: m.invited_email,
+                user_avatar_url: null,
+                status: m.status
+              }))
+            setMembers(activeMembers)
+          } else {
+            setMembers([])
+          }
+        } catch (error) {
+          console.error('Erro ao buscar membros:', error)
+          setMembers([])
+        }
+      }
+      
+      // Reset seleção de membro ao mudar de time
+      setSelectedMemberId('all')
+    }
+
+    loadMembers()
+  }, [selectedTeamId, teams, session])
+
   if (isLoading) {
     return (
       <MainLayout>
@@ -116,9 +214,18 @@ export function InsightsPage() {
     );
   }
 
-  const filteredMeetings = selectedTeamId === 'all'
-    ? meetings
-    : meetings.filter(meeting => meeting.team_id === selectedTeamId);
+  const filteredMeetings = meetings
+    .filter(meeting => {
+      // Filtro de time
+      if (selectedTeamId !== 'all' && meeting.team_id !== selectedTeamId) {
+        return false
+      }
+      // Filtro de membro
+      if (selectedMemberId !== 'all' && meeting.user_id !== selectedMemberId) {
+        return false
+      }
+      return true
+    });
 
   const withScores = filteredMeetings
     .filter(m => m.insights?.commercialQuality != null)
@@ -137,7 +244,7 @@ export function InsightsPage() {
 
   const topicCounts: Record<string, number> = {};
   filteredMeetings.forEach(m => {
-    m.insights?.keyTopics?.forEach(topic => {
+    m.insights?.keyTopics?.forEach((topic: string) => {
       topicCounts[topic] = (topicCounts[topic] || 0) + 1;
     });
   });
@@ -168,31 +275,63 @@ export function InsightsPage() {
         </div>
 
         {teams.length > 0 && (
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs font-semibold text-[#666666] mr-1">{t('common.team', 'Time')}:</span>
-            <button
-              onClick={() => setSelectedTeamId('all')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition ${
-                selectedTeamId === 'all'
-                  ? 'bg-[#2D5A27] text-white border-[#2D5A27]'
-                  : 'bg-white text-[#666666] border-[#E0E0E0] hover:border-[#2D5A27] hover:text-[#2D5A27]'
-              }`}
-            >
-              {t('common.allTeams', 'Todos os times')}
-            </button>
-            {teams.map(team => (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-semibold text-[#666666] mr-1">{t('common.team', 'Time')}:</span>
               <button
-                key={team.id}
-                onClick={() => setSelectedTeamId(team.id)}
+                onClick={() => setSelectedTeamId('all')}
                 className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition ${
-                  selectedTeamId === team.id
+                  selectedTeamId === 'all'
                     ? 'bg-[#2D5A27] text-white border-[#2D5A27]'
                     : 'bg-white text-[#666666] border-[#E0E0E0] hover:border-[#2D5A27] hover:text-[#2D5A27]'
                 }`}
               >
-                {team.name}
+                {t('common.allTeams', 'Todos os times')}
               </button>
-            ))}
+              {teams.map(team => (
+                <button
+                  key={team.id}
+                  onClick={() => setSelectedTeamId(team.id)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition ${
+                    selectedTeamId === team.id
+                      ? 'bg-[#2D5A27] text-white border-[#2D5A27]'
+                      : 'bg-white text-[#666666] border-[#E0E0E0] hover:border-[#2D5A27] hover:text-[#2D5A27]'
+                  }`}
+                >
+                  {team.name}
+                </button>
+              ))}
+            </div>
+
+            {/* Filtro de membros */}
+            {members.length > 0 && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs font-semibold text-[#666666] mr-1">Membro:</span>
+                <button
+                  onClick={() => setSelectedMemberId('all')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition ${
+                    selectedMemberId === 'all'
+                      ? 'bg-[#2D5A27] text-white border-[#2D5A27]'
+                      : 'bg-white text-[#666666] border-[#E0E0E0] hover:border-[#2D5A27] hover:text-[#2D5A27]'
+                  }`}
+                >
+                  Todos os membros
+                </button>
+                {members.map(member => (
+                  <button
+                    key={member.id}
+                    onClick={() => setSelectedMemberId(member.user_id)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition ${
+                      selectedMemberId === member.user_id
+                        ? 'bg-[#2D5A27] text-white border-[#2D5A27]'
+                        : 'bg-white text-[#666666] border-[#E0E0E0] hover:border-[#2D5A27] hover:text-[#2D5A27]'
+                    }`}
+                  >
+                    {member.user_name}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
