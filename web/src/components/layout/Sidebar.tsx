@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Home, Video, TrendingUp, LogOut, Settings, ChevronLeft, ChevronRight, Users, CreditCard, Plug, GraduationCap, FileText, Lock, HelpCircle, CalendarClock, Shield, Webhook, ChevronDown, Calendar } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+import { Home, Video, TrendingUp, LogOut, Settings, ChevronLeft, ChevronRight, Users, CreditCard, Plug, GraduationCap, FileText, Lock, HelpCircle, CalendarClock, Shield, Webhook, ChevronDown, Calendar, Repeat } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth, useSubscription } from '@/contexts'
@@ -21,17 +21,39 @@ interface MenuGroup {
 
 export function Sidebar() {
   const { t } = useTranslation()
-  const { signOut } = useAuth()
+  const { signOut, session } = useAuth()
   const { subscription } = useSubscription()
   const navigate = useNavigate()
   const location = useLocation()
   const [expanded, setExpanded] = useState(true)
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({ integrations: true })
   const { open: onboardingOpen, openModal: openOnboarding, closeModal: closeOnboarding } = useOnboarding()
+  const [isTeamOwner, setIsTeamOwner] = useState(false)
 
   const toggleGroup = (id: string) => setOpenGroups(prev => ({ ...prev, [id]: !prev[id] }))
 
   const isPro = subscription?.plan === 'professional' || subscription?.plan === 'trial'
+
+  // Verifica se usuário é owner de algum time
+  const checkTeamOwnership = useCallback(async () => {
+    if (!session) return
+    try {
+      const response = await fetch('https://lemon-meet-production.up.railway.app/api/teams', {
+        headers: { 'Authorization': `Bearer ${session.access_token}` }
+      })
+      if (response.ok) {
+        const data = await response.json()
+        const hasOwnerTeam = data.teams?.some((team: any) => team.isOwner) ?? false
+        setIsTeamOwner(hasOwnerTeam)
+      }
+    } catch (error) {
+      console.error('Erro ao verificar ownership de times:', error)
+    }
+  }, [session])
+
+  useEffect(() => {
+    checkTeamOwnership()
+  }, [checkTeamOwnership])
 
   const groups: MenuGroup[] = [
     {
@@ -49,6 +71,7 @@ export function Sidebar() {
       section: 'Conta',
       items: [
         { id: 'team',         path: '/team',                    icon: Users,      label: t('nav.team', 'Meu Time') },
+        ...(isTeamOwner ? [{ id: 'router',       path: '/team-scheduling',         icon: Repeat,     label: 'Router' }] : []),
         {
           id: 'integrations',
           path: '/integrations/permissions',

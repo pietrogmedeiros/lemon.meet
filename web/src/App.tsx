@@ -25,6 +25,7 @@ const TermosAppPage           = lazy(() => import('@/pages/TermosAppPage').then(
 const CalendarPage            = lazy(() => import('@/pages/CalendarPage').then(m => ({ default: m.CalendarPage })))
 const JoinTeamPage            = lazy(() => import('@/pages/JoinTeamPage').then(m => ({ default: m.JoinTeamPage })))
 const TeamSchedulingPage      = lazy(() => import('@/pages/TeamSchedulingPage').then(m => ({ default: m.TeamSchedulingPage })))
+const TeamSchedulingListPage  = lazy(() => import('@/pages/TeamSchedulingListPage').then(m => ({ default: m.TeamSchedulingListPage })))
 const PublicSchedulingPage    = lazy(() => import('@/pages/PublicSchedulingPage').then(m => ({ default: m.PublicSchedulingPage })))
 
 function App() {
@@ -88,6 +89,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <TeamPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/team-scheduling"
+            element={
+              <ProtectedRoute>
+                <TeamSchedulingListPage />
               </ProtectedRoute>
             }
           />
