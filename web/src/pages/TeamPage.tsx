@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase'
 import {
   Users, Plus, Trash2, CheckCircle, Clock,
   AlertCircle, Loader, Video, Crown, UserPlus, ChevronRight,
-  Shield, Link2, Copy, Check, Calendar
+  Shield, Link2, Copy, Check
 } from 'lucide-react'
 import { formatDate } from '@/lib'
 import { useNavigate } from 'react-router-dom'
@@ -635,26 +635,6 @@ export function TeamPage() {
             {/* Coluna lateral: ações do owner */}
             {isOwner && (
               <div className="space-y-4">
-                {/* Agendamento Round Robin */}
-                <div className="bg-white border border-[#E0E0E0] rounded-2xl p-5 shadow-sm space-y-4">
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-lg bg-[#2D5A27]/10 flex items-center justify-center">
-                      <Calendar size={14} className="text-[#2D5A27]" />
-                    </div>
-                    <span className="text-sm font-semibold text-[#333333]">Agendamento Automático</span>
-                  </div>
-                  <p className="text-xs text-[#666666] leading-relaxed">
-                    Configure um link público de agendamento com distribuição automática Round Robin entre os membros.
-                  </p>
-                  <button
-                    onClick={() => navigate(`/teams/${team.id}/scheduling`)}
-                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#2D5A27] text-white text-sm font-semibold hover:bg-[#1E3D1A] transition shadow-sm"
-                  >
-                    <Calendar size={15} />
-                    Configurar agendamento
-                  </button>
-                </div>
-
                 {/* Link de convite */}
                 <div className="bg-white border border-[#E0E0E0] rounded-2xl p-5 shadow-sm space-y-4">
                   <div className="flex items-center gap-2">
