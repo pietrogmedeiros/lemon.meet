@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MainLayout } from '@/components/layout';
 import { Card } from '@/components/ui';
@@ -6,12 +6,23 @@ import { useAuth } from '@/contexts';
 import {
   Video, TrendingUp, TrendingDown, Minus,
   ChevronLeft, ChevronRight, BarChart3,
-  CheckSquare, Hash, Calendar
+  CheckSquare, Hash, Calendar, Download
 } from 'lucide-react';
 import { fetchMeetings as fetchMeetingsCache } from '@/lib/meetingsCache';
 import { fetchUserTeams, type TeamOption } from '@/lib/teamScope';
+import html2pdf from 'html2pdf.js';
+
+const API = import.meta.env.VITE_API_URL || 'http://localhost:3000'
 
 // ── Types ────────────────────────────────────────────────────────────────────
+
+interface TeamMember {
+  id: string
+  user_id: string
+  user_name: string
+  user_email: string
+  status: string
+}
 
 interface MeetingInsights {
   sentiment: 'positive' | 'neutral' | 'negative';
@@ -29,6 +40,7 @@ interface Meeting {
   insights: MeetingInsights | null;
   created_at: string;
   team_id?: string | null;
+  user_id?: string | null;
 }
 
 // ── Week helpers ─────────────────────────────────────────────────────────────
@@ -162,9 +174,13 @@ export function RelatorioPage() {
   const { session } = useAuth();
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [teams, setTeams] = useState<TeamOption[]>([]);
+  const [members, setMembers] = useState<TeamMember[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [weekOffset, setWeekOffset] = useState(0); // 0 = current week, -1 = prev…
   const [selectedTeamId, setSelectedTeamId] = useState<string>('all');
+  const [selectedMemberId, setSelectedMemberId] = useState<string>('all');
+  const [isExporting, setIsExporting] = useState(false);
+  const reportRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!session?.access_token) {
@@ -197,9 +213,99 @@ export function RelatorioPage() {
     }
   }, [selectedTeamId, teams]);
 
-  const filteredMeetings = selectedTeamId === 'all'
-    ? meetings
-    : meetings.filter(meeting => meeting.team_id === selectedTeamId);
+  // Busca membros quando o time muda
+  useEffect(() => {
+    const loadMembers = async () => {
+      if (!session?.access_token) {
+        setMembers([])
+        return
+      }
+
+      // Se "Todos os times" está selecionado, busca membros de todos os times
+      if (selectedTeamId === 'all') {
+        try {
+          const allMembers: TeamMember[] = []
+          const seenUserIds = new Set<string>()
+
+          for (const team of teams) {
+            const response = await fetch(`${API}/api/teams/${team.id}`, {
+              headers: { Authorization: `Bearer ${session.access_token}` }
+            })
+            
+            if (response.ok) {
+              const data = await response.json()
+              const activeMembers = (data.members || [])
+                .filter((m: any) => m.status === 'active' && m.user_id)
+                .map((m: any) => ({
+                  id: m.id,
+                  user_id: m.user_id,
+                  user_name: m.name || m.invited_email || 'Sem nome',
+                  user_email: m.invited_email,
+                  status: m.status
+                }))
+              
+              // Evita duplicatas (usuário pode estar em múltiplos times)
+              for (const member of activeMembers) {
+                if (!seenUserIds.has(member.user_id)) {
+                  seenUserIds.add(member.user_id)
+                  allMembers.push(member)
+                }
+              }
+            }
+          }
+          
+          setMembers(allMembers)
+        } catch (error) {
+          console.error('Erro ao buscar membros:', error)
+          setMembers([])
+        }
+      } else {
+        // Busca membros do time específico
+        try {
+          const response = await fetch(`${API}/api/teams/${selectedTeamId}`, {
+            headers: { Authorization: `Bearer ${session.access_token}` }
+          })
+          
+          if (response.ok) {
+            const data = await response.json()
+            const activeMembers = (data.members || [])
+              .filter((m: any) => m.status === 'active' && m.user_id)
+              .map((m: any) => ({
+                id: m.id,
+                user_id: m.user_id,
+                user_name: m.name || m.invited_email || 'Sem nome',
+                user_email: m.invited_email,
+                status: m.status
+              }))
+            setMembers(activeMembers)
+          } else {
+            setMembers([])
+          }
+        } catch (error) {
+          console.error('Erro ao buscar membros:', error)
+          setMembers([])
+        }
+      }
+      
+      // Reset seleção de membro ao mudar de time
+      setSelectedMemberId('all')
+    }
+
+    loadMembers()
+  }, [selectedTeamId, teams, session])
+
+  const filteredMeetings = meetings
+    .filter(meeting => {
+      // Filtro de time
+      if (selectedTeamId !== 'all' && meeting.team_id !== selectedTeamId) {
+        return false
+      }
+      // Filtro de membro
+      if (selectedMemberId !== 'all' && meeting.user_id !== selectedMemberId) {
+        return false
+      }
+      return true
+    });
 
   const { start, end } = getWeekBounds(weekOffset);
   const { start: prevStart, end: prevEnd } = getWeekBounds(weekOffset - 1);
@@ -219,6 +325,51 @@ export function RelatorioPage() {
     dominantSentiment === 'positivo' ? 'text-[#2D5A27]' :
     dominantSentiment === 'negativo' ? 'text-[#DC3545]' : 'text-[#888]';
 
+  const handleExportPDF = async () => {
+    if (!reportRef.current || isExporting) return;
+
+    setIsExporting(true);
+
+    try {
+      // Clone o elemento para não afetar o DOM visível
+      const element = reportRef.current.cloneNode(true) as HTMLElement;
+      
+      // Remove botões de navegação e filtros do PDF
+      const navButtons = element.querySelectorAll('button');
+      navButtons.forEach(btn => btn.remove());
+
+      // Adiciona logo da Lemon no topo
+      const header = document.createElement('div');
+      header.style.cssText = 'text-align: center; margin-bottom: 30px; padding: 20px; border-bottom: 3px solid #2D5A27;';
+      header.innerHTML = `
+        <div style="display: flex; align-items: center; justify-content: center; gap: 12px;">
+          <div style="width: 48px; height: 48px; background: #2D5A27; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 32px;">🍋</div>
+          <h1 style="font-size: 32px; font-weight: bold; color: #2D5A27; margin: 0;">Lemon.meet</h1>
+        </div>
+        <p style="font-size: 14px; color: #666; margin: 8px 0 0 0;">Relatório Semanal - ${formatWeekLabel(start, end)}</p>
+        <p style="font-size: 12px; color: #999; margin: 4px 0 0 0;">Gerado em ${new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+      `;
+      element.insertBefore(header, element.firstChild);
+
+      // Configurações do PDF
+      const opt = {
+        margin: [10, 10, 10, 10] as [number, number, number, number],
+        filename: `relatorio-semanal-${formatWeekLabel(start, end).replace(/\s+/g, '-')}.pdf`,
+        image: { type: 'jpeg' as const, quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' as const }
+      };
+
+      // Gera e baixa o PDF
+      await html2pdf().set(opt).from(element).save();
+    } catch (error) {
+      console.error('Erro ao exportar PDF:', error);
+      alert('Erro ao gerar PDF. Tente novamente.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <MainLayout>
@@ -233,61 +384,106 @@ export function RelatorioPage() {
     <MainLayout>
       <div className="space-y-6 max-w-5xl">
 
-        {/* Header + week nav */}
+        {/* Header + week nav + export */}
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-[#1a1a1a]">Relatório Semanal</h1>
             <p className="mt-1 text-sm text-[#666]">Resumo consolidado das suas reuniões por semana</p>
           </div>
 
-          <div className="flex items-center gap-2 bg-white border border-[#E0E0E0] rounded-xl px-3 py-2">
+          <div className="flex items-center gap-3">
+            {/* Botão Exportar PDF */}
             <button
-              onClick={() => setWeekOffset(w => w - 1)}
-              className="p-1 rounded hover:bg-neutral-100 transition-colors text-[#555]"
-              aria-label="Semana anterior"
+              onClick={handleExportPDF}
+              disabled={isExporting || curr.total === 0}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-[#2D5A27] text-white text-sm font-semibold rounded-xl hover:bg-[#234520] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <ChevronLeft size={16} />
+              <Download size={16} />
+              {isExporting ? 'Gerando PDF...' : 'Exportar PDF'}
             </button>
-            <span className="text-sm font-medium text-[#333] min-w-[150px] text-center">
-              {isCurrentWeek ? 'Esta semana' : formatWeekLabel(start, end)}
-            </span>
-            <button
-              onClick={() => setWeekOffset(w => Math.min(w + 1, 0))}
-              disabled={isCurrentWeek}
-              className="p-1 rounded hover:bg-neutral-100 transition-colors text-[#555] disabled:opacity-30 disabled:cursor-default"
-              aria-label="Próxima semana"
-            >
-              <ChevronRight size={16} />
-            </button>
+
+            {/* Week navigation */}
+            <div className="flex items-center gap-2 bg-white border border-[#E0E0E0] rounded-xl px-3 py-2">
+              <button
+                onClick={() => setWeekOffset(w => w - 1)}
+                className="p-1 rounded hover:bg-neutral-100 transition-colors text-[#555]"
+                aria-label="Semana anterior"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <span className="text-sm font-medium text-[#333] min-w-[150px] text-center">
+                {isCurrentWeek ? 'Esta semana' : formatWeekLabel(start, end)}
+              </span>
+              <button
+                onClick={() => setWeekOffset(w => Math.min(w + 1, 0))}
+                disabled={isCurrentWeek}
+                className="p-1 rounded hover:bg-neutral-100 transition-colors text-[#555] disabled:opacity-30 disabled:cursor-default"
+                aria-label="Próxima semana"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
           </div>
         </div>
 
         {teams.length > 0 && (
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs font-semibold text-[#666666] mr-1">{t('common.team', 'Time')}:</span>
-            <button
-              onClick={() => setSelectedTeamId('all')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition ${
-                selectedTeamId === 'all'
-                  ? 'bg-[#2D5A27] text-white border-[#2D5A27]'
-                  : 'bg-white text-[#666666] border-[#E0E0E0] hover:border-[#2D5A27] hover:text-[#2D5A27]'
-              }`}
-            >
-              {t('common.allTeams', 'Todos os times')}
-            </button>
-            {teams.map(team => (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-semibold text-[#666666] mr-1">{t('common.team', 'Time')}:</span>
               <button
-                key={team.id}
-                onClick={() => setSelectedTeamId(team.id)}
+                onClick={() => setSelectedTeamId('all')}
                 className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition ${
-                  selectedTeamId === team.id
+                  selectedTeamId === 'all'
                     ? 'bg-[#2D5A27] text-white border-[#2D5A27]'
                     : 'bg-white text-[#666666] border-[#E0E0E0] hover:border-[#2D5A27] hover:text-[#2D5A27]'
                 }`}
               >
-                {team.name}
+                {t('common.allTeams', 'Todos os times')}
               </button>
-            ))}
+              {teams.map(team => (
+                <button
+                  key={team.id}
+                  onClick={() => setSelectedTeamId(team.id)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition ${
+                    selectedTeamId === team.id
+                      ? 'bg-[#2D5A27] text-white border-[#2D5A27]'
+                      : 'bg-white text-[#666666] border-[#E0E0E0] hover:border-[#2D5A27] hover:text-[#2D5A27]'
+                  }`}
+                >
+                  {team.name}
+                </button>
+              ))}
+            </div>
+
+            {/* Filtro de membros */}
+            {members.length > 0 && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs font-semibold text-[#666666] mr-1">Membro:</span>
+                <button
+                  onClick={() => setSelectedMemberId('all')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition ${
+                    selectedMemberId === 'all'
+                      ? 'bg-[#2D5A27] text-white border-[#2D5A27]'
+                      : 'bg-white text-[#666666] border-[#E0E0E0] hover:border-[#2D5A27] hover:text-[#2D5A27]'
+                  }`}
+                >
+                  Todos os membros
+                </button>
+                {members.map(member => (
+                  <button
+                    key={member.id}
+                    onClick={() => setSelectedMemberId(member.user_id)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition ${
+                      selectedMemberId === member.user_id
+                        ? 'bg-[#2D5A27] text-white border-[#2D5A27]'
+                        : 'bg-white text-[#666666] border-[#E0E0E0] hover:border-[#2D5A27] hover:text-[#2D5A27]'
+                    }`}
+                  >
+                    {member.user_name}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -298,6 +494,8 @@ export function RelatorioPage() {
           {end.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
         </p>
 
+        {/* Container para exportação */}
+        <div ref={reportRef}>
         {/* Empty state */}
         {curr.total === 0 && (
           <Card className="p-12 text-center">
@@ -437,6 +635,7 @@ export function RelatorioPage() {
             </div>
           </>
         )}
+        </div>
       </div>
     </MainLayout>
   );
