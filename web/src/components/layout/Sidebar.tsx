@@ -104,7 +104,7 @@ export function Sidebar() {
       section: 'Conta',
       items: [
         { id: 'team',         path: '/team',                    icon: Users,      label: t('nav.team', 'Meu Time') },
-        ...(isTeamOwner ? [{ id: 'router',       path: '/team-scheduling',         icon: Repeat,     label: 'Router' }] : []),
+        ...(isTeamOwner ? [{ id: 'router',       path: '/team-scheduling',         icon: Repeat,     label: 'Round Robin' }] : []),
         {
           id: 'integrations',
           path: '/integrations/permissions',

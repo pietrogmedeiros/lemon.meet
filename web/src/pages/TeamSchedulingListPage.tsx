@@ -93,7 +93,7 @@ export function TeamSchedulingListPage() {
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-[#333333] mb-2">
-            Router - Agendamento Automático
+            Round Robin - Agendamento Automático
           </h1>
           <p className="text-[#666666]">
             Selecione um time para configurar o agendamento Round Robin
@@ -111,7 +111,7 @@ export function TeamSchedulingListPage() {
                 Como funciona o Round Robin?
               </h3>
               <p className="text-sm text-[#666666] leading-relaxed mb-3">
-                O Router distribui automaticamente os agendamentos entre os membros do time de forma equilibrada e justa. 
+                O Round Robin distribui automaticamente os agendamentos entre os membros do time de forma equilibrada e justa. 
                 Cada novo agendamento é atribuído ao próximo membro disponível na fila, seguindo a ordem de rotação configurada.
               </p>
               <ul className="text-sm text-[#666666] space-y-2">
