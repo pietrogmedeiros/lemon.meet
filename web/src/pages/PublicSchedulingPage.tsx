@@ -135,7 +135,7 @@ export function PublicSchedulingPage() {
             Agendamento Confirmado!
           </h1>
           <p className="text-[#666666] mb-8">
-            Enviamos uma confirmação para <strong>{guestEmail}</strong>
+            Seu agendamento foi confirmado com sucesso
           </p>
           <div className="p-6 bg-[#F8F9FA] rounded-xl text-left space-y-3">
             <div className="flex items-center gap-3 text-sm">
