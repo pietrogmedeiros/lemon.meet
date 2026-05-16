@@ -100,6 +100,42 @@ export function TeamSchedulingListPage() {
           </p>
         </div>
 
+        {/* Explicação */}
+        <div className="bg-gradient-to-br from-[#2D5A27]/5 to-[#2D5A27]/10 rounded-2xl p-6 mb-8 border border-[#2D5A27]/20">
+          <div className="flex items-start gap-4">
+            <div className="w-10 h-10 rounded-lg bg-[#2D5A27] flex items-center justify-center flex-shrink-0">
+              <Calendar className="text-white" size={20} />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-lg font-bold text-[#333333] mb-2">
+                Como funciona o Round Robin?
+              </h3>
+              <p className="text-sm text-[#666666] leading-relaxed mb-3">
+                O Router distribui automaticamente os agendamentos entre os membros do time de forma equilibrada e justa. 
+                Cada novo agendamento é atribuído ao próximo membro disponível na fila, seguindo a ordem de rotação configurada.
+              </p>
+              <ul className="text-sm text-[#666666] space-y-2">
+                <li className="flex items-start gap-2">
+                  <span className="text-[#2D5A27] font-bold">1.</span>
+                  <span>Configure os membros e a ordem de rotação do seu time</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-[#2D5A27] font-bold">2.</span>
+                  <span>Defina os horários de atendimento e duração das reuniões</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-[#2D5A27] font-bold">3.</span>
+                  <span>Compartilhe o link público de agendamento com seus leads</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-[#2D5A27] font-bold">4.</span>
+                  <span>O sistema distribui automaticamente verificando disponibilidade real no Google Calendar</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
         {/* Lista de times */}
         <div className="grid gap-4">
           {teams.map((team) => (
