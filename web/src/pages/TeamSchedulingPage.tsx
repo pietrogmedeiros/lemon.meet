@@ -126,8 +126,16 @@ export function TeamSchedulingPage() {
       const data = await response.json()
       setTeam(data.team)
 
-      // Carrega membros do time (para lista de adicionar)
-      setAvailableMembers(data.members?.filter((m: any) => m.status === 'active') || [])
+      // Carrega membros disponíveis com informação de calendário
+      const membersResponse = await fetch(
+        `${API}/api/scheduling/teams/${teamId}/available-members`,
+        { headers: { Authorization: `Bearer ${session.access_token}` } }
+      )
+      
+      if (membersResponse.ok) {
+        const membersData = await membersResponse.json()
+        setAvailableMembers(membersData.members || [])
+      }
     } catch (err) {
       console.error(err)
     }
@@ -247,8 +255,8 @@ export function TeamSchedulingPage() {
       if (config) {
         setConfig({ ...config, logo_url: data.logo_url })
       }
-
-      alert('Logo atualizado com sucesso!')
+      
+      // Logo atualizado silenciosamente (visual feedback é suficiente)
     } catch (error: any) {
       console.error('Erro ao fazer upload do logo:', error)
       alert('Erro ao fazer upload: ' + error.message)
@@ -310,7 +318,18 @@ export function TeamSchedulingPage() {
 
       if (!response.ok) {
         const error = await response.json()
-        throw new Error(error.message || 'Erro ao adicionar')
+        
+        // Verifica se o erro é por falta de integração do calendário
+        if (error.needsCalendar) {
+          alert(
+            '📅 ' + error.message + '\n\n' +
+            'Peça para o membro conectar o Google Calendar em:\n' +
+            'Menu → Integrações → Google Calendar'
+          )
+        } else {
+          throw new Error(error.message || 'Erro ao adicionar')
+        }
+        return
       }
 
       await loadMembers()
@@ -709,18 +728,43 @@ export function TeamSchedulingPage() {
                   .filter((m) => !members.some((sm) => sm.user_id === m.user_id))
                   .map((member) => (
                     <div
-                      key={member.id}
+                      key={member.user_id}
                       className="flex items-center justify-between p-3 bg-[#F5F5F5] rounded-xl"
                     >
-                      <span className="text-sm text-[#333333]">{member.name || member.invited_email}</span>
-                      <button
-                        onClick={() => handleAddMember(member.user_id)}
-                        disabled={addingMember}
-                        className="flex items-center gap-2 px-3 py-1 bg-[#2D5A27] text-white text-sm rounded-lg hover:bg-[#234520] transition-colors disabled:opacity-50"
-                      >
-                        <Plus size={16} />
-                        Adicionar
-                      </button>
+                      <div className="flex items-center gap-2 flex-1">
+                        {/* Indicador de calendário */}
+                        {member.has_calendar ? (
+                          <div
+                            className="w-5 h-5 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0"
+                            title="Google Calendar conectado"
+                          >
+                            <Calendar size={12} className="text-green-600" />
+                          </div>
+                        ) : (
+                          <div
+                            className="w-5 h-5 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0"
+                            title="Google Calendar não conectado"
+                          >
+                            <Calendar size={12} className="text-red-600" />
+                          </div>
+                        )}
+                        <span className="text-sm text-[#333333]">{member.name}</span>
+                      </div>
+                      
+                      {member.has_calendar ? (
+                        <button
+                          onClick={() => handleAddMember(member.user_id)}
+                          disabled={addingMember}
+                          className="flex items-center gap-2 px-3 py-1 bg-[#2D5A27] text-white text-sm rounded-lg hover:bg-[#234520] transition-colors disabled:opacity-50"
+                        >
+                          <Plus size={16} />
+                          Adicionar
+                        </button>
+                      ) : (
+                        <div className="text-xs text-red-600 max-w-[200px] text-right">
+                          Sem calendário conectado
+                        </div>
+                      )}
                     </div>
                   ))}
 
