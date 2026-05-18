@@ -176,8 +176,36 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
       return res.status(500).json({ success: false, message: 'Error fetching meetings' })
     }
 
+    // Determina has_transcript sem trafegar o texto completo da transcrição.
+    // Considera "com transcrição" se houver texto em meetings.transcript OU
+    // ao menos um registro em transcript_segments.
+    const meetingIds = (data ?? []).map((m: any) => m.id)
+    const hasTranscriptSet = new Set<string>()
+
+    if (meetingIds.length > 0) {
+      const [{ data: withText }, { data: withSegments }] = await Promise.all([
+        supabase
+          .from('meetings')
+          .select('id')
+          .in('id', meetingIds)
+          .not('transcript', 'is', null)
+          .neq('transcript', ''),
+        supabase
+          .from('transcript_segments')
+          .select('meeting_id')
+          .in('meeting_id', meetingIds),
+      ])
+      ;(withText ?? []).forEach((r: any) => hasTranscriptSet.add(r.id))
+      ;(withSegments ?? []).forEach((r: any) => hasTranscriptSet.add(r.meeting_id))
+    }
+
+    const meetings = (data ?? []).map((m: any) => ({
+      ...m,
+      has_transcript: hasTranscriptSet.has(m.id),
+    }))
+
     res.set('Cache-Control', 'private, max-age=20, stale-while-revalidate=40')
-    return res.json({ success: true, meetings: data ?? [] })
+    return res.json({ success: true, meetings })
   } catch (err) {
     logger.error('Unexpected error in GET /meetings:', err)
     return res.status(500).json({ success: false, message: 'Internal server error' })

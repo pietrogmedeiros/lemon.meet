@@ -549,7 +549,7 @@ router.get('/:id/meetings', authMiddleware, async (req: AuthRequest, res: Respon
 
     const { data: meetings, error } = await supabase
       .from('meetings')
-      .select('id, title, platform, status, meet_link, started_at, ended_at, duration_seconds, insights, created_at, user_id, transcript')
+      .select('id, title, platform, status, meet_link, started_at, ended_at, duration_seconds, insights, created_at, user_id')
       .in('user_id', memberIds)
       .order('created_at', { ascending: false })
       .limit(200)
@@ -567,9 +567,30 @@ router.get('/:id/meetings', authMiddleware, async (req: AuthRequest, res: Respon
       })
     )
 
+    // has_transcript: texto em meetings.transcript OU registros em transcript_segments
+    const meetingIds = (meetings ?? []).map(m => m.id)
+    const hasTranscriptSet = new Set<string>()
+    if (meetingIds.length > 0) {
+      const [{ data: withText }, { data: withSegments }] = await Promise.all([
+        supabase
+          .from('meetings')
+          .select('id')
+          .in('id', meetingIds)
+          .not('transcript', 'is', null)
+          .neq('transcript', ''),
+        supabase
+          .from('transcript_segments')
+          .select('meeting_id')
+          .in('meeting_id', meetingIds),
+      ])
+      ;(withText ?? []).forEach((r: any) => hasTranscriptSet.add(r.id))
+      ;(withSegments ?? []).forEach((r: any) => hasTranscriptSet.add(r.meeting_id))
+    }
+
     const enriched = (meetings ?? []).map(m => ({
       ...m,
       member_name: memberMap.get(m.user_id) ?? m.user_id,
+      has_transcript: hasTranscriptSet.has(m.id),
     }))
 
     return res.json({ success: true, meetings: enriched, canSeeAll })

@@ -409,7 +409,7 @@ export function MeetingsPage() {
 
                 <div className="mb-3 flex items-center gap-2 flex-wrap">
                   {getStatusBadge(meeting.status)}
-                  {meeting.transcript && meeting.transcript.trim().length > 0 ? (
+                  {(meeting.has_transcript ?? (meeting.transcript && meeting.transcript.trim().length > 0)) ? (
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-[#2D5A27]/10 text-[#2D5A27] border border-[#2D5A27]/20">
                       <FileText className="w-3 h-3" />
                       Com transcrição

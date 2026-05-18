@@ -29,6 +29,7 @@ export interface Meeting {
   user_avatar_url?: string | null
   team_id?: string | null
   transcript?: string | null
+  has_transcript?: boolean
 }
 
 let cache: CacheEntry | null = null
