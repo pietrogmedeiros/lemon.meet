@@ -30,7 +30,7 @@ const PublicSchedulingPage    = lazy(() => import('@/pages/PublicSchedulingPage'
 const FeatureRequestsPage     = lazy(() => import('@/pages/FeatureRequestsPage').then(m => ({ default: m.FeatureRequestsPage })))
 
 function App() {
-  const { shouldShow, dismiss } = useFeedbackSurvey();
+  const { shouldShow, markSubmitted } = useFeedbackSurvey();
 
   return (
     <ThemeProvider>
@@ -193,7 +193,7 @@ function App() {
         </Routes>
         
         {/* Modal de pesquisa de satisfação */}
-        <FeedbackSurveyModal isOpen={shouldShow} onClose={dismiss} />
+        <FeedbackSurveyModal isOpen={shouldShow} onSubmitted={markSubmitted} />
         
         </Suspense>
         </SubscriptionProvider>

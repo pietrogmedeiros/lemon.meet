@@ -3,7 +3,6 @@ import { supabase } from '../lib/supabase';
 
 export function useFeedbackSurvey() {
   const [shouldShow, setShouldShow] = useState(false);
-  const [isChecking, setIsChecking] = useState(true);
 
   useEffect(() => {
     checkIfShouldShow();
@@ -11,68 +10,42 @@ export function useFeedbackSurvey() {
 
   const checkIfShouldShow = async () => {
     try {
-      // Verifica localStorage primeiro (mais rápido)
+      // Atalho local: já respondeu nesta máquina/navegador
       const hasSubmittedLocal = localStorage.getItem('lemon-feedback-submitted');
       if (hasSubmittedLocal === 'true') {
-        setShouldShow(false);
-        setIsChecking(false);
         return;
       }
 
-      // Verifica se está autenticado
+      // Só mostra para usuários autenticados
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        setShouldShow(false);
-        setIsChecking(false);
-        return;
-      }
+      if (!session) return;
 
-      // Verifica no backend se já respondeu
+      // Confirma no backend (fonte da verdade entre dispositivos)
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-      
       const res = await fetch(`${apiUrl}/api/feedback/check`, {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
+        headers: { Authorization: `Bearer ${session.access_token}` },
       });
 
-      if (!res.ok) {
-        setShouldShow(false);
-        setIsChecking(false);
+      if (!res.ok) return;
+
+      const data = await res.json();
+
+      if (data.hasSubmitted) {
+        localStorage.setItem('lemon-feedback-submitted', 'true');
         return;
       }
 
-      const data = await res.json();
-      
-      if (data.hasSubmitted) {
-        // Sincroniza com localStorage
-        localStorage.setItem('lemon-feedback-submitted', 'true');
-        setShouldShow(false);
-      } else {
-        // Verifica se já mostrou a pesquisa nesta sessão
-        const hasSeenThisSession = sessionStorage.getItem('lemon-feedback-shown');
-        if (!hasSeenThisSession) {
-          // Adiciona delay de 3 segundos antes de mostrar
-          setTimeout(() => {
-            setShouldShow(true);
-            sessionStorage.setItem('lemon-feedback-shown', 'true');
-          }, 3000);
-        }
-      }
-
+      // Ainda não respondeu — mostra o modal (bloqueante até responder).
+      // Pequeno delay pra não aparecer no exato instante em que a página monta.
+      setTimeout(() => setShouldShow(true), 1500);
     } catch (error) {
       console.error('Error checking feedback status:', error);
-      setShouldShow(false);
-    } finally {
-      setIsChecking(false);
     }
   };
 
-  const dismiss = () => {
+  const markSubmitted = () => {
     setShouldShow(false);
-    // Marca como visto nesta sessão (mas não submete)
-    sessionStorage.setItem('lemon-feedback-shown', 'true');
   };
 
-  return { shouldShow, isChecking, dismiss };
+  return { shouldShow, markSubmitted };
 }

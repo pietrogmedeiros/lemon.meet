@@ -1,13 +1,13 @@
 import { useState } from 'react';
-import { X, Send } from 'lucide-react';
+import { Send } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 interface FeedbackSurveyModalProps {
   isOpen: boolean;
-  onClose: () => void;
+  onSubmitted: () => void;
 }
 
-export function FeedbackSurveyModal({ isOpen, onClose }: FeedbackSurveyModalProps) {
+export function FeedbackSurveyModal({ isOpen, onSubmitted }: FeedbackSurveyModalProps) {
   const [howUsing, setHowUsing] = useState('');
   const [whatThink, setWhatThink] = useState('');
   const [featureRequest, setFeatureRequest] = useState('');
@@ -29,7 +29,7 @@ export function FeedbackSurveyModal({ isOpen, onClose }: FeedbackSurveyModalProp
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      
+
       if (!session) {
         setError('Sessão expirada. Faça login novamente.');
         return;
@@ -51,14 +51,17 @@ export function FeedbackSurveyModal({ isOpen, onClose }: FeedbackSurveyModalProp
       const data = await res.json();
 
       if (!res.ok) {
+        // Se o backend diz que já respondeu, também marca como enviado e fecha
+        if (res.status === 409) {
+          localStorage.setItem('lemon-feedback-submitted', 'true');
+          onSubmitted();
+          return;
+        }
         throw new Error(data.message || 'Erro ao enviar feedback');
       }
 
-      // Marca como enviado no localStorage
       localStorage.setItem('lemon-feedback-submitted', 'true');
-      
-      // Fecha o modal
-      onClose();
+      onSubmitted();
 
     } catch (err: any) {
       console.error('Error submitting feedback:', err);
@@ -72,24 +75,16 @@ export function FeedbackSurveyModal({ isOpen, onClose }: FeedbackSurveyModalProp
 
   return (
     <>
-      {/* Overlay */}
+      {/* Overlay — sem onClick para impedir fechar clicando fora */}
       <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
         {/* Modal */}
         <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-          {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-[#E0E0E0]">
-            <div>
-              <h2 className="text-xl font-bold text-[#333333]">Queremos ouvir você! 🎤</h2>
-              <p className="text-sm text-[#666666] mt-1">
-                Ajude-nos a melhorar o Lemon.meet respondendo 3 perguntas rápidas
-              </p>
-            </div>
-            <button
-              onClick={onClose}
-              className="w-8 h-8 rounded-lg hover:bg-[#F5F5F5] flex items-center justify-center transition"
-            >
-              <X className="w-5 h-5 text-[#666666]" />
-            </button>
+          {/* Header — sem botão de fechar */}
+          <div className="px-6 py-4 border-b border-[#E0E0E0]">
+            <h2 className="text-xl font-bold text-[#333333]">Queremos ouvir você! 🎤</h2>
+            <p className="text-sm text-[#666666] mt-1">
+              Ajude-nos a melhorar o Lemon.meet respondendo 3 perguntas rápidas
+            </p>
           </div>
 
           {/* Form */}
@@ -152,16 +147,8 @@ export function FeedbackSurveyModal({ isOpen, onClose }: FeedbackSurveyModalProp
               </div>
             )}
 
-            {/* Footer */}
-            <div className="flex items-center justify-between pt-4 border-t border-[#E0E0E0]">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-2 text-sm text-[#666666] hover:text-[#333333] transition"
-                disabled={isSubmitting}
-              >
-                Agora não
-              </button>
+            {/* Footer — apenas botão de enviar */}
+            <div className="flex items-center justify-end pt-4 border-t border-[#E0E0E0]">
               <button
                 type="submit"
                 disabled={isSubmitting || !howUsing.trim() || !whatThink.trim() || !featureRequest.trim()}
