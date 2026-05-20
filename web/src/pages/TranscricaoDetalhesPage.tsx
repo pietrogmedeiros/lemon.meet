@@ -4,7 +4,7 @@ import { MainLayout } from '../components/layout/MainLayout';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
-import { ArrowLeft, Clock, Calendar, Mic, Target, CheckCircle, Mail, BookOpen, Sparkles, X, Copy, Check, Trash2, Lock, Users, RefreshCw, Download, Phone, Edit2, Save, MessageCircle } from 'lucide-react';
+import { ArrowLeft, Clock, Calendar, Mic, Target, CheckCircle, Mail, BookOpen, Sparkles, X, Copy, Check, Trash2, Lock, Users, RefreshCw, Download, Phone, Edit2, Save, MessageCircle, Heart, AlertTriangle, Smile } from 'lucide-react';
 import { RapportSection } from '../components/ui/RapportSection';
 import { MeetingChatPanel } from '../components/MeetingChatPanel';
 import { supabase } from '../lib/supabase';
@@ -20,26 +20,68 @@ interface TranscriptSegment {
   created_at: string;
 }
 
-interface BantDimension {
+interface ScoreDimension {
   score: number;
   evidence: string;
 }
 
-interface MeetingInsights {
+interface BantScore {
+  budget: ScoreDimension;
+  authority: ScoreDimension;
+  need: ScoreDimension;
+  timeline: ScoreDimension;
+}
+
+interface SpinScore {
+  situation: ScoreDimension;
+  problem: ScoreDimension;
+  implication: ScoreDimension;
+  needPayoff: ScoreDimension;
+}
+
+interface EscalationFlag {
+  description: string;
+  severity: 'low' | 'medium' | 'high';
+}
+
+interface BaseInsights {
   sentiment: 'positive' | 'neutral' | 'negative';
-  commercialQuality: number;
   executiveContext: string;
-  closingProbability: number;
   followUp: string[];
   followUpSuggestions: string[];
   keyTopics: string[];
   actionItems: string[];
-  bantScore?: {
-    budget: BantDimension;
-    authority: BantDimension;
-    need: BantDimension;
-    timeline: BantDimension;
-  };
+}
+
+interface BantInsights extends BaseInsights {
+  framework: 'bant';
+  commercialQuality: number;
+  closingProbability: number;
+  bantScore: BantScore;
+}
+
+interface SpinInsights extends BaseInsights {
+  framework: 'spin';
+  commercialQuality: number;
+  closingProbability: number;
+  spinScore: SpinScore;
+}
+
+interface CsInsights extends BaseInsights {
+  framework: 'cs';
+  healthScore: number;
+  churnRisk: 'low' | 'medium' | 'high';
+  churnRiskEvidence: string;
+  satisfactionScore: number;
+  escalationFlags: EscalationFlag[];
+}
+
+type MeetingInsights = BantInsights | SpinInsights | CsInsights;
+
+// Insights antigos não tinham `framework`; assumimos BANT (era o único modo).
+function getFramework(insights: MeetingInsights | null | undefined): 'bant' | 'spin' | 'cs' {
+  if (!insights) return 'bant';
+  return (insights as any).framework ?? 'bant';
 }
 
 interface Meeting {
@@ -1081,79 +1123,230 @@ export function TranscricaoDetalhesPage() {
         {/* Insights */}
         {meeting.insights && (
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            {/* Score & Sentiment */}
-            <Card className="p-5">
-              <h2 className="text-headline-2 text-primary mb-4 flex items-center gap-2">
-                <Target className="h-5 w-5" />
-                Score Comercial
-              </h2>
-              <div className="flex items-center gap-4">
-                <div className="flex-shrink-0 w-20 h-20 rounded-full border-4 border-accent flex items-center justify-center">
-                  <span className="text-2xl font-bold text-primary">
-                    {meeting.insights.commercialQuality ?? '–'}
-                  </span>
-                </div>
-                <div className="flex-1">
-                  <div className="h-3 rounded-full bg-neutral-lighter overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-accent transition-all"
-                      style={{ width: `${(meeting.insights.commercialQuality / 10) * 100}%` }}
-                    />
-                  </div>
-                  <p className="mt-2 text-sm text-secondary">
-                    Sentimento:{' '}
-                    {meeting.insights.sentiment === 'positive' ? '😊 Positivo' :
-                     meeting.insights.sentiment === 'negative' ? '😟 Negativo' : '😐 Neutro'}
-                  </p>
-                  <p className="mt-1 text-sm text-secondary">
-                    Probabilidade de fechamento:{' '}
-                    <strong className="text-primary">{meeting.insights.closingProbability}%</strong>
-                  </p>
-                </div>
-              </div>
-              {meeting.insights.executiveContext && (
-                <p className="mt-4 text-sm text-secondary bg-neutral-lighter rounded-lg p-3 leading-relaxed">
-                  {meeting.insights.executiveContext}
-                </p>
-              )}
-            </Card>
+            {/* Card 1: Score Comercial (Sales) ou Saúde da Conta (CS) */}
+            {(() => {
+              const insights = meeting.insights!;
+              const framework = getFramework(insights);
 
-            {/* BANT Scorecard */}
-            {meeting.insights.bantScore && (
-              <Card className="p-5">
-                <h2 className="text-headline-2 text-primary mb-4 flex items-center gap-2">
-                  <Sparkles className="h-5 w-5" />
-                  Scorecard BANT
-                </h2>
-                <div className="space-y-3">
-                  {(
-                    [
-                      { key: 'budget', label: 'Budget', color: '#22c55e' },
-                      { key: 'authority', label: 'Authority', color: '#3b82f6' },
-                      { key: 'need', label: 'Need', color: '#f59e0b' },
-                      { key: 'timeline', label: 'Timeline', color: '#a855f7' },
-                    ] as const
-                  ).map(({ key, label, color }) => {
-                    const dim = meeting.insights!.bantScore![key];
-                    return (
-                      <div key={key}>
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-xs font-semibold uppercase tracking-wider text-secondary">{label}</span>
-                          <span className="text-xs font-bold" style={{ color }}>{dim.score}/10</span>
-                        </div>
-                        <div className="h-2 rounded-full bg-neutral-lighter overflow-hidden mb-1">
+              const sentimentLabel = insights.sentiment === 'positive' ? '😊 Positivo' :
+                                     insights.sentiment === 'negative' ? '😟 Negativo' : '😐 Neutro';
+
+              if (framework === 'cs') {
+                const cs = insights as CsInsights;
+                const churnColor = cs.churnRisk === 'high' ? '#ef4444' : cs.churnRisk === 'medium' ? '#f59e0b' : '#22c55e';
+                const churnLabel = cs.churnRisk === 'high' ? 'Alto' : cs.churnRisk === 'medium' ? 'Médio' : 'Baixo';
+                return (
+                  <Card className="p-5">
+                    <h2 className="text-headline-2 text-primary mb-4 flex items-center gap-2">
+                      <Heart className="h-5 w-5" />
+                      Saúde da Conta
+                    </h2>
+                    <div className="flex items-center gap-4">
+                      <div className="flex-shrink-0 w-20 h-20 rounded-full border-4 border-accent flex items-center justify-center">
+                        <span className="text-2xl font-bold text-primary">
+                          {cs.healthScore ?? '–'}
+                        </span>
+                      </div>
+                      <div className="flex-1">
+                        <div className="h-3 rounded-full bg-neutral-lighter overflow-hidden">
                           <div
-                            className="h-full rounded-full transition-all"
-                            style={{ width: `${dim.score * 10}%`, backgroundColor: color }}
+                            className="h-full rounded-full bg-accent transition-all"
+                            style={{ width: `${cs.healthScore ?? 0}%` }}
                           />
                         </div>
-                        <p className="text-xs text-secondary leading-snug">{dim.evidence}</p>
+                        <p className="mt-2 text-sm text-secondary">
+                          Sentimento: {sentimentLabel}
+                        </p>
+                        <p className="mt-1 text-sm text-secondary">
+                          Risco de churn:{' '}
+                          <strong style={{ color: churnColor }}>{churnLabel}</strong>
+                        </p>
                       </div>
-                    );
-                  })}
-                </div>
-              </Card>
-            )}
+                    </div>
+                    {insights.executiveContext && (
+                      <p className="mt-4 text-sm text-secondary bg-neutral-lighter rounded-lg p-3 leading-relaxed">
+                        {insights.executiveContext}
+                      </p>
+                    )}
+                  </Card>
+                );
+              }
+
+              // Sales (BANT ou SPIN) — mesma estrutura
+              const sales = insights as BantInsights | SpinInsights;
+              return (
+                <Card className="p-5">
+                  <h2 className="text-headline-2 text-primary mb-4 flex items-center gap-2">
+                    <Target className="h-5 w-5" />
+                    Score Comercial
+                  </h2>
+                  <div className="flex items-center gap-4">
+                    <div className="flex-shrink-0 w-20 h-20 rounded-full border-4 border-accent flex items-center justify-center">
+                      <span className="text-2xl font-bold text-primary">
+                        {sales.commercialQuality ?? '–'}
+                      </span>
+                    </div>
+                    <div className="flex-1">
+                      <div className="h-3 rounded-full bg-neutral-lighter overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-accent transition-all"
+                          style={{ width: `${(sales.commercialQuality / 10) * 100}%` }}
+                        />
+                      </div>
+                      <p className="mt-2 text-sm text-secondary">
+                        Sentimento: {sentimentLabel}
+                      </p>
+                      <p className="mt-1 text-sm text-secondary">
+                        Probabilidade de fechamento:{' '}
+                        <strong className="text-primary">{sales.closingProbability}%</strong>
+                      </p>
+                    </div>
+                  </div>
+                  {insights.executiveContext && (
+                    <p className="mt-4 text-sm text-secondary bg-neutral-lighter rounded-lg p-3 leading-relaxed">
+                      {insights.executiveContext}
+                    </p>
+                  )}
+                </Card>
+              );
+            })()}
+
+            {/* Card 2: Scorecard por framework */}
+            {(() => {
+              const insights = meeting.insights!;
+              const framework = getFramework(insights);
+
+              // BANT scorecard
+              if (framework === 'bant') {
+                const bant = (insights as BantInsights).bantScore;
+                if (!bant) return null;
+                return (
+                  <Card className="p-5">
+                    <h2 className="text-headline-2 text-primary mb-4 flex items-center gap-2">
+                      <Sparkles className="h-5 w-5" />
+                      Scorecard BANT
+                    </h2>
+                    <div className="space-y-3">
+                      {([
+                        { key: 'budget', label: 'Budget', color: '#22c55e' },
+                        { key: 'authority', label: 'Authority', color: '#3b82f6' },
+                        { key: 'need', label: 'Need', color: '#f59e0b' },
+                        { key: 'timeline', label: 'Timeline', color: '#a855f7' },
+                      ] as const).map(({ key, label, color }) => {
+                        const dim = bant[key];
+                        return (
+                          <div key={key}>
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-xs font-semibold uppercase tracking-wider text-secondary">{label}</span>
+                              <span className="text-xs font-bold" style={{ color }}>{dim.score}/10</span>
+                            </div>
+                            <div className="h-2 rounded-full bg-neutral-lighter overflow-hidden mb-1">
+                              <div className="h-full rounded-full transition-all" style={{ width: `${dim.score * 10}%`, backgroundColor: color }} />
+                            </div>
+                            <p className="text-xs text-secondary leading-snug">{dim.evidence}</p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </Card>
+                );
+              }
+
+              // SPIN scorecard
+              if (framework === 'spin') {
+                const spin = (insights as SpinInsights).spinScore;
+                if (!spin) return null;
+                return (
+                  <Card className="p-5">
+                    <h2 className="text-headline-2 text-primary mb-4 flex items-center gap-2">
+                      <Sparkles className="h-5 w-5" />
+                      Scorecard SPIN
+                    </h2>
+                    <div className="space-y-3">
+                      {([
+                        { key: 'situation', label: 'Situation', color: '#22c55e' },
+                        { key: 'problem', label: 'Problem', color: '#3b82f6' },
+                        { key: 'implication', label: 'Implication', color: '#f59e0b' },
+                        { key: 'needPayoff', label: 'Need-payoff', color: '#a855f7' },
+                      ] as const).map(({ key, label, color }) => {
+                        const dim = spin[key];
+                        return (
+                          <div key={key}>
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-xs font-semibold uppercase tracking-wider text-secondary">{label}</span>
+                              <span className="text-xs font-bold" style={{ color }}>{dim.score}/10</span>
+                            </div>
+                            <div className="h-2 rounded-full bg-neutral-lighter overflow-hidden mb-1">
+                              <div className="h-full rounded-full transition-all" style={{ width: `${dim.score * 10}%`, backgroundColor: color }} />
+                            </div>
+                            <p className="text-xs text-secondary leading-snug">{dim.evidence}</p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </Card>
+                );
+              }
+
+              // CS indicadores
+              const cs = insights as CsInsights;
+              return (
+                <Card className="p-5">
+                  <h2 className="text-headline-2 text-primary mb-4 flex items-center gap-2">
+                    <Smile className="h-5 w-5" />
+                    Indicadores CS
+                  </h2>
+                  <div className="space-y-4">
+                    {/* Satisfaction */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-semibold uppercase tracking-wider text-secondary">Satisfação</span>
+                        <span className="text-xs font-bold text-primary">{cs.satisfactionScore ?? '–'}/10</span>
+                      </div>
+                      <div className="h-2 rounded-full bg-neutral-lighter overflow-hidden">
+                        <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${((cs.satisfactionScore ?? 0) / 10) * 100}%` }} />
+                      </div>
+                    </div>
+
+                    {/* Churn risk evidence */}
+                    {cs.churnRiskEvidence && (
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-wider text-secondary mb-1">
+                          Evidência do risco de churn
+                        </p>
+                        <p className="text-xs text-secondary bg-neutral-lighter rounded-lg p-2.5 leading-relaxed">
+                          {cs.churnRiskEvidence}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Escalation flags */}
+                    {cs.escalationFlags && cs.escalationFlags.length > 0 && (
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-wider text-secondary mb-2 flex items-center gap-1.5">
+                          <AlertTriangle className="h-3.5 w-3.5" />
+                          Momentos críticos ({cs.escalationFlags.length})
+                        </p>
+                        <ul className="space-y-1.5">
+                          {cs.escalationFlags.map((flag, i) => {
+                            const sevColor = flag.severity === 'high' ? '#ef4444' : flag.severity === 'medium' ? '#f59e0b' : '#22c55e';
+                            return (
+                              <li key={i} className="flex items-start gap-2 text-xs text-secondary">
+                                <span
+                                  className="mt-1 w-1.5 h-1.5 rounded-full shrink-0"
+                                  style={{ backgroundColor: sevColor }}
+                                />
+                                <span className="leading-snug">{flag.description}</span>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              );
+            })()}
 
             {/* Action items with status tracking */}
             <Card className="p-5 lg:col-span-2">

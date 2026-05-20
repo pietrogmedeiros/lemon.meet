@@ -1,5 +1,18 @@
 {
   "projects": {
     "default": "lemon-meet"
-  }
+  },
+  "targets": {
+    "lemon-meet": {
+      "hosting": {
+        "production": [
+          "lemon-meet"
+        ],
+        "staging": [
+          "lemon-meet-staging"
+        ]
+      }
+    }
+  },
+  "etags": {}
 }

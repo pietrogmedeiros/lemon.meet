@@ -48,10 +48,38 @@ async function setActiveOwnerTeam(userId: string, teamId: string): Promise<void>
 router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.id
-    const { name } = req.body
+    const { name, team_type, evaluation_framework, custom_prompt_instructions } = req.body
 
     if (!name || typeof name !== 'string' || !name.trim()) {
       return res.status(400).json({ success: false, message: 'name is required' })
+    }
+
+    // Valida campos opcionais da config de avaliação (mesma regra do PATCH)
+    if (team_type !== undefined && team_type !== 'sales' && team_type !== 'customer_success') {
+      return res.status(400).json({
+        success: false,
+        message: "team_type deve ser 'sales' ou 'customer_success'",
+      })
+    }
+    if (evaluation_framework !== undefined && evaluation_framework !== 'bant' && evaluation_framework !== 'spin') {
+      return res.status(400).json({
+        success: false,
+        message: "evaluation_framework deve ser 'bant' ou 'spin'",
+      })
+    }
+    if (custom_prompt_instructions !== undefined && custom_prompt_instructions !== null) {
+      if (typeof custom_prompt_instructions !== 'string') {
+        return res.status(400).json({
+          success: false,
+          message: 'custom_prompt_instructions deve ser string ou null',
+        })
+      }
+      if (custom_prompt_instructions.length > 4000) {
+        return res.status(400).json({
+          success: false,
+          message: 'custom_prompt_instructions excede 4000 caracteres',
+        })
+      }
     }
 
     const createPermission = await canCreateOwnedTeam(userId)
@@ -68,15 +96,25 @@ router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
     if (countError) throw countError
 
     if (existingTeams && existingTeams.length >= 5) {
-      return res.status(409).json({ 
-        success: false, 
-        message: 'Você atingiu o limite máximo de 5 times.' 
+      return res.status(409).json({
+        success: false,
+        message: 'Você atingiu o limite máximo de 5 times.'
       })
+    }
+
+    const insertPayload: Record<string, unknown> = {
+      name: name.trim(),
+      owner_id: userId,
+    }
+    if (team_type !== undefined) insertPayload.team_type = team_type
+    if (evaluation_framework !== undefined) insertPayload.evaluation_framework = evaluation_framework
+    if (custom_prompt_instructions !== undefined) {
+      insertPayload.custom_prompt_instructions = custom_prompt_instructions === '' ? null : custom_prompt_instructions
     }
 
     const { data: team, error } = await supabase
       .from('teams')
-      .insert({ name: name.trim(), owner_id: userId })
+      .insert(insertPayload)
       .select()
       .single()
 
@@ -110,12 +148,10 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
     const activeOwnerTeamId = await getPreferredOwnerTeamId(userId)
     logger.info(`📋 GET /api/teams - Usuario ${userId} solicitando lista de times`)
 
-    // 🔧 DEV USER: retorna TODOS os times
-    const { data: { user } } = await supabase.auth.admin.getUserById(userId)
-    const userEmail = user?.email?.toLowerCase().trim()
-    const isDevUser = userEmail === 'pietrogoncalvesmedeiros@gmail.com'
+    // 🔧 DEV USER: retorna TODOS os times (regra centralizada em teamAccess.isDevUser)
+    const isDev = await isDevUser(userId)
 
-    if (isDevUser) {
+    if (isDev) {
       logger.info(`🔧 DEV USER detectado - retornando TODOS os times`)
       const { data: allTeams } = await supabase
         .from('teams')
@@ -136,6 +172,7 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
       logger.info(`🔧 DEV USER: Total de times retornados: ${teamsWithCount.length}`)
       return res.json({ success: true, teams: teamsWithCount, activeOwnerTeamId, isDevUser: true })
     }
+
 
     // Times onde é owner
     const { data: ownedTeams } = await supabase
@@ -285,6 +322,94 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
     return res.json({ success: true, team, members: enriched, isOwner })
   } catch (err) {
     logger.error('Error fetching team:', err)
+    return res.status(500).json({ success: false, message: 'Internal server error' })
+  }
+})
+
+// ── PATCH /api/teams/:id/evaluation-config ────────────────────
+// Atualiza a config de avaliação por IA do time (owner-only).
+// Define team_type (sales/customer_success), evaluation_framework (bant/spin)
+// e instruções customizadas para a IA.
+router.patch('/:id/evaluation-config', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id
+    const { id: teamId } = req.params
+    const { team_type, evaluation_framework, custom_prompt_instructions } = req.body
+
+    // Valida team_type
+    if (team_type !== undefined && team_type !== 'sales' && team_type !== 'customer_success') {
+      return res.status(400).json({
+        success: false,
+        message: "team_type deve ser 'sales' ou 'customer_success'",
+      })
+    }
+
+    // Valida evaluation_framework
+    if (evaluation_framework !== undefined && evaluation_framework !== 'bant' && evaluation_framework !== 'spin') {
+      return res.status(400).json({
+        success: false,
+        message: "evaluation_framework deve ser 'bant' ou 'spin'",
+      })
+    }
+
+    // Valida custom_prompt_instructions (tamanho razoável)
+    if (custom_prompt_instructions !== undefined && custom_prompt_instructions !== null) {
+      if (typeof custom_prompt_instructions !== 'string') {
+        return res.status(400).json({
+          success: false,
+          message: 'custom_prompt_instructions deve ser string ou null',
+        })
+      }
+      if (custom_prompt_instructions.length > 4000) {
+        return res.status(400).json({
+          success: false,
+          message: 'custom_prompt_instructions excede 4000 caracteres',
+        })
+      }
+    }
+
+    // Owner-only
+    const { data: team } = await supabase
+      .from('teams')
+      .select('id, owner_id')
+      .eq('id', teamId)
+      .single()
+
+    if (!team) {
+      return res.status(404).json({ success: false, message: 'Time não encontrado' })
+    }
+    if (team.owner_id !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Apenas o owner pode alterar a configuração de avaliação',
+      })
+    }
+
+    // Monta update parcial
+    const update: Record<string, unknown> = {}
+    if (team_type !== undefined) update.team_type = team_type
+    if (evaluation_framework !== undefined) update.evaluation_framework = evaluation_framework
+    if (custom_prompt_instructions !== undefined) {
+      update.custom_prompt_instructions = custom_prompt_instructions === '' ? null : custom_prompt_instructions
+    }
+
+    if (Object.keys(update).length === 0) {
+      return res.status(400).json({ success: false, message: 'Nenhum campo para atualizar' })
+    }
+
+    const { data: updated, error } = await supabase
+      .from('teams')
+      .update(update)
+      .eq('id', teamId)
+      .select()
+      .single()
+
+    if (error) throw error
+
+    logger.info(`Team ${teamId} evaluation config updated by owner ${userId}: ${JSON.stringify(update)}`)
+    return res.json({ success: true, team: updated })
+  } catch (err) {
+    logger.error('Error updating team evaluation config:', err)
     return res.status(500).json({ success: false, message: 'Internal server error' })
   }
 })
@@ -654,6 +779,73 @@ router.patch('/:id/members/:memberId/role', authMiddleware, async (req: AuthRequ
     return res.json({ success: true })
   } catch (err) {
     logger.error('Error changing member role:', err)
+    return res.status(500).json({ success: false, message: 'Internal server error' })
+  }
+})
+
+// ── DELETE /api/teams/:id ─────────────────────────────────────
+// Remove um time inteiro (owner-only). Exige confirmação por nome no body.
+// Cleanup:
+// - team_members (delete explícito como defesa em profundidade)
+// - team_invite_links e team_scheduling (CASCADE pelo FK)
+// - meetings.team_id (SET NULL pelo FK — histórico preservado)
+// - active_owner_team_id no user_metadata é limpo se apontava pra este time
+router.delete('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id
+    const { id: teamId } = req.params
+    const { name } = req.body
+
+    // Carrega o time
+    const { data: team } = await supabase
+      .from('teams')
+      .select('id, name, owner_id')
+      .eq('id', teamId)
+      .single()
+
+    if (!team) {
+      return res.status(404).json({ success: false, message: 'Time não encontrado' })
+    }
+    if (team.owner_id !== userId) {
+      return res.status(403).json({ success: false, message: 'Apenas o owner pode excluir o time' })
+    }
+
+    // Confirmação por nome — comparação trim-only, case-sensitive
+    if (typeof name !== 'string' || name.trim() !== team.name) {
+      return res.status(400).json({
+        success: false,
+        message: 'O nome digitado não confere com o nome do time',
+      })
+    }
+
+    // Defense-in-depth: remove team_members antes do time (caso FK não tenha CASCADE)
+    await supabase.from('team_members').delete().eq('team_id', teamId)
+
+    const { error: deleteError } = await supabase
+      .from('teams')
+      .delete()
+      .eq('id', teamId)
+
+    if (deleteError) throw deleteError
+
+    // Limpa active_owner_team_id se apontava pra este time
+    try {
+      const { data: profile } = await supabase.auth.admin.getUserById(userId)
+      const currentMetadata = profile.user?.user_metadata ?? {}
+      if (currentMetadata.active_owner_team_id === teamId) {
+        const next = { ...currentMetadata }
+        delete next.active_owner_team_id
+        await supabase.auth.admin.updateUserById(userId, { user_metadata: next })
+      }
+    } catch (metaErr) {
+      // Falha na limpeza do metadata não impede o sucesso da exclusão
+      logger.warn(`Falha ao limpar active_owner_team_id após delete do time ${teamId}:`, metaErr)
+    }
+
+    logger.info(`Team ${teamId} ("${team.name}") deleted by owner ${userId}`)
+    return res.json({ success: true })
+  } catch (err) {
+    logger.error('Error deleting team:', err)
     return res.status(500).json({ success: false, message: 'Internal server error' })
   }
 })

@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase'
 import {
   Users, Plus, Trash2, CheckCircle, Clock,
   AlertCircle, Loader, Video, Crown, UserPlus, ChevronRight,
-  Shield, Link2, Copy, Check
+  Shield, Link2, Copy, Check, Sparkles, X, Settings
 } from 'lucide-react'
 import { formatDate } from '@/lib'
 import { useNavigate } from 'react-router-dom'
@@ -26,6 +26,9 @@ interface Team {
   name: string
   owner_id: string
   isOwner?: boolean
+  team_type?: 'sales' | 'customer_success'
+  evaluation_framework?: 'bant' | 'spin'
+  custom_prompt_instructions?: string | null
 }
 
 interface TeamMeeting {
@@ -61,12 +64,26 @@ export function TeamPage() {
   const [isOwner, setIsOwner] = useState(false)
   const [loading, setLoading] = useState(true)
   const [teamLoading, setTeamLoading] = useState(false)
-  const [tab, setTab] = useState<'members' | 'meetings'>('members')
+  const [tab, setTab] = useState<'members' | 'meetings' | 'settings'>('members')
 
   // Criar time
+  const [showCreateTeamModal, setShowCreateTeamModal] = useState(false)
   const [teamName, setTeamName] = useState('')
+  const [createTeamType, setCreateTeamType] = useState<'sales' | 'customer_success'>('sales')
+  const [createTeamFramework, setCreateTeamFramework] = useState<'bant' | 'spin'>('bant')
+  const [createTeamInstructions, setCreateTeamInstructions] = useState('')
   const [createStatus, setCreateStatus] = useState<'idle' | 'loading' | 'error'>('idle')
   const [createError, setCreateError] = useState('')
+
+  const openCreateTeamModal = () => {
+    setTeamName('')
+    setCreateTeamType('sales')
+    setCreateTeamFramework('bant')
+    setCreateTeamInstructions('')
+    setCreateError('')
+    setCreateStatus('idle')
+    setShowCreateTeamModal(true)
+  }
 
   // Meetings do time
   const [meetings, setMeetings] = useState<TeamMeeting[]>([])
@@ -77,6 +94,22 @@ export function TeamPage() {
 
   // Alterar papel
   const [promotingMember, setPromotingMember] = useState<string | null>(null)
+
+  // Config de avaliação por IA
+  const [showConfigModal, setShowConfigModal] = useState(false)
+  const [configForm, setConfigForm] = useState<{
+    team_type: 'sales' | 'customer_success'
+    evaluation_framework: 'bant' | 'spin'
+    custom_prompt_instructions: string
+  }>({ team_type: 'sales', evaluation_framework: 'bant', custom_prompt_instructions: '' })
+  const [configSaving, setConfigSaving] = useState(false)
+  const [configError, setConfigError] = useState('')
+
+  // Excluir time
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [deleteConfirmText, setDeleteConfirmText] = useState('')
+  const [deleteLoading, setDeleteLoading] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
 
   // Link de convite
   const [showInviteLinkModal, setShowInviteLinkModal] = useState(false)
@@ -252,12 +285,24 @@ export function TeamPage() {
     setCreateError('')
     setCreateStatus('loading')
     try {
+      const payload: Record<string, unknown> = {
+        name: teamName.trim(),
+        team_type: createTeamType,
+        custom_prompt_instructions: createTeamInstructions.trim() || null,
+      }
+      // evaluation_framework só é relevante quando team_type='sales'
+      if (createTeamType === 'sales') {
+        payload.evaluation_framework = createTeamFramework
+      }
+
       const data = await apiFetch('/api/teams', session, {
         method: 'POST',
-        body: JSON.stringify({ name: teamName.trim() }),
+        body: JSON.stringify(payload),
       })
       if (!data.success) throw new Error(data.message)
+      setShowCreateTeamModal(false)
       setTeamName('')
+      setCreateTeamInstructions('')
       await loadTeams()
       // Seleciona o time recém-criado
       if (data.team) {
@@ -328,10 +373,239 @@ export function TeamPage() {
     setTimeout(() => setLinkCopied(false), 2000)
   }
 
+  const handleOpenDeleteModal = () => {
+    setDeleteConfirmText('')
+    setDeleteError('')
+    setShowDeleteModal(true)
+  }
+
+  const handleDeleteTeam = async () => {
+    if (!team) return
+    if (deleteConfirmText.trim() !== team.name) {
+      setDeleteError('O nome digitado não confere com o nome do time')
+      return
+    }
+    setDeleteLoading(true)
+    setDeleteError('')
+    try {
+      const data = await apiFetch(`/api/teams/${team.id}`, session, {
+        method: 'DELETE',
+        body: JSON.stringify({ name: deleteConfirmText.trim() }),
+      })
+      if (!data.success) throw new Error(data.message ?? 'Erro ao excluir time')
+      // Limpa estado local e recarrega lista
+      setShowDeleteModal(false)
+      setTeam(null)
+      setSelectedTeamId(null)
+      await loadTeams()
+    } catch (err: any) {
+      setDeleteError(err.message ?? 'Erro ao excluir')
+    } finally {
+      setDeleteLoading(false)
+    }
+  }
+
+  const handleOpenConfigModal = () => {
+    if (!team) return
+    setConfigForm({
+      team_type: team.team_type ?? 'sales',
+      evaluation_framework: team.evaluation_framework ?? 'bant',
+      custom_prompt_instructions: team.custom_prompt_instructions ?? '',
+    })
+    setConfigError('')
+    setShowConfigModal(true)
+  }
+
+  const handleSaveConfig = async () => {
+    if (!team) return
+    setConfigSaving(true)
+    setConfigError('')
+    try {
+      const payload: Record<string, unknown> = {
+        team_type: configForm.team_type,
+        custom_prompt_instructions: configForm.custom_prompt_instructions.trim() || null,
+      }
+      // evaluation_framework só é relevante quando team_type='sales'
+      if (configForm.team_type === 'sales') {
+        payload.evaluation_framework = configForm.evaluation_framework
+      }
+
+      const data = await apiFetch(`/api/teams/${team.id}/evaluation-config`, session, {
+        method: 'PATCH',
+        body: JSON.stringify(payload),
+      })
+      if (!data.success) throw new Error(data.message ?? 'Erro ao salvar configuração')
+
+      setTeam(prev => prev ? {
+        ...prev,
+        team_type: data.team.team_type,
+        evaluation_framework: data.team.evaluation_framework,
+        custom_prompt_instructions: data.team.custom_prompt_instructions,
+      } : prev)
+      setShowConfigModal(false)
+    } catch (err: any) {
+      setConfigError(err.message ?? 'Erro ao salvar')
+    } finally {
+      setConfigSaving(false)
+    }
+  }
+
   const formatDuration = (s: number | null) => {
     if (!s) return '0m'
     const m = Math.floor(s / 60)
     return `${m}m`
+  }
+
+  const renderCreateTeamModal = () => {
+    if (!showCreateTeamModal) return null
+    const isLoading = createStatus === 'loading'
+    return (
+      <div
+        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        onClick={() => !isLoading && setShowCreateTeamModal(false)}
+      >
+        <div
+          className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 space-y-5 max-h-[90vh] overflow-y-auto"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div className="flex items-start justify-between">
+            <div>
+              <h3 className="text-xl font-bold text-[#333333]">Criar novo time</h3>
+              <p className="text-sm text-[#666666] mt-1">
+                Defina o tipo do time e como a IA deve avaliar as reuniões
+              </p>
+            </div>
+            <button
+              onClick={() => !isLoading && setShowCreateTeamModal(false)}
+              className="text-[#999999] hover:text-[#333333] transition"
+              disabled={isLoading}
+            >
+              <X size={20} />
+            </button>
+          </div>
+
+          {/* Nome do time */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-[#666666] uppercase tracking-wider">
+              Nome do time
+            </label>
+            <input
+              type="text"
+              value={teamName}
+              onChange={(e) => setTeamName(e.target.value)}
+              placeholder="Ex: Time Comercial"
+              autoFocus
+              className="w-full px-4 py-2.5 rounded-xl border border-[#E0E0E0] text-[#333333] text-sm focus:outline-none focus:ring-2 focus:ring-[#2D5A27]/25 focus:border-[#2D5A27] transition bg-white placeholder:text-[#999]"
+            />
+          </div>
+
+          {/* Tipo do time */}
+          <div className="space-y-2">
+            <label className="text-xs font-semibold text-[#666666] uppercase tracking-wider">
+              Tipo do time
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              {([
+                { value: 'sales' as const, label: 'Sales', desc: 'Reuniões comerciais (prospecção, qualificação, fechamento)' },
+                { value: 'customer_success' as const, label: 'Customer Success', desc: 'Reuniões com clientes ativos (health, retenção, expansão)' },
+              ]).map(opt => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setCreateTeamType(opt.value)}
+                  className={`text-left p-3 rounded-xl border-2 transition ${
+                    createTeamType === opt.value
+                      ? 'border-[#2D5A27] bg-[#2D5A27]/5'
+                      : 'border-[#E0E0E0] hover:border-[#CCCCCC]'
+                  }`}
+                >
+                  <div className="text-sm font-semibold text-[#333333]">{opt.label}</div>
+                  <div className="text-xs text-[#666666] mt-1 leading-relaxed">{opt.desc}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Framework (só Sales) */}
+          {createTeamType === 'sales' && (
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-[#666666] uppercase tracking-wider">
+                Framework de avaliação
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {([
+                  { value: 'bant' as const, label: 'BANT', desc: 'Budget, Authority, Need, Timeline' },
+                  { value: 'spin' as const, label: 'SPIN Selling', desc: 'Situation, Problem, Implication, Need-payoff' },
+                ]).map(opt => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setCreateTeamFramework(opt.value)}
+                    className={`text-left p-3 rounded-xl border-2 transition ${
+                      createTeamFramework === opt.value
+                        ? 'border-[#2D5A27] bg-[#2D5A27]/5'
+                        : 'border-[#E0E0E0] hover:border-[#CCCCCC]'
+                    }`}
+                  >
+                    <div className="text-sm font-semibold text-[#333333]">{opt.label}</div>
+                    <div className="text-xs text-[#666666] mt-1 leading-relaxed">{opt.desc}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Instruções customizadas */}
+          <div className="space-y-2">
+            <label className="text-xs font-semibold text-[#666666] uppercase tracking-wider">
+              Instruções customizadas (opcional)
+            </label>
+            <p className="text-xs text-[#666666] leading-relaxed">
+              Instruções adicionais para a IA. Contextualize seu ICP, tom desejado, sinais específicos a observar, etc.
+            </p>
+            <textarea
+              value={createTeamInstructions}
+              onChange={(e) => setCreateTeamInstructions(e.target.value)}
+              placeholder="Você pode preencher depois, se preferir."
+              maxLength={4000}
+              rows={4}
+              className="w-full text-sm text-[#333333] bg-[#F8F9FA] border border-[#E0E0E0] rounded-xl p-3 focus:outline-none focus:border-[#2D5A27] resize-y"
+            />
+            <div className="text-xs text-[#999999] text-right">
+              {createTeamInstructions.length} / 4000
+            </div>
+          </div>
+
+          {/* Erro */}
+          {createError && (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex gap-2">
+              <AlertCircle size={16} className="text-[#DC3545] shrink-0 mt-0.5" />
+              <p className="text-xs text-[#DC3545] leading-relaxed">{createError}</p>
+            </div>
+          )}
+
+          {/* Botões */}
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowCreateTeamModal(false)}
+              disabled={isLoading}
+              className="flex-1 py-2.5 rounded-xl border border-[#E0E0E0] text-sm font-semibold text-[#666666] hover:bg-[#F8F9FA] transition disabled:opacity-50"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleCreateTeam}
+              disabled={isLoading || !teamName.trim()}
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#2D5A27] text-white text-sm font-semibold hover:bg-[#1E3D1A] transition disabled:opacity-50"
+            >
+              {isLoading ? <Loader size={15} className="animate-spin" /> : <Plus size={15} />}
+              Criar time
+            </button>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   if (loading) {
@@ -377,35 +651,17 @@ export function TeamPage() {
           </div>
 
           {/* Card de criação */}
-          <div className="bg-white border border-[#E0E0E0] rounded-2xl p-6 shadow-sm space-y-4">
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-[#666666] uppercase tracking-wider">
-                Nome do time
-              </label>
-              <input
-                type="text"
-                value={teamName}
-                onChange={(e) => setTeamName(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleCreateTeam()}
-                placeholder="Ex: Time Comercial"
-                className="w-full px-4 py-2.5 rounded-xl border border-[#E0E0E0] text-[#333333] text-sm focus:outline-none focus:ring-2 focus:ring-[#2D5A27]/25 focus:border-[#2D5A27] transition bg-white placeholder:text-[#999]"
-              />
-            </div>
-            {createError && (
-              <p className="text-xs text-[#DC3545] flex items-center gap-1.5">
-                <AlertCircle size={13} /> {createError}
-              </p>
-            )}
+          <div className="bg-white border border-[#E0E0E0] rounded-2xl p-6 shadow-sm">
             <button
-              onClick={handleCreateTeam}
-              disabled={createStatus === 'loading' || !teamName.trim()}
-              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-[#2D5A27] text-white text-sm font-semibold hover:bg-[#1E3D1A] transition disabled:opacity-50 shadow-sm"
+              onClick={openCreateTeamModal}
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-[#2D5A27] text-white text-sm font-semibold hover:bg-[#1E3D1A] transition shadow-sm"
             >
-              {createStatus === 'loading' ? <Loader size={15} className="animate-spin" /> : <Plus size={15} />}
-              Criar time
+              <Plus size={15} />
+              Criar meu time
             </button>
           </div>
         </div>
+        {renderCreateTeamModal()}
       </MainLayout>
     )
   }
@@ -432,63 +688,39 @@ export function TeamPage() {
     <MainLayout>
       <div className="space-y-6">
 
-        {/* Seletor de Times + Criar Novo */}
-        {teams.length > 1 || canCreateMore ? (
-          <div className="bg-white border border-[#E0E0E0] rounded-2xl p-4 shadow-sm">
-            <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
-              {/* Seletor */}
-              <div className="flex-1">
+        {/* Header de navegação: seletor (se >1 time) + ação primária criar */}
+        {(teams.length > 1 || canCreateMore) && (
+          <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-end">
+            {teams.length > 1 && (
+              <div className="flex-1 min-w-0">
                 <label className="text-xs font-semibold text-[#666666] uppercase tracking-wider mb-2 block">
                   Selecione um time ({teams.length}/5)
                 </label>
                 <select
                   value={selectedTeamId ?? ''}
-                  onChange={(e) => {
-                    console.log('[TeamPage] Selecionando time:', e.target.value)
-                    setSelectedTeamId(e.target.value)
-                  }}
-                  className="w-full px-4 py-2.5 rounded-xl border border-[#E0E0E0] text-[#333333] text-sm focus:outline-none focus:ring-2 focus:ring-[#2D5A27]/25 focus:border-[#2D5A27] transition bg-white"
+                  onChange={(e) => setSelectedTeamId(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-[#E0E0E0] text-[#333333] text-sm focus:outline-none focus:ring-2 focus:ring-[#2D5A27]/25 focus:border-[#2D5A27] transition bg-white shadow-sm"
                 >
-                  {teams.map(t => {
-                    console.log('[TeamPage] Renderizando option:', t.name, t.id, t.isOwner)
-                    return (
-                      <option key={t.id} value={t.id}>
-                        {t.name} {t.isOwner ? '(Owner)' : '(Membro)'}
-                      </option>
-                    )
-                  })}
+                  {teams.map(t => (
+                    <option key={t.id} value={t.id}>
+                      {t.name} {t.isOwner ? '(Owner)' : '(Membro)'}
+                    </option>
+                  ))}
                 </select>
               </div>
+            )}
 
-              {/* Criar novo time */}
-              {canCreateMore && (
-                <div className="sm:pt-6">
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={teamName}
-                      onChange={(e) => setTeamName(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleCreateTeam()}
-                      placeholder="Nome do novo time"
-                      className="flex-1 px-3 py-2 rounded-lg border border-[#E0E0E0] text-sm focus:outline-none focus:ring-2 focus:ring-[#2D5A27]/25"
-                    />
-                    <button
-                      onClick={handleCreateTeam}
-                      disabled={createStatus === 'loading' || !teamName.trim()}
-                      className="px-4 py-2 rounded-lg bg-[#2D5A27] text-white text-sm font-medium hover:bg-[#1E3D1A] transition disabled:opacity-50 flex items-center gap-2"
-                    >
-                      {createStatus === 'loading' ? <Loader size={14} className="animate-spin" /> : <Plus size={14} />}
-                      Criar
-                    </button>
-                  </div>
-                  {createError && (
-                    <p className="text-xs text-[#DC3545] mt-1">{createError}</p>
-                  )}
-                </div>
-              )}
-            </div>
+            {canCreateMore && (
+              <button
+                onClick={openCreateTeamModal}
+                className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-[#2D5A27] text-white text-sm font-semibold hover:bg-[#1E3D1A] transition whitespace-nowrap shadow-sm"
+              >
+                <Plus size={15} />
+                Novo time
+              </button>
+            )}
           </div>
-        ) : null}
+        )}
 
         {/* Header full-width */}
         <div className="bg-white border border-[#E0E0E0] rounded-2xl p-6 shadow-sm">
@@ -528,7 +760,7 @@ export function TeamPage() {
 
         {/* Tabs */}
         <div className="flex gap-1 bg-[#F5F5F5] rounded-xl p-1 w-fit">
-          {(['members', 'meetings'] as const).map((t) => (
+          {(isOwner ? (['members', 'meetings', 'settings'] as const) : (['members', 'meetings'] as const)).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -538,20 +770,16 @@ export function TeamPage() {
                   : 'text-[#666666] hover:text-[#333333]'
               }`}
             >
-              {t === 'members' ? (
-                <span className="flex items-center gap-2"><Users size={14} /> Membros</span>
-              ) : (
-                <span className="flex items-center gap-2"><Video size={14} /> Reuniões do Time</span>
-              )}
+              {t === 'members' && <span className="flex items-center gap-2"><Users size={14} /> Membros</span>}
+              {t === 'meetings' && <span className="flex items-center gap-2"><Video size={14} /> Reuniões do Time</span>}
+              {t === 'settings' && <span className="flex items-center gap-2"><Settings size={14} /> Configurações</span>}
             </button>
           ))}
         </div>
 
         {/* ── ABA MEMBROS ── */}
         {tab === 'members' && (
-          <div className={`grid gap-6 ${isOwner ? 'grid-cols-1 lg:grid-cols-[1fr_340px]' : 'grid-cols-1'}`}>
-
-            {/* Coluna principal: lista de membros */}
+          <div>
             <div className="bg-white border border-[#E0E0E0] rounded-2xl shadow-sm overflow-hidden">
               <div className="px-5 py-3.5 border-b border-[#F0F0F0] flex items-center justify-between">
                 <span className="text-xs font-semibold text-[#666666] uppercase tracking-wider">
@@ -632,54 +860,106 @@ export function TeamPage() {
               </div>
             </div>
 
-            {/* Coluna lateral: ações do owner */}
-            {isOwner && (
-              <div className="space-y-4">
-                {/* Link de convite */}
-                <div className="bg-white border border-[#E0E0E0] rounded-2xl p-5 shadow-sm space-y-4">
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-lg bg-[#2D5A27]/10 flex items-center justify-center">
-                      <Link2 size={14} className="text-[#2D5A27]" />
-                    </div>
-                    <span className="text-sm font-semibold text-[#333333]">Link de convite</span>
-                  </div>
-                  <p className="text-xs text-[#666666] leading-relaxed">
-                    Gere um link compartilhável que qualquer pessoa pode usar para entrar no time.
-                  </p>
-                  <button
-                    onClick={handleGenerateInviteLink}
-                    disabled={inviteLinkLoading}
-                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#2D5A27] text-white text-sm font-semibold hover:bg-[#1E3D1A] transition disabled:opacity-50 shadow-sm"
-                  >
-                    {inviteLinkLoading ? (
-                      <Loader size={15} className="animate-spin" />
-                    ) : (
-                      <Link2 size={15} />
-                    )}
-                    Gerar link de convite
-                  </button>
-                </div>
+          </div>
+        )}
 
-                {/* Info extra */}
-                <div className="bg-[#F8F9FA] border border-[#F0F0F0] rounded-2xl p-5 space-y-3">
-                  <p className="text-xs font-semibold text-[#666666] uppercase tracking-wider">Como funciona</p>
-                  <ul className="space-y-2.5 text-xs text-[#666666] leading-relaxed">
-                    <li className="flex items-start gap-2">
-                      <span className="w-4 h-4 rounded-full bg-[#2D5A27]/15 text-[#2D5A27] flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5">1</span>
-                      Clique em "Gerar link de convite" para criar um link compartilhável.
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="w-4 h-4 rounded-full bg-[#2D5A27]/15 text-[#2D5A27] flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5">2</span>
-                      Compartilhe o link com a pessoa que deseja convidar.
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="w-4 h-4 rounded-full bg-[#2D5A27]/15 text-[#2D5A27] flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5">3</span>
-                      Após fazer login, ela será automaticamente adicionada ao time.
-                    </li>
-                  </ul>
+        {/* ── ABA CONFIGURAÇÕES (owner-only) ── */}
+        {tab === 'settings' && isOwner && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Seção: Avaliação por IA */}
+            <div className="bg-white border border-[#E0E0E0] rounded-2xl shadow-sm overflow-hidden">
+              <div className="px-5 py-3.5 border-b border-[#F0F0F0] flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-[#2D5A27]/10 flex items-center justify-center">
+                  <Sparkles size={14} className="text-[#2D5A27]" />
                 </div>
+                <span className="text-sm font-semibold text-[#333333]">Avaliação por IA</span>
               </div>
-            )}
+              <div className="p-5 space-y-4">
+                <p className="text-xs text-[#666666] leading-relaxed">
+                  Define como a IA analisa as reuniões deste time: tipo (Sales/CS), framework
+                  (BANT/SPIN) e instruções customizadas pro seu contexto.
+                </p>
+                <div className="bg-[#F8F9FA] rounded-xl p-3 space-y-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs text-[#666666]">Tipo do time</span>
+                    <span className="text-xs font-semibold text-[#333333]">
+                      {team.team_type === 'customer_success' ? 'Customer Success' : 'Sales'}
+                    </span>
+                  </div>
+                  {team.team_type !== 'customer_success' && (
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs text-[#666666]">Framework</span>
+                      <span className="text-xs font-semibold text-[#333333]">
+                        {(team.evaluation_framework ?? 'bant').toUpperCase()}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs text-[#666666]">Instruções customizadas</span>
+                    <span className="text-xs font-semibold text-[#333333]">
+                      {team.custom_prompt_instructions ? 'Sim' : 'Não'}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  onClick={handleOpenConfigModal}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-[#2D5A27] text-[#2D5A27] text-sm font-semibold hover:bg-[#2D5A27]/5 transition"
+                >
+                  <Sparkles size={15} />
+                  Configurar avaliação
+                </button>
+              </div>
+            </div>
+
+            {/* Seção: Convite de membros */}
+            <div className="bg-white border border-[#E0E0E0] rounded-2xl shadow-sm overflow-hidden">
+              <div className="px-5 py-3.5 border-b border-[#F0F0F0] flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-[#2D5A27]/10 flex items-center justify-center">
+                  <Link2 size={14} className="text-[#2D5A27]" />
+                </div>
+                <span className="text-sm font-semibold text-[#333333]">Convite de membros</span>
+              </div>
+              <div className="p-5 space-y-4">
+                <p className="text-xs text-[#666666] leading-relaxed">
+                  Gere um link compartilhável (válido por 7 dias) que qualquer pessoa pode
+                  usar pra entrar no time. Após login, ela é automaticamente adicionada.
+                </p>
+                <button
+                  onClick={handleGenerateInviteLink}
+                  disabled={inviteLinkLoading}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#2D5A27] text-white text-sm font-semibold hover:bg-[#1E3D1A] transition disabled:opacity-50 shadow-sm"
+                >
+                  {inviteLinkLoading ? <Loader size={15} className="animate-spin" /> : <Link2 size={15} />}
+                  Gerar link de convite
+                </button>
+              </div>
+            </div>
+
+            {/* Seção: Zona de perigo — span full width */}
+            <div className="lg:col-span-2 bg-white border border-red-200 rounded-2xl shadow-sm overflow-hidden">
+              <div className="px-5 py-3.5 border-b border-red-100 flex items-center gap-2 bg-red-50/50">
+                <div className="w-7 h-7 rounded-lg bg-red-100 flex items-center justify-center">
+                  <AlertCircle size={14} className="text-[#DC3545]" />
+                </div>
+                <span className="text-sm font-semibold text-[#DC3545]">Zona de perigo</span>
+              </div>
+              <div className="p-5 flex flex-col sm:flex-row sm:items-center gap-4">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-[#333333]">Excluir este time</p>
+                  <p className="text-xs text-[#666666] leading-relaxed mt-1">
+                    Remove o time e todos os membros. Reuniões já registradas permanecem mas
+                    perdem o vínculo com o time. <strong>Ação irreversível.</strong>
+                  </p>
+                </div>
+                <button
+                  onClick={handleOpenDeleteModal}
+                  className="shrink-0 flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl border border-[#DC3545] text-[#DC3545] text-sm font-semibold hover:bg-red-50 transition whitespace-nowrap"
+                >
+                  <Trash2 size={15} />
+                  Excluir time
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
@@ -738,6 +1018,234 @@ export function TeamPage() {
         )}
 
       </div>
+
+      {renderCreateTeamModal()}
+
+      {/* Modal de Config de Avaliação */}
+      {showConfigModal && team && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => !configSaving && setShowConfigModal(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 space-y-5 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            {/* Header */}
+            <div className="flex items-start justify-between">
+              <div>
+                <h3 className="text-xl font-bold text-[#333333]">Configurar avaliação por IA</h3>
+                <p className="text-sm text-[#666666] mt-1">Como a IA deve analisar as reuniões deste time</p>
+              </div>
+              <button
+                onClick={() => !configSaving && setShowConfigModal(false)}
+                className="text-[#999999] hover:text-[#333333] transition"
+                disabled={configSaving}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Tipo do time */}
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-[#666666] uppercase tracking-wider">
+                Tipo do time
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {([
+                  { value: 'sales' as const, label: 'Sales', desc: 'Reuniões comerciais (prospecção, qualificação, fechamento)' },
+                  { value: 'customer_success' as const, label: 'Customer Success', desc: 'Reuniões com clientes ativos (health, retenção, expansão)' },
+                ]).map(opt => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setConfigForm(prev => ({ ...prev, team_type: opt.value }))}
+                    className={`text-left p-3 rounded-xl border-2 transition ${
+                      configForm.team_type === opt.value
+                        ? 'border-[#2D5A27] bg-[#2D5A27]/5'
+                        : 'border-[#E0E0E0] hover:border-[#CCCCCC]'
+                    }`}
+                  >
+                    <div className="text-sm font-semibold text-[#333333]">{opt.label}</div>
+                    <div className="text-xs text-[#666666] mt-1 leading-relaxed">{opt.desc}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Framework (só Sales) */}
+            {configForm.team_type === 'sales' && (
+              <div className="space-y-2">
+                <label className="text-xs font-semibold text-[#666666] uppercase tracking-wider">
+                  Framework de avaliação
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {([
+                    { value: 'bant' as const, label: 'BANT', desc: 'Budget, Authority, Need, Timeline' },
+                    { value: 'spin' as const, label: 'SPIN Selling', desc: 'Situation, Problem, Implication, Need-payoff' },
+                  ]).map(opt => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setConfigForm(prev => ({ ...prev, evaluation_framework: opt.value }))}
+                      className={`text-left p-3 rounded-xl border-2 transition ${
+                        configForm.evaluation_framework === opt.value
+                          ? 'border-[#2D5A27] bg-[#2D5A27]/5'
+                          : 'border-[#E0E0E0] hover:border-[#CCCCCC]'
+                      }`}
+                    >
+                      <div className="text-sm font-semibold text-[#333333]">{opt.label}</div>
+                      <div className="text-xs text-[#666666] mt-1 leading-relaxed">{opt.desc}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Instruções customizadas */}
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-[#666666] uppercase tracking-wider">
+                Instruções customizadas (opcional)
+              </label>
+              <p className="text-xs text-[#666666] leading-relaxed">
+                Instruções adicionais que serão incluídas no prompt da IA. Use para contextualizar seu ICP,
+                tom desejado, sinais específicos a observar, etc. Não substitui o framework — complementa.
+              </p>
+              <textarea
+                value={configForm.custom_prompt_instructions}
+                onChange={(e) => setConfigForm(prev => ({ ...prev, custom_prompt_instructions: e.target.value }))}
+                placeholder="Ex: Nosso ICP é diretor de RH de empresa de 100-500 funcionários. Foque em sinais de adoção do módulo de pesquisa de clima e mencione integração com SAP se for citada."
+                maxLength={4000}
+                rows={6}
+                className="w-full text-sm text-[#333333] bg-[#F8F9FA] border border-[#E0E0E0] rounded-xl p-3 focus:outline-none focus:border-[#2D5A27] resize-y"
+              />
+              <div className="text-xs text-[#999999] text-right">
+                {configForm.custom_prompt_instructions.length} / 4000
+              </div>
+            </div>
+
+            {/* Aviso histórico */}
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex gap-2">
+              <AlertCircle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+              <p className="text-xs text-amber-800 leading-relaxed">
+                Reuniões já processadas permanecem com a análise no framework original.
+                A nova configuração só vale para reuniões processadas a partir de agora.
+              </p>
+            </div>
+
+            {/* Erro */}
+            {configError && (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex gap-2">
+                <AlertCircle size={16} className="text-[#DC3545] shrink-0 mt-0.5" />
+                <p className="text-xs text-[#DC3545] leading-relaxed">{configError}</p>
+              </div>
+            )}
+
+            {/* Botões */}
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowConfigModal(false)}
+                disabled={configSaving}
+                className="flex-1 py-2.5 rounded-xl border border-[#E0E0E0] text-sm font-semibold text-[#666666] hover:bg-[#F8F9FA] transition disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSaveConfig}
+                disabled={configSaving}
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#2D5A27] text-white text-sm font-semibold hover:bg-[#1E3D1A] transition disabled:opacity-50"
+              >
+                {configSaving ? <Loader size={15} className="animate-spin" /> : <Check size={15} />}
+                Salvar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Excluir Time */}
+      {showDeleteModal && team && (
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={() => !deleteLoading && setShowDeleteModal(false)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center">
+                  <AlertCircle size={20} className="text-[#DC3545]" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-[#333333]">Excluir time</h3>
+                  <p className="text-xs text-[#666666] mt-0.5">Esta ação não pode ser desfeita</p>
+                </div>
+              </div>
+              <button
+                onClick={() => !deleteLoading && setShowDeleteModal(false)}
+                className="text-[#999999] hover:text-[#333333] transition"
+                disabled={deleteLoading}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* O que será removido */}
+            <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-xs text-[#7a1f2b] leading-relaxed space-y-1.5">
+              <p className="font-semibold">Ao excluir o time:</p>
+              <ul className="space-y-1 pl-4 list-disc">
+                <li>Todos os membros serão removidos</li>
+                <li>Links de convite ativos serão invalidados</li>
+                <li>Configurações de scheduling/round-robin serão apagadas</li>
+                <li>Reuniões existentes permanecem, mas perdem o vínculo com o time</li>
+              </ul>
+            </div>
+
+            {/* Confirmação por nome */}
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-[#666666] leading-relaxed block">
+                Para confirmar, digite o nome do time:{' '}
+                <span className="font-mono font-bold text-[#DC3545] bg-red-50 px-1.5 py-0.5 rounded">
+                  {team.name}
+                </span>
+              </label>
+              <input
+                type="text"
+                value={deleteConfirmText}
+                onChange={(e) => { setDeleteConfirmText(e.target.value); setDeleteError('') }}
+                placeholder={team.name}
+                autoFocus
+                disabled={deleteLoading}
+                className="w-full px-4 py-2.5 rounded-xl border border-[#E0E0E0] text-[#333333] text-sm focus:outline-none focus:ring-2 focus:ring-[#DC3545]/25 focus:border-[#DC3545] transition bg-white placeholder:text-[#999]"
+              />
+            </div>
+
+            {/* Erro */}
+            {deleteError && (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex gap-2">
+                <AlertCircle size={16} className="text-[#DC3545] shrink-0 mt-0.5" />
+                <p className="text-xs text-[#DC3545] leading-relaxed">{deleteError}</p>
+              </div>
+            )}
+
+            {/* Botões */}
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                disabled={deleteLoading}
+                className="flex-1 py-2.5 rounded-xl border border-[#E0E0E0] text-sm font-semibold text-[#666666] hover:bg-[#F8F9FA] transition disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleDeleteTeam}
+                disabled={deleteLoading || deleteConfirmText.trim() !== team.name}
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#DC3545] text-white text-sm font-semibold hover:bg-[#b9293a] transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {deleteLoading ? <Loader size={15} className="animate-spin" /> : <Trash2 size={15} />}
+                Excluir definitivamente
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal de Link de Convite */}
       {showInviteLinkModal && inviteLink && (
