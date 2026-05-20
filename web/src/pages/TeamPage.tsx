@@ -3,8 +3,8 @@ import { MainLayout } from '@/components/layout'
 import { supabase } from '@/lib/supabase'
 import {
   Users, Plus, Trash2, CheckCircle, Clock,
-  AlertCircle, Loader, Video, Crown, UserPlus, ChevronRight,
-  Shield, Link2, Copy, Check, Sparkles, X, Settings
+  AlertCircle, Loader, Video, Crown, UserPlus, ChevronRight, ChevronLeft,
+  Shield, Link2, Copy, Check, Sparkles, X, Settings, Heart, Target, BookOpen
 } from 'lucide-react'
 import { formatDate } from '@/lib'
 import { useNavigate } from 'react-router-dom'
@@ -104,6 +104,11 @@ export function TeamPage() {
   }>({ team_type: 'sales', evaluation_framework: 'bant', custom_prompt_instructions: '' })
   const [configSaving, setConfigSaving] = useState(false)
   const [configError, setConfigError] = useState('')
+
+  // What's new (mostrado uma vez pra owners pós-release CS)
+  const WHATS_NEW_KEY = 'whatsnew_2026_05_cs_seen'
+  const [showWhatsNew, setShowWhatsNew] = useState(false)
+  const [whatsNewStep, setWhatsNewStep] = useState(0)
 
   // Excluir time
   const [showDeleteModal, setShowDeleteModal] = useState(false)
@@ -280,6 +285,30 @@ export function TeamPage() {
     if (tab === 'meetings') loadMeetings()
   }, [tab, loadMeetings])
 
+  // Dispara "What's new" pra owners na primeira visita pós-release
+  useEffect(() => {
+    if (!team || !isOwner) return
+    if (typeof window === 'undefined') return
+    try {
+      const seen = window.localStorage.getItem(WHATS_NEW_KEY)
+      if (!seen) {
+        // pequeno delay pra página renderizar primeiro
+        const t = setTimeout(() => setShowWhatsNew(true), 400)
+        return () => clearTimeout(t)
+      }
+    } catch {
+      // localStorage indisponível (ex: navegação anônima com storage bloqueado) — não força modal
+    }
+  }, [team, isOwner])
+
+  const dismissWhatsNew = () => {
+    try {
+      window.localStorage.setItem(WHATS_NEW_KEY, new Date().toISOString())
+    } catch {}
+    setShowWhatsNew(false)
+    setWhatsNewStep(0)
+  }
+
   const handleCreateTeam = async () => {
     if (!teamName.trim()) return
     setCreateError('')
@@ -454,6 +483,212 @@ export function TeamPage() {
     if (!s) return '0m'
     const m = Math.floor(s / 60)
     return `${m}m`
+  }
+
+  const renderWhatsNewModal = () => {
+    if (!showWhatsNew) return null
+
+    const STEPS: Array<{
+      icon: typeof Sparkles
+      iconColor: string
+      iconBg: string
+      tag: string
+      title: string
+      description: string
+      preview?: React.ReactNode
+    }> = [
+      {
+        icon: Heart,
+        iconColor: '#DC3545',
+        iconBg: 'bg-red-50',
+        tag: 'Novo tipo de time',
+        title: 'Customer Success agora é suportado',
+        description: 'Lemon não é mais só pra Sales. Times de CS podem analisar reuniões com clientes ativos e ver métricas específicas: Health Score (0-100), Risco de Churn (low/medium/high), Satisfação (0-10) e momentos críticos detectados na conversa.',
+        preview: (
+          <div className="grid grid-cols-2 gap-2 text-left">
+            <div className="bg-red-50 border border-red-100 rounded-xl p-3">
+              <div className="text-[10px] font-semibold text-[#DC3545] uppercase tracking-wider mb-1">Health Score</div>
+              <div className="text-xl font-bold text-[#333333]">72/100</div>
+            </div>
+            <div className="bg-amber-50 border border-amber-100 rounded-xl p-3">
+              <div className="text-[10px] font-semibold text-amber-600 uppercase tracking-wider mb-1">Churn Risk</div>
+              <div className="text-xl font-bold text-[#333333]">Médio</div>
+            </div>
+          </div>
+        ),
+      },
+      {
+        icon: Target,
+        iconColor: '#2D5A27',
+        iconBg: 'bg-[#2D5A27]/10',
+        tag: 'Novo framework Sales',
+        title: 'Escolha entre BANT e SPIN Selling',
+        description: 'Times de Sales agora podem escolher o framework de análise. BANT (Budget, Authority, Need, Timeline) continua disponível, e SPIN Selling (Situation, Problem, Implication, Need-payoff) chegou pra abordagens consultivas. A escolha vale pra novas reuniões — as antigas mantêm o framework original.',
+        preview: (
+          <div className="flex gap-2 text-left">
+            <div className="flex-1 bg-[#2D5A27]/5 border border-[#2D5A27]/20 rounded-xl p-3">
+              <div className="text-[10px] font-semibold text-[#2D5A27] uppercase tracking-wider mb-1">BANT</div>
+              <div className="text-xs text-[#666666] leading-snug">Budget · Authority · Need · Timeline</div>
+            </div>
+            <div className="flex-1 bg-[#2D5A27]/5 border border-[#2D5A27]/20 rounded-xl p-3">
+              <div className="text-[10px] font-semibold text-[#2D5A27] uppercase tracking-wider mb-1">SPIN</div>
+              <div className="text-xs text-[#666666] leading-snug">Situation · Problem · Implication · Need-payoff</div>
+            </div>
+          </div>
+        ),
+      },
+      {
+        icon: BookOpen,
+        iconColor: '#2D5A27',
+        iconBg: 'bg-[#2D5A27]/10',
+        tag: 'Personalize a IA',
+        title: 'Instruções customizadas pro seu contexto',
+        description: 'Adicione até 4000 caracteres de instruções específicas que serão aplicadas a TODAS as análises do time. Use pra contextualizar seu ICP, tom desejado, sinais específicos a observar — sem precisar prompt engineering. Não substitui o framework: complementa.',
+        preview: (
+          <div className="bg-[#F8F9FA] border border-[#E0E0E0] rounded-xl p-3 text-left">
+            <div className="text-[10px] font-semibold text-[#666666] uppercase tracking-wider mb-1.5">Exemplo</div>
+            <p className="text-xs text-[#666666] leading-relaxed font-mono">
+              "Nosso ICP é diretor de RH de empresa de 100-500 funcionários. Foque em sinais de adoção do módulo de pesquisa de clima e mencione integração com SAP se for citada."
+            </p>
+          </div>
+        ),
+      },
+      {
+        icon: Settings,
+        iconColor: '#2D5A27',
+        iconBg: 'bg-[#2D5A27]/10',
+        tag: 'Página redesenhada',
+        title: 'Nova aba "Configurações" pra owners',
+        description: 'Tudo de administração ficou numa aba dedicada: configurar a avaliação por IA, gerar link de convite e a zona de perigo (excluir time). A aba "Membros" ganhou largura total e o botão "+ Novo time" agora fica sempre visível no topo, mesmo quando você tem só um time.',
+        preview: (
+          <div className="flex gap-1 bg-[#F5F5F5] rounded-xl p-1 text-left w-fit mx-auto">
+            <div className="px-3 py-1.5 text-xs text-[#666666] flex items-center gap-1.5"><Users size={11} /> Membros</div>
+            <div className="px-3 py-1.5 text-xs text-[#666666] flex items-center gap-1.5"><Video size={11} /> Reuniões</div>
+            <div className="px-3 py-1.5 rounded-lg bg-white text-xs font-semibold text-[#2D5A27] shadow-sm flex items-center gap-1.5"><Settings size={11} /> Configurações</div>
+          </div>
+        ),
+      },
+      {
+        icon: Trash2,
+        iconColor: '#DC3545',
+        iconBg: 'bg-red-50',
+        tag: 'Mais segurança',
+        title: 'Excluir time agora exige confirmação',
+        description: 'Pra evitar acidentes, a exclusão de um time pede pra você digitar exatamente o nome dele antes de habilitar o botão. Membros são removidos, links de convite invalidados, e reuniões já registradas perdem o vínculo mas permanecem no histórico. Disponível em Configurações → Zona de perigo.',
+        preview: (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-left">
+            <div className="text-[10px] text-[#666666] mb-1">Para confirmar, digite:</div>
+            <div className="font-mono text-xs font-bold text-[#DC3545] mb-2">Meu Time Comercial</div>
+            <div className="flex gap-2">
+              <div className="flex-1 bg-white border border-[#DC3545]/40 rounded-lg px-2 py-1 text-xs text-[#999999]">Meu Time Comercial</div>
+              <div className="bg-[#DC3545] text-white text-xs font-semibold px-3 py-1 rounded-lg">Excluir</div>
+            </div>
+          </div>
+        ),
+      },
+    ]
+
+    const step = STEPS[whatsNewStep]
+    const isFirst = whatsNewStep === 0
+    const isLast = whatsNewStep === STEPS.length - 1
+    const Icon = step.icon
+
+    return (
+      <div
+        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        onClick={dismissWhatsNew}
+      >
+        <div
+          className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 space-y-5 max-h-[90vh] overflow-y-auto"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div className="flex items-start justify-between">
+            <div>
+              <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[#2D5A27]/10 text-[#2D5A27] text-[10px] font-semibold uppercase tracking-wider mb-2">
+                <Sparkles size={10} />
+                Novidades
+              </div>
+              <p className="text-xs text-[#999999]">{whatsNewStep + 1} de {STEPS.length}</p>
+            </div>
+            <button
+              onClick={dismissWhatsNew}
+              className="text-[#999999] hover:text-[#333333] transition"
+              aria-label="Fechar"
+            >
+              <X size={20} />
+            </button>
+          </div>
+
+          {/* Conteúdo */}
+          <div className="text-center space-y-4">
+            <div className={`w-16 h-16 rounded-2xl ${step.iconBg} flex items-center justify-center mx-auto`}>
+              <Icon size={28} style={{ color: step.iconColor }} />
+            </div>
+            <div>
+              <div className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: step.iconColor }}>
+                {step.tag}
+              </div>
+              <h3 className="text-xl font-bold text-[#333333] leading-tight">{step.title}</h3>
+            </div>
+            <p className="text-sm text-[#666666] leading-relaxed text-left">{step.description}</p>
+            {step.preview && <div className="pt-1">{step.preview}</div>}
+          </div>
+
+          {/* Indicador de progresso */}
+          <div className="flex items-center justify-center gap-1.5">
+            {STEPS.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setWhatsNewStep(i)}
+                className={`h-1.5 rounded-full transition-all ${
+                  i === whatsNewStep
+                    ? 'w-6 bg-[#2D5A27]'
+                    : 'w-1.5 bg-[#E0E0E0] hover:bg-[#CCCCCC]'
+                }`}
+                aria-label={`Ir para passo ${i + 1}`}
+              />
+            ))}
+          </div>
+
+          {/* Navegação */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setWhatsNewStep(s => Math.max(0, s - 1))}
+              disabled={isFirst}
+              className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl border border-[#E0E0E0] text-sm font-semibold text-[#666666] hover:bg-[#F8F9FA] transition disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              <ChevronLeft size={15} />
+              Anterior
+            </button>
+            <button
+              onClick={dismissWhatsNew}
+              className="px-4 py-2.5 rounded-xl text-sm font-semibold text-[#666666] hover:bg-[#F8F9FA] transition"
+            >
+              Pular
+            </button>
+            <div className="flex-1" />
+            {isLast ? (
+              <button
+                onClick={dismissWhatsNew}
+                className="flex items-center justify-center gap-1.5 px-5 py-2.5 rounded-xl bg-[#2D5A27] text-white text-sm font-semibold hover:bg-[#1E3D1A] transition shadow-sm"
+              >
+                <Check size={15} />
+                Entendi
+              </button>
+            ) : (
+              <button
+                onClick={() => setWhatsNewStep(s => Math.min(STEPS.length - 1, s + 1))}
+                className="flex items-center justify-center gap-1.5 px-5 py-2.5 rounded-xl bg-[#2D5A27] text-white text-sm font-semibold hover:bg-[#1E3D1A] transition shadow-sm"
+              >
+                Próximo
+                <ChevronRight size={15} />
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    )
   }
 
   const renderCreateTeamModal = () => {
@@ -1020,6 +1255,7 @@ export function TeamPage() {
       </div>
 
       {renderCreateTeamModal()}
+      {renderWhatsNewModal()}
 
       {/* Modal de Config de Avaliação */}
       {showConfigModal && team && (
