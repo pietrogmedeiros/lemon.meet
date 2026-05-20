@@ -8,30 +8,101 @@ const deepseek = new OpenAI({
   baseURL: 'https://api.deepseek.com',
 });
 
-export interface BantDimension {
+// Dimensão padrão usada por BANT e SPIN (score 0-10 + evidência textual)
+export interface ScoreDimension {
   score: number;   // 0-10
   evidence: string;
 }
 
+// BANT continua igual — mantido pra retrocompat
+export type BantDimension = ScoreDimension;
+
 export interface BantScore {
-  budget: BantDimension;
-  authority: BantDimension;
-  need: BantDimension;
-  timeline: BantDimension;
+  budget: ScoreDimension;
+  authority: ScoreDimension;
+  need: ScoreDimension;
+  timeline: ScoreDimension;
 }
 
-export interface MeetingInsights {
+export interface SpinScore {
+  situation: ScoreDimension;
+  problem: ScoreDimension;
+  implication: ScoreDimension;
+  needPayoff: ScoreDimension;
+}
+
+export interface EscalationFlag {
+  description: string;
+  severity: 'low' | 'medium' | 'high';
+}
+
+// Campos comuns a todos os frameworks (Sales e CS)
+interface BaseInsights {
   sentiment: 'positive' | 'neutral' | 'negative';
-  commercialQuality: number; // 0-10
   executiveContext: string;
-  closingProbability: number; // 0-100%
   followUp: string[];
-  followUpSuggestions: string[]; // exactly 4 sales follow-up suggestions
+  followUpSuggestions: string[]; // exatamente 4 sugestões prontas
   keyTopics: string[];
   actionItems: string[];
-  bantScore?: BantScore;
   participants?: number;
   duration?: number;
+}
+
+// Campos comuns a todos os frameworks de Sales (BANT e SPIN)
+interface SalesBaseInsights extends BaseInsights {
+  commercialQuality: number; // 0-10
+  closingProbability: number; // 0-100%
+}
+
+export interface BantInsights extends SalesBaseInsights {
+  framework: 'bant';
+  bantScore: BantScore;
+}
+
+export interface SpinInsights extends SalesBaseInsights {
+  framework: 'spin';
+  spinScore: SpinScore;
+}
+
+export interface CsInsights extends BaseInsights {
+  framework: 'cs';
+  healthScore: number;          // 0-100 (substitui closingProbability)
+  churnRisk: 'low' | 'medium' | 'high';
+  churnRiskEvidence: string;
+  satisfactionScore: number;    // 0-10
+  escalationFlags: EscalationFlag[];
+}
+
+// Tipo discriminado: framework determina a variante
+export type MeetingInsights = BantInsights | SpinInsights | CsInsights;
+
+// Type guards
+export function isSalesInsights(insights: MeetingInsights): insights is BantInsights | SpinInsights {
+  return insights.framework === 'bant' || insights.framework === 'spin';
+}
+
+export function isCsInsights(insights: MeetingInsights): insights is CsInsights {
+  return insights.framework === 'cs';
+}
+
+/**
+ * Normaliza payload de insights vindo do banco.
+ * Dados antigos não tinham `framework` — assumimos BANT (era o único modo).
+ */
+export function normalizeInsights(raw: any): MeetingInsights | null {
+  if (!raw || typeof raw !== 'object') return null;
+  if (!raw.framework) {
+    // Retrocompat: registros antigos sem framework são BANT
+    return { ...raw, framework: 'bant' } as BantInsights;
+  }
+  return raw as MeetingInsights;
+}
+
+// Config de avaliação herdada do time da reunião
+interface TeamEvaluationConfig {
+  teamType: 'sales' | 'customer_success';
+  framework: 'bant' | 'spin'; // só relevante quando teamType='sales'
+  customInstructions: string | null;
 }
 
 export class InsightsService {
@@ -99,8 +170,10 @@ Retorne APENAS o JSON válido, sem texto adicional.`;
         throw new Error('No content in DeepSeek response');
       }
 
-      // Parse JSON
-      const insights: MeetingInsights = JSON.parse(content);
+      // Parse JSON. Por enquanto (Fase 2a) toda chamada gera no formato BANT —
+      // o branching por framework vem na Fase 2b com a config do time.
+      const parsed = JSON.parse(content);
+      const insights = { ...parsed, framework: 'bant' as const } as BantInsights;
 
       // Validações básicas
       if (!insights.sentiment || !insights.executiveContext) {
@@ -178,7 +251,7 @@ Retorne APENAS o JSON válido, sem texto adicional.`;
         return null;
       }
 
-      return data?.insights as MeetingInsights || null;
+      return normalizeInsights(data?.insights);
 
     } catch (error) {
       logger.error('Error in getInsights:', error);
@@ -187,10 +260,26 @@ Retorne APENAS o JSON válido, sem texto adicional.`;
   }
 
   /**
-   * Gera e-mail de follow-up profissional baseado nos insights da reunião
+   * Gera e-mail de follow-up profissional baseado nos insights da reunião.
+   * Adapta o framing para Sales (foco em fechamento) ou Customer Success (foco em saúde da conta).
    */
   async generateFollowUpEmail(meetingTitle: string, insights: MeetingInsights): Promise<string> {
-    const systemPrompt = `Você é um especialista em vendas consultivas. Com base nos insights de uma reunião comercial, escreva um e-mail de follow-up profissional, personalizado e persuasivo em português do Brasil.
+    const isCs = isCsInsights(insights);
+
+    const systemPrompt = isCs
+      ? `Você é um especialista em Customer Success. Com base nos insights de uma reunião com cliente ativo, escreva um e-mail de follow-up profissional, atencioso e construtivo em português do Brasil.
+
+O e-mail deve:
+- Ter assunto na primeira linha no formato "Assunto: ..."
+- Ser conciso (máx. 200 palavras no corpo)
+- Reforçar parceria de longo prazo e valor entregue
+- Endereçar pontos de atenção/risco se houver
+- Listar próximos passos acordados
+- Ter tom empático e profissional
+- Terminar com proposta clara de próximo contato
+
+Retorne APENAS o texto do e-mail (assunto + corpo), sem explicações.`
+      : `Você é um especialista em vendas consultivas. Com base nos insights de uma reunião comercial, escreva um e-mail de follow-up profissional, personalizado e persuasivo em português do Brasil.
 
 O e-mail deve:
 - Ter assunto na primeira linha no formato "Assunto: ..."
@@ -202,9 +291,13 @@ O e-mail deve:
 
 Retorne APENAS o texto do e-mail (assunto + corpo), sem explicações.`;
 
+    const metricLine = isCs
+      ? `Health Score: ${insights.healthScore}/100 | Risco de churn: ${insights.churnRisk}`
+      : `Probabilidade de fechamento: ${insights.closingProbability}%`;
+
     const userPrompt = `Reunião: ${meetingTitle}
 Contexto executivo: ${insights.executiveContext}
-Probabilidade de fechamento: ${insights.closingProbability}%
+${metricLine}
 Próximos passos: ${insights.actionItems.slice(0, 3).join('; ')}
 Sugestões de follow-up: ${insights.followUpSuggestions.slice(0, 2).join('; ')}`;
 
@@ -261,7 +354,10 @@ Retorne APENAS o texto do briefing, sem cabeçalhos ou formatação markdown.`;
                        m.insights.sentiment === 'negative' ? '😟 Negativo' : '😐 Neutro';
       parts.push(`Sentiment: ${sentiment}`);
       
-      if (m.insights.closingProbability !== undefined) {
+      if (isCsInsights(m.insights)) {
+        parts.push(`Health Score: ${m.insights.healthScore}/100`);
+        parts.push(`Risco de churn: ${m.insights.churnRisk}`);
+      } else if (m.insights.closingProbability !== undefined) {
         parts.push(`Prob. fechamento: ${m.insights.closingProbability}%`);
       }
       
