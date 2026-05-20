@@ -48,10 +48,38 @@ async function setActiveOwnerTeam(userId: string, teamId: string): Promise<void>
 router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.id
-    const { name } = req.body
+    const { name, team_type, evaluation_framework, custom_prompt_instructions } = req.body
 
     if (!name || typeof name !== 'string' || !name.trim()) {
       return res.status(400).json({ success: false, message: 'name is required' })
+    }
+
+    // Valida campos opcionais da config de avaliação (mesma regra do PATCH)
+    if (team_type !== undefined && team_type !== 'sales' && team_type !== 'customer_success') {
+      return res.status(400).json({
+        success: false,
+        message: "team_type deve ser 'sales' ou 'customer_success'",
+      })
+    }
+    if (evaluation_framework !== undefined && evaluation_framework !== 'bant' && evaluation_framework !== 'spin') {
+      return res.status(400).json({
+        success: false,
+        message: "evaluation_framework deve ser 'bant' ou 'spin'",
+      })
+    }
+    if (custom_prompt_instructions !== undefined && custom_prompt_instructions !== null) {
+      if (typeof custom_prompt_instructions !== 'string') {
+        return res.status(400).json({
+          success: false,
+          message: 'custom_prompt_instructions deve ser string ou null',
+        })
+      }
+      if (custom_prompt_instructions.length > 4000) {
+        return res.status(400).json({
+          success: false,
+          message: 'custom_prompt_instructions excede 4000 caracteres',
+        })
+      }
     }
 
     const createPermission = await canCreateOwnedTeam(userId)
@@ -68,15 +96,25 @@ router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
     if (countError) throw countError
 
     if (existingTeams && existingTeams.length >= 5) {
-      return res.status(409).json({ 
-        success: false, 
-        message: 'Você atingiu o limite máximo de 5 times.' 
+      return res.status(409).json({
+        success: false,
+        message: 'Você atingiu o limite máximo de 5 times.'
       })
+    }
+
+    const insertPayload: Record<string, unknown> = {
+      name: name.trim(),
+      owner_id: userId,
+    }
+    if (team_type !== undefined) insertPayload.team_type = team_type
+    if (evaluation_framework !== undefined) insertPayload.evaluation_framework = evaluation_framework
+    if (custom_prompt_instructions !== undefined) {
+      insertPayload.custom_prompt_instructions = custom_prompt_instructions === '' ? null : custom_prompt_instructions
     }
 
     const { data: team, error } = await supabase
       .from('teams')
-      .insert({ name: name.trim(), owner_id: userId })
+      .insert(insertPayload)
       .select()
       .single()
 

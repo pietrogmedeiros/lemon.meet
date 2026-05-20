@@ -67,9 +67,23 @@ export function TeamPage() {
   const [tab, setTab] = useState<'members' | 'meetings'>('members')
 
   // Criar time
+  const [showCreateTeamModal, setShowCreateTeamModal] = useState(false)
   const [teamName, setTeamName] = useState('')
+  const [createTeamType, setCreateTeamType] = useState<'sales' | 'customer_success'>('sales')
+  const [createTeamFramework, setCreateTeamFramework] = useState<'bant' | 'spin'>('bant')
+  const [createTeamInstructions, setCreateTeamInstructions] = useState('')
   const [createStatus, setCreateStatus] = useState<'idle' | 'loading' | 'error'>('idle')
   const [createError, setCreateError] = useState('')
+
+  const openCreateTeamModal = () => {
+    setTeamName('')
+    setCreateTeamType('sales')
+    setCreateTeamFramework('bant')
+    setCreateTeamInstructions('')
+    setCreateError('')
+    setCreateStatus('idle')
+    setShowCreateTeamModal(true)
+  }
 
   // Meetings do time
   const [meetings, setMeetings] = useState<TeamMeeting[]>([])
@@ -265,12 +279,24 @@ export function TeamPage() {
     setCreateError('')
     setCreateStatus('loading')
     try {
+      const payload: Record<string, unknown> = {
+        name: teamName.trim(),
+        team_type: createTeamType,
+        custom_prompt_instructions: createTeamInstructions.trim() || null,
+      }
+      // evaluation_framework só é relevante quando team_type='sales'
+      if (createTeamType === 'sales') {
+        payload.evaluation_framework = createTeamFramework
+      }
+
       const data = await apiFetch('/api/teams', session, {
         method: 'POST',
-        body: JSON.stringify({ name: teamName.trim() }),
+        body: JSON.stringify(payload),
       })
       if (!data.success) throw new Error(data.message)
+      setShowCreateTeamModal(false)
       setTeamName('')
+      setCreateTeamInstructions('')
       await loadTeams()
       // Seleciona o time recém-criado
       if (data.team) {
@@ -392,6 +418,158 @@ export function TeamPage() {
     return `${m}m`
   }
 
+  const renderCreateTeamModal = () => {
+    if (!showCreateTeamModal) return null
+    const isLoading = createStatus === 'loading'
+    return (
+      <div
+        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        onClick={() => !isLoading && setShowCreateTeamModal(false)}
+      >
+        <div
+          className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 space-y-5 max-h-[90vh] overflow-y-auto"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div className="flex items-start justify-between">
+            <div>
+              <h3 className="text-xl font-bold text-[#333333]">Criar novo time</h3>
+              <p className="text-sm text-[#666666] mt-1">
+                Defina o tipo do time e como a IA deve avaliar as reuniões
+              </p>
+            </div>
+            <button
+              onClick={() => !isLoading && setShowCreateTeamModal(false)}
+              className="text-[#999999] hover:text-[#333333] transition"
+              disabled={isLoading}
+            >
+              <X size={20} />
+            </button>
+          </div>
+
+          {/* Nome do time */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-[#666666] uppercase tracking-wider">
+              Nome do time
+            </label>
+            <input
+              type="text"
+              value={teamName}
+              onChange={(e) => setTeamName(e.target.value)}
+              placeholder="Ex: Time Comercial"
+              autoFocus
+              className="w-full px-4 py-2.5 rounded-xl border border-[#E0E0E0] text-[#333333] text-sm focus:outline-none focus:ring-2 focus:ring-[#2D5A27]/25 focus:border-[#2D5A27] transition bg-white placeholder:text-[#999]"
+            />
+          </div>
+
+          {/* Tipo do time */}
+          <div className="space-y-2">
+            <label className="text-xs font-semibold text-[#666666] uppercase tracking-wider">
+              Tipo do time
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              {([
+                { value: 'sales' as const, label: 'Sales', desc: 'Reuniões comerciais (prospecção, qualificação, fechamento)' },
+                { value: 'customer_success' as const, label: 'Customer Success', desc: 'Reuniões com clientes ativos (health, retenção, expansão)' },
+              ]).map(opt => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setCreateTeamType(opt.value)}
+                  className={`text-left p-3 rounded-xl border-2 transition ${
+                    createTeamType === opt.value
+                      ? 'border-[#2D5A27] bg-[#2D5A27]/5'
+                      : 'border-[#E0E0E0] hover:border-[#CCCCCC]'
+                  }`}
+                >
+                  <div className="text-sm font-semibold text-[#333333]">{opt.label}</div>
+                  <div className="text-xs text-[#666666] mt-1 leading-relaxed">{opt.desc}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Framework (só Sales) */}
+          {createTeamType === 'sales' && (
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-[#666666] uppercase tracking-wider">
+                Framework de avaliação
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {([
+                  { value: 'bant' as const, label: 'BANT', desc: 'Budget, Authority, Need, Timeline' },
+                  { value: 'spin' as const, label: 'SPIN Selling', desc: 'Situation, Problem, Implication, Need-payoff' },
+                ]).map(opt => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setCreateTeamFramework(opt.value)}
+                    className={`text-left p-3 rounded-xl border-2 transition ${
+                      createTeamFramework === opt.value
+                        ? 'border-[#2D5A27] bg-[#2D5A27]/5'
+                        : 'border-[#E0E0E0] hover:border-[#CCCCCC]'
+                    }`}
+                  >
+                    <div className="text-sm font-semibold text-[#333333]">{opt.label}</div>
+                    <div className="text-xs text-[#666666] mt-1 leading-relaxed">{opt.desc}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Instruções customizadas */}
+          <div className="space-y-2">
+            <label className="text-xs font-semibold text-[#666666] uppercase tracking-wider">
+              Instruções customizadas (opcional)
+            </label>
+            <p className="text-xs text-[#666666] leading-relaxed">
+              Instruções adicionais para a IA. Contextualize seu ICP, tom desejado, sinais específicos a observar, etc.
+            </p>
+            <textarea
+              value={createTeamInstructions}
+              onChange={(e) => setCreateTeamInstructions(e.target.value)}
+              placeholder="Você pode preencher depois, se preferir."
+              maxLength={4000}
+              rows={4}
+              className="w-full text-sm text-[#333333] bg-[#F8F9FA] border border-[#E0E0E0] rounded-xl p-3 focus:outline-none focus:border-[#2D5A27] resize-y"
+            />
+            <div className="text-xs text-[#999999] text-right">
+              {createTeamInstructions.length} / 4000
+            </div>
+          </div>
+
+          {/* Erro */}
+          {createError && (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex gap-2">
+              <AlertCircle size={16} className="text-[#DC3545] shrink-0 mt-0.5" />
+              <p className="text-xs text-[#DC3545] leading-relaxed">{createError}</p>
+            </div>
+          )}
+
+          {/* Botões */}
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowCreateTeamModal(false)}
+              disabled={isLoading}
+              className="flex-1 py-2.5 rounded-xl border border-[#E0E0E0] text-sm font-semibold text-[#666666] hover:bg-[#F8F9FA] transition disabled:opacity-50"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleCreateTeam}
+              disabled={isLoading || !teamName.trim()}
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#2D5A27] text-white text-sm font-semibold hover:bg-[#1E3D1A] transition disabled:opacity-50"
+            >
+              {isLoading ? <Loader size={15} className="animate-spin" /> : <Plus size={15} />}
+              Criar time
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   if (loading) {
     return (
       <MainLayout>
@@ -435,35 +613,17 @@ export function TeamPage() {
           </div>
 
           {/* Card de criação */}
-          <div className="bg-white border border-[#E0E0E0] rounded-2xl p-6 shadow-sm space-y-4">
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-[#666666] uppercase tracking-wider">
-                Nome do time
-              </label>
-              <input
-                type="text"
-                value={teamName}
-                onChange={(e) => setTeamName(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleCreateTeam()}
-                placeholder="Ex: Time Comercial"
-                className="w-full px-4 py-2.5 rounded-xl border border-[#E0E0E0] text-[#333333] text-sm focus:outline-none focus:ring-2 focus:ring-[#2D5A27]/25 focus:border-[#2D5A27] transition bg-white placeholder:text-[#999]"
-              />
-            </div>
-            {createError && (
-              <p className="text-xs text-[#DC3545] flex items-center gap-1.5">
-                <AlertCircle size={13} /> {createError}
-              </p>
-            )}
+          <div className="bg-white border border-[#E0E0E0] rounded-2xl p-6 shadow-sm">
             <button
-              onClick={handleCreateTeam}
-              disabled={createStatus === 'loading' || !teamName.trim()}
-              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-[#2D5A27] text-white text-sm font-semibold hover:bg-[#1E3D1A] transition disabled:opacity-50 shadow-sm"
+              onClick={openCreateTeamModal}
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-[#2D5A27] text-white text-sm font-semibold hover:bg-[#1E3D1A] transition shadow-sm"
             >
-              {createStatus === 'loading' ? <Loader size={15} className="animate-spin" /> : <Plus size={15} />}
-              Criar time
+              <Plus size={15} />
+              Criar meu time
             </button>
           </div>
         </div>
+        {renderCreateTeamModal()}
       </MainLayout>
     )
   }
@@ -521,27 +681,13 @@ export function TeamPage() {
               {/* Criar novo time */}
               {canCreateMore && (
                 <div className="sm:pt-6">
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={teamName}
-                      onChange={(e) => setTeamName(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleCreateTeam()}
-                      placeholder="Nome do novo time"
-                      className="flex-1 px-3 py-2 rounded-lg border border-[#E0E0E0] text-sm focus:outline-none focus:ring-2 focus:ring-[#2D5A27]/25"
-                    />
-                    <button
-                      onClick={handleCreateTeam}
-                      disabled={createStatus === 'loading' || !teamName.trim()}
-                      className="px-4 py-2 rounded-lg bg-[#2D5A27] text-white text-sm font-medium hover:bg-[#1E3D1A] transition disabled:opacity-50 flex items-center gap-2"
-                    >
-                      {createStatus === 'loading' ? <Loader size={14} className="animate-spin" /> : <Plus size={14} />}
-                      Criar
-                    </button>
-                  </div>
-                  {createError && (
-                    <p className="text-xs text-[#DC3545] mt-1">{createError}</p>
-                  )}
+                  <button
+                    onClick={openCreateTeamModal}
+                    className="px-4 py-2 rounded-lg bg-[#2D5A27] text-white text-sm font-medium hover:bg-[#1E3D1A] transition flex items-center gap-2 whitespace-nowrap"
+                  >
+                    <Plus size={14} />
+                    Novo time
+                  </button>
                 </div>
               )}
             </div>
@@ -835,6 +981,8 @@ export function TeamPage() {
         )}
 
       </div>
+
+      {renderCreateTeamModal()}
 
       {/* Modal de Config de Avaliação */}
       {showConfigModal && team && (
