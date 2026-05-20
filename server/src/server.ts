@@ -75,6 +75,9 @@ app.use(cors({
       // Firebase Hosting (domínio padrão e domínio customizado)
       'https://lemon-meet.web.app',
       'https://lemon-meet.firebaseapp.com',
+      // Staging
+      'https://lemon-meet-staging.web.app',
+      'https://lemon-meet-staging.firebaseapp.com',
       // Lemon.crm (host que embeda o app via iframe)
       ...lemonCrmOrigins,
     ]

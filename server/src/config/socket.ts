@@ -10,6 +10,8 @@ export function setupSocketIO(httpServer: HTTPServer): SocketIOServer {
     'http://localhost:5173',
     'https://lemon-meet.web.app',
     'https://lemon-meet.firebaseapp.com',
+    'https://lemon-meet-staging.web.app',
+    'https://lemon-meet-staging.firebaseapp.com',
   ]
   
   const io = new SocketIOServer(httpServer, {
