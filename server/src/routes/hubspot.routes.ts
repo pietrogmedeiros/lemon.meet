@@ -222,12 +222,16 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
 
     // Buscar ID do owner (usuário autenticado no HubSpot)
     // user_id (OAuth) e hubspot_owner_id são entidades distintas no HubSpot:
-    // precisa traduzir via /crm/v3/owners/{userId}?idProperty=userId
+    // precisa traduzir via /crm/v3/owners/{userId}?idProperty=userId.
+    // Se o user_id não tiver licença de Sales Hub Owner, esse endpoint falha;
+    // nesse caso tentamos fallback por email (também retornado pelo token info).
     let authenticatedOwnerId: string | null = null
     try {
       const tokenInfoRes = await fetch(`${HUBSPOT_API_BASE}/oauth/v1/access-tokens/${token}`)
       if (tokenInfoRes.ok) {
-        const tokenInfo = await tokenInfoRes.json() as { user_id?: number, hub_id?: number }
+        const tokenInfo = await tokenInfoRes.json() as { user_id?: number, hub_id?: number, user?: string }
+
+        // Tentativa 1: resolver via userId
         if (tokenInfo.user_id) {
           const ownerRes = await fetch(
             `${HUBSPOT_API_BASE}/crm/v3/owners/${tokenInfo.user_id}?idProperty=userId`,
@@ -237,17 +241,42 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
             const owner = await ownerRes.json() as { id?: string }
             if (owner.id) {
               authenticatedOwnerId = owner.id
-              logger.info(`[HubSpot] ✅ Owner ID resolvido: ${authenticatedOwnerId} (user_id=${tokenInfo.user_id})`)
+              logger.info(`[HubSpot] ✅ Owner ID resolvido via userId: ${authenticatedOwnerId} (user_id=${tokenInfo.user_id})`)
             } else {
               logger.warn(`[HubSpot] ⚠️  Resposta de owner sem id para user_id=${tokenInfo.user_id}`)
             }
           } else {
             const errBody = await ownerRes.text()
-            logger.warn(`[HubSpot] ⚠️  Falha ao resolver owner para user_id=${tokenInfo.user_id} (status ${ownerRes.status}): ${errBody}`)
+            logger.warn(`[HubSpot] ⚠️  Owner via userId falhou (status ${ownerRes.status}): ${errBody}`)
           }
         }
+
+        // Tentativa 2: fallback por email do usuário do token
+        if (!authenticatedOwnerId && tokenInfo.user) {
+          logger.info(`[HubSpot] 🔁 Tentando resolver owner via email: ${tokenInfo.user}`)
+          const listRes = await fetch(
+            `${HUBSPOT_API_BASE}/crm/v3/owners?email=${encodeURIComponent(tokenInfo.user)}&limit=1`,
+            { headers: { Authorization: `Bearer ${token}` } }
+          )
+          if (listRes.ok) {
+            const list = await listRes.json() as { results?: Array<{ id?: string, email?: string }> }
+            if (list.results && list.results.length > 0 && list.results[0].id) {
+              authenticatedOwnerId = list.results[0].id
+              logger.info(`[HubSpot] ✅ Owner ID resolvido via email: ${authenticatedOwnerId} (email=${tokenInfo.user})`)
+            } else {
+              logger.warn(`[HubSpot] ⚠️  Lista de owners por email retornou vazia para ${tokenInfo.user}`)
+            }
+          } else {
+            const errBody = await listRes.text()
+            logger.warn(`[HubSpot] ⚠️  Fallback de owner por email falhou (status ${listRes.status}): ${errBody}`)
+          }
+        }
+
+        if (!authenticatedOwnerId) {
+          logger.error(`[HubSpot] ❌ Não foi possível resolver authenticatedOwnerId (user_id=${tokenInfo.user_id}, email=${tokenInfo.user}). Deal será criado sem owner.`)
+        }
       } else {
-        logger.warn(`[HubSpot] ⚠️  Não foi possível obter owner ID do token`)
+        logger.warn(`[HubSpot] ⚠️  Não foi possível obter info do token (status ${tokenInfoRes.status})`)
       }
     } catch (err) {
       logger.error(`[HubSpot] ❌ Erro ao buscar owner ID:`, err)
@@ -341,22 +370,25 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
                 logger.info(`[HubSpot] 👤 Proprietário do contato: ${contactOwnerId}`)
               }
               
-              // Buscar deals associados a este contato
-              logger.info(`[HubSpot] 🔍 Buscando deals do contato ${contactId}...`)
+              // Buscar deals associados a este contato — v4 é mais robusto e
+              // retorna todos os tipos de associação (v3 só retorna o default)
+              logger.info(`[HubSpot] 🔍 Buscando deals do contato ${contactId} (v4)...`)
               const dealsRes = await fetch(
-                `${HUBSPOT_API_BASE}/crm/v3/objects/contacts/${contactId}/associations/deals`,
+                `${HUBSPOT_API_BASE}/crm/v4/objects/contacts/${contactId}/associations/deals?limit=100`,
                 {
                   headers: { Authorization: `Bearer ${token}` },
                 }
               )
 
               if (dealsRes.ok) {
-                const dealsData = await dealsRes.json() as { results: Array<{ id: string }> }
+                const dealsData = await dealsRes.json() as {
+                  results: Array<{ toObjectId: number | string }>
+                }
                 logger.info(`[HubSpot] 📊 Contato tem ${dealsData.results.length} deal(s) associado(s)`)
-                
+
                 if (dealsData.results.length > 0) {
                   // Atualizar o primeiro deal encontrado
-                  dealId = dealsData.results[0].id
+                  dealId = String(dealsData.results[0].toObjectId)
                   logger.info(`[HubSpot] 🔄 Atualizando deal existente: ${dealId}`)
                   
                   // Ao atualizar, NÃO mudar o nome do deal
@@ -398,8 +430,11 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
                 } else {
                   logger.info(`[HubSpot] 🆕 Contato sem deals, será criado novo deal`)
                 }
+              } else {
+                const errText = await dealsRes.text()
+                logger.error(`[HubSpot] ❌ Erro ao buscar deals do contato ${contactId} (status ${dealsRes.status}):`, errText)
               }
-              
+
               // Se encontrou contato mas não tem deal, criar deal e associar
               if (!dealId) {
                 logger.info(`[HubSpot] ➡️ Saindo do loop para criar deal para contato ${contactId}`)
