@@ -145,12 +145,15 @@ async function handleComplete(data: BaasCompletePayload & { event_uuid?: string 
   const meetingId = meeting.id
 
   if (!transcript || transcript.length === 0) {
-    logger.warn(`[MeetingBaas] Nenhum transcript para meeting ${meetingId}`)
-    await supabase.from('meetings').update({ status: 'completed' }).eq('id', meetingId)
-    
+    logger.warn(`[MeetingBaas] Nenhum transcript para meeting ${meetingId} (webhook v1)`)
+    await supabase.from('meetings').update({
+      status: 'failed',
+      failure_reason: 'no_transcript_in_webhook',
+    }).eq('id', meetingId)
+
     // Notifica usuário
     await notificationService.notifyMeetingNoTranscription(meeting.user_id, meetingId, meeting.title)
-    
+
     return
   }
 
@@ -204,7 +207,11 @@ async function handleComplete(data: BaasCompletePayload & { event_uuid?: string 
     logger.info(`[MeetingBaas] Meeting ${meetingId} finalizada com sucesso`)
   } catch (err) {
     logger.error(`[MeetingBaas] Erro ao gerar insights para meeting ${meetingId}:`, err)
-    await supabase.from('meetings').update({ status: 'completed' }).eq('id', meetingId)
+    const errMsg = (err instanceof Error ? err.message : String(err)).slice(0, 300)
+    await supabase.from('meetings').update({
+      status: 'completed',
+      failure_reason: `insights_generation_failed: ${errMsg}`,
+    }).eq('id', meetingId)
   }
 }
 
@@ -276,11 +283,15 @@ async function handleBotCompleted(data: Record<string, any>) {
   const transcriptionUrl: string | undefined = data.transcription
   if (!transcriptionUrl) {
     logger.warn(`[MeetingBaas] bot.completed: sem URL de transcrição para meeting ${meetingId}`)
-    await supabase.from('meetings').update({ status: 'completed', ended_at: data.exited_at ?? new Date().toISOString() }).eq('id', meetingId)
-    
+    await supabase.from('meetings').update({
+      status: 'failed',
+      failure_reason: 'no_transcription_url',
+      ended_at: data.exited_at ?? new Date().toISOString(),
+    }).eq('id', meetingId)
+
     // Notifica usuário
     await notificationService.notifyMeetingNoTranscription(meeting.user_id, meetingId, meeting.title)
-    
+
     return
   }
 
@@ -311,11 +322,16 @@ async function handleBotCompleted(data: Record<string, any>) {
     logger.info(`[MeetingBaas] ${rawTranscription.length} entradas de transcrição para meeting ${meetingId}`)
   } catch (err) {
     logger.error(`[MeetingBaas] Erro ao baixar transcrição para meeting ${meetingId}:`, err)
-    await supabase.from('meetings').update({ status: 'completed', ended_at: data.exited_at ?? new Date().toISOString() }).eq('id', meetingId)
-    
+    const errMsg = (err instanceof Error ? err.message : String(err)).slice(0, 300)
+    await supabase.from('meetings').update({
+      status: 'failed',
+      failure_reason: `transcription_download_failed: ${errMsg}`,
+      ended_at: data.exited_at ?? new Date().toISOString(),
+    }).eq('id', meetingId)
+
     // Notifica usuário
     await notificationService.notifyMeetingNoTranscription(meeting.user_id, meetingId, meeting.title)
-    
+
     return
   }
 
@@ -353,7 +369,11 @@ async function handleBotCompleted(data: Record<string, any>) {
     logger.info(`[MeetingBaas] bot.completed: meeting ${meetingId} finalizada com sucesso`)
   } catch (err) {
     logger.error(`[MeetingBaas] Erro ao gerar insights para meeting ${meetingId}:`, err)
-    await supabase.from('meetings').update({ status: 'completed' }).eq('id', meetingId)
+    const errMsg = (err instanceof Error ? err.message : String(err)).slice(0, 300)
+    await supabase.from('meetings').update({
+      status: 'completed',
+      failure_reason: `insights_generation_failed: ${errMsg}`,
+    }).eq('id', meetingId)
   }
 }
 

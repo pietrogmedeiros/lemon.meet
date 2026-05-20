@@ -155,6 +155,7 @@ export function MeetingsPage() {
     if (status === 'completed') return <Badge variant="success">Concluída</Badge>;
     if (status === 'recording') return <Badge variant="danger">Gravando</Badge>;
     if (status === 'processing') return <Badge variant="secondary">Processando</Badge>;
+    if (status === 'failed') return <Badge variant="danger">Falhou</Badge>;
     return <Badge variant="secondary">{status ?? 'Desconhecido'}</Badge>;
   };
 

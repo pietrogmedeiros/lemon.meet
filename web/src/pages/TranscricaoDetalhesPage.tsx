@@ -58,6 +58,37 @@ interface Meeting {
   user_name?: string | null;
   user_email?: string | null;
   user_avatar_url?: string | null;
+  failure_reason?: string | null;
+}
+
+// Traduz códigos de failure_reason em mensagens amigáveis pro usuário.
+function describeFailureReason(reason: string | null | undefined): { title: string; detail: string } | null {
+  if (!reason) return null;
+  if (reason.startsWith('no_transcript_in_webhook')) {
+    return {
+      title: 'Reunião sem transcrição',
+      detail: 'O bot entrou na reunião mas não capturou áudio. Verifique se a sala admitiu o bot e se o microfone dos participantes estava ativo.',
+    };
+  }
+  if (reason.startsWith('no_transcription_url')) {
+    return {
+      title: 'Serviço de transcrição não retornou áudio',
+      detail: 'O serviço externo concluiu o bot mas não disponibilizou link de transcrição. Tente reprocessar a reunião.',
+    };
+  }
+  if (reason.startsWith('transcription_download_failed')) {
+    return {
+      title: 'Falha ao baixar a transcrição',
+      detail: 'Não foi possível obter a transcrição do serviço externo (provavelmente instabilidade temporária). Tente reprocessar.',
+    };
+  }
+  if (reason.startsWith('insights_generation_failed')) {
+    return {
+      title: 'Análise por IA falhou',
+      detail: 'A transcrição está disponível, mas não foi possível gerar os insights. Tente reprocessar para gerar a análise.',
+    };
+  }
+  return { title: 'Reunião com erro', detail: reason };
 }
 
 interface ActionItem {
@@ -77,6 +108,7 @@ function StatusBadge({ status }: { status: string }) {
     case 'recording': return <Badge variant="danger">Gravando</Badge>;
     case 'processing': return <Badge variant="secondary">Processando</Badge>;
     case 'completed': return <Badge variant="success">Concluída</Badge>;
+    case 'failed': return <Badge variant="danger">Falhou</Badge>;
     case 'error': return <Badge variant="danger">Erro</Badge>;
     default: return <Badge variant="secondary">{status}</Badge>;
   }
@@ -1022,6 +1054,29 @@ export function TranscricaoDetalhesPage() {
             )}
           </Card>
         )}
+
+        {/* Banner de falha — exibe motivo quando a reunião terminou em erro
+            ou quando insights falharam mesmo com transcript disponível */}
+        {(() => {
+          const info = describeFailureReason(meeting.failure_reason);
+          if (!info) return null;
+          return (
+            <Card className="p-4 border-l-4 border-l-red-500 bg-red-50/40">
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-red-100 flex items-center justify-center mt-0.5">
+                  <X className="h-4 w-4 text-red-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-red-700">{info.title}</p>
+                  <p className="text-sm text-secondary mt-1 leading-relaxed">{info.detail}</p>
+                  <p className="text-xs text-secondary/60 mt-2 font-mono">
+                    código: {meeting.failure_reason}
+                  </p>
+                </div>
+              </div>
+            </Card>
+          );
+        })()}
 
         {/* Insights */}
         {meeting.insights && (
