@@ -44,6 +44,8 @@ interface MeetingChatPanelProps {
   authToken: string;
 }
 
+const CHAT_WHATS_NEW_KEY = 'chat_ia_v2_whatsnew_seen';
+
 export function MeetingChatPanel({ meetingId, isOpen, onClose, apiUrl, authToken }: MeetingChatPanelProps) {
   const [chats, setChats] = useState<ChatMessage[]>([]);
   const [question, setQuestion] = useState('');
@@ -51,9 +53,24 @@ export function MeetingChatPanel({ meetingId, isOpen, onClose, apiUrl, authToken
   const [remainingQuestions, setRemainingQuestions] = useState(10);
   const [error, setError] = useState<string | null>(null);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
-  
+  const [showWhatsNew, setShowWhatsNew] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      return !window.localStorage.getItem(CHAT_WHATS_NEW_KEY);
+    } catch {
+      return false;
+    }
+  });
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  const dismissWhatsNew = () => {
+    try {
+      window.localStorage.setItem(CHAT_WHATS_NEW_KEY, new Date().toISOString());
+    } catch {}
+    setShowWhatsNew(false);
+  };
 
   // Auto-scroll para última mensagem
   const scrollToBottom = () => {
@@ -190,6 +207,77 @@ export function MeetingChatPanel({ meetingId, isOpen, onClose, apiUrl, authToken
 
       {/* Painel lateral */}
       <div className="fixed right-0 top-0 bottom-0 w-full sm:w-[480px] bg-white shadow-2xl z-50 flex flex-col animate-slide-in-right">
+        {/* What's new popup — primeira abertura pós-upgrade v2 */}
+        {showWhatsNew && (
+          <div className="absolute inset-0 bg-black/30 z-10 flex items-center justify-center p-4" onClick={dismissWhatsNew}>
+            <div
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-5 space-y-4 max-h-[90%] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-[#2D5A27]/10 flex items-center justify-center">
+                    <Sparkles className="w-5 h-5 text-[#2D5A27]" />
+                  </div>
+                  <div>
+                    <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[#2D5A27]/10 text-[#2D5A27] text-[10px] font-semibold uppercase tracking-wider mb-1">
+                      Novidades
+                    </div>
+                    <h3 className="text-base font-bold text-[#333333] leading-tight">
+                      Chat IA v2.0 — muito mais útil
+                    </h3>
+                  </div>
+                </div>
+                <button
+                  onClick={dismissWhatsNew}
+                  className="text-[#999999] hover:text-[#333333] transition shrink-0"
+                  aria-label="Fechar"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <p className="text-xs text-[#666666] leading-relaxed">
+                Refizemos o Chat IA do zero pra entregar análise de verdade, não só extração. Veja o que mudou:
+              </p>
+
+              <ul className="space-y-2.5 text-xs text-[#333333] leading-relaxed">
+                <li className="flex items-start gap-2">
+                  <span className="text-base leading-none mt-0.5">💡</span>
+                  <span><strong>Observações proativas:</strong> toda resposta termina com um insight que você não perguntou (riscos, oportunidades, próximos passos críticos).</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-base leading-none mt-0.5">🧠</span>
+                  <span><strong>Acesso à análise completa:</strong> a IA agora usa os scores de BANT/SPIN/CS, sentimento, satisfação e action items pra responder com contexto.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-base leading-none mt-0.5">💬</span>
+                  <span><strong>Conversa contínua:</strong> faz follow-up entre perguntas — "e quanto a isso?", "explica melhor o item 2" funcionam.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-base leading-none mt-0.5">⚡</span>
+                  <span><strong>Atalhos prontos:</strong> 6 ações em 1 clique (Resumir, Próximos passos, Riscos, Email follow-up, Por que pode não fechar?, Decisor).</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-base leading-none mt-0.5">📧</span>
+                  <span><strong>Drafts prontos:</strong> peça "email de follow-up" e receba texto pronto pra copiar — com assunto e referências específicas da reunião.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-base leading-none mt-0.5">📈</span>
+                  <span><strong>Respostas mais longas:</strong> dobro de espaço pra análises profundas quando a pergunta pede.</span>
+                </li>
+              </ul>
+
+              <button
+                onClick={dismissWhatsNew}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#2D5A27] text-white text-sm font-semibold hover:bg-[#1E3D1A] transition shadow-sm"
+              >
+                Entendi, vamos lá
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[#E0E0E0] bg-[#F8F9FA]">
           <div className="flex items-center gap-3">
