@@ -289,6 +289,94 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
   }
 })
 
+// ── PATCH /api/teams/:id/evaluation-config ────────────────────
+// Atualiza a config de avaliação por IA do time (owner-only).
+// Define team_type (sales/customer_success), evaluation_framework (bant/spin)
+// e instruções customizadas para a IA.
+router.patch('/:id/evaluation-config', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id
+    const { id: teamId } = req.params
+    const { team_type, evaluation_framework, custom_prompt_instructions } = req.body
+
+    // Valida team_type
+    if (team_type !== undefined && team_type !== 'sales' && team_type !== 'customer_success') {
+      return res.status(400).json({
+        success: false,
+        message: "team_type deve ser 'sales' ou 'customer_success'",
+      })
+    }
+
+    // Valida evaluation_framework
+    if (evaluation_framework !== undefined && evaluation_framework !== 'bant' && evaluation_framework !== 'spin') {
+      return res.status(400).json({
+        success: false,
+        message: "evaluation_framework deve ser 'bant' ou 'spin'",
+      })
+    }
+
+    // Valida custom_prompt_instructions (tamanho razoável)
+    if (custom_prompt_instructions !== undefined && custom_prompt_instructions !== null) {
+      if (typeof custom_prompt_instructions !== 'string') {
+        return res.status(400).json({
+          success: false,
+          message: 'custom_prompt_instructions deve ser string ou null',
+        })
+      }
+      if (custom_prompt_instructions.length > 4000) {
+        return res.status(400).json({
+          success: false,
+          message: 'custom_prompt_instructions excede 4000 caracteres',
+        })
+      }
+    }
+
+    // Owner-only
+    const { data: team } = await supabase
+      .from('teams')
+      .select('id, owner_id')
+      .eq('id', teamId)
+      .single()
+
+    if (!team) {
+      return res.status(404).json({ success: false, message: 'Time não encontrado' })
+    }
+    if (team.owner_id !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Apenas o owner pode alterar a configuração de avaliação',
+      })
+    }
+
+    // Monta update parcial
+    const update: Record<string, unknown> = {}
+    if (team_type !== undefined) update.team_type = team_type
+    if (evaluation_framework !== undefined) update.evaluation_framework = evaluation_framework
+    if (custom_prompt_instructions !== undefined) {
+      update.custom_prompt_instructions = custom_prompt_instructions === '' ? null : custom_prompt_instructions
+    }
+
+    if (Object.keys(update).length === 0) {
+      return res.status(400).json({ success: false, message: 'Nenhum campo para atualizar' })
+    }
+
+    const { data: updated, error } = await supabase
+      .from('teams')
+      .update(update)
+      .eq('id', teamId)
+      .select()
+      .single()
+
+    if (error) throw error
+
+    logger.info(`Team ${teamId} evaluation config updated by owner ${userId}: ${JSON.stringify(update)}`)
+    return res.json({ success: true, team: updated })
+  } catch (err) {
+    logger.error('Error updating team evaluation config:', err)
+    return res.status(500).json({ success: false, message: 'Internal server error' })
+  }
+})
+
 // ── GET /api/teams/my ─────────────────────────────────────────
 // Mantido para compatibilidade - retorna o primeiro time do usuário
 router.get('/my', authMiddleware, async (req: AuthRequest, res: Response) => {
