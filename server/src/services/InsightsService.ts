@@ -54,7 +54,7 @@ Analise a transcrição fornecida e retorne um JSON estruturado com os seguintes
   "sentiment": "positive" | "neutral" | "negative",
   "commercialQuality": <número de 0 a 10>,
   "executiveContext": "<resumo executivo em 2-3 frases>",
-  "closingProbability": <número de 0 a 100>,
+  "closingProbability": <PORCENTAGEM inteira de 0 a 100, NUNCA use escala 0-10>,
   "followUp": ["<ação 1>", "<ação 2>", ...],
   "followUpSuggestions": ["<sugestão 1>", "<sugestão 2>", "<sugestão 3>", "<sugestão 4>"],
   "keyTopics": ["<tópico 1>", "<tópico 2>", ...],
@@ -71,7 +71,7 @@ Critérios:
 - sentiment: Analise o tom geral (positivo, neutro ou negativo)
 - commercialQuality: Avalie a qualidade comercial da reunião (engajamento, clareza, objetividade)
 - executiveContext: Resuma os pontos principais para um executivo
-- closingProbability: Probabilidade de fechamento do negócio baseado nos sinais da reunião
+- closingProbability: PORCENTAGEM de 0 a 100 representando a probabilidade de fechamento do negócio. ATENÇÃO: este campo é em escala 0-100 (porcentagem), NÃO em 0-10 como commercialQuality. Exemplos válidos: 25 (baixa), 50 (média), 70 (boa), 85 (alta), 95 (muito alta). NUNCA retorne valor menor que 10 se o sentiment for positivo ou neutro — provavelmente está confundindo escalas.
 - followUp: Próximos passos gerais recomendados
 - followUpSuggestions: EXATAMENTE 4 mensagens prontas para enviar diretamente ao cliente via e-mail ou WhatsApp após a reunião. Cada mensagem deve estar escrita na primeira pessoa ("Olá [nome/cliente], ...") em português do Brasil, tom profissional mas humano, referenciar algo específico discutido na reunião, e ter uma chamada para ação clara. Não escreva instruções para o vendedor — escreva o texto da mensagem em si, como se fosse disparar agora. Ordene da mais urgente para a menos urgente.
 - keyTopics: Principais temas discutidos
@@ -105,6 +105,23 @@ Retorne APENAS o JSON válido, sem texto adicional.`;
       // Validações básicas
       if (!insights.sentiment || !insights.executiveContext) {
         throw new Error('Invalid insights format from DeepSeek');
+      }
+
+      // Sanity check: detecta quando o LLM confundiu escalas e retornou
+      // closingProbability na escala 0-10 em vez de 0-100. Sintomas:
+      // valor <= 10 idêntico ou muito próximo ao commercialQuality e
+      // sentiment não-negativo. Nesse caso multiplicamos por 10.
+      if (
+        typeof insights.closingProbability === 'number' &&
+        insights.closingProbability > 0 &&
+        insights.closingProbability <= 10 &&
+        typeof insights.commercialQuality === 'number' &&
+        insights.commercialQuality >= 4 &&
+        insights.sentiment !== 'negative' &&
+        Math.abs(insights.closingProbability - insights.commercialQuality) <= 2
+      ) {
+        logger.warn(`[Insights ${meetingId}] closingProbability=${insights.closingProbability} parece estar em escala 0-10 (commercialQuality=${insights.commercialQuality}, sentiment=${insights.sentiment}). Multiplicando por 10.`);
+        insights.closingProbability = insights.closingProbability * 10;
       }
 
       logger.info(`Insights generated successfully for meeting ${meetingId}`);
