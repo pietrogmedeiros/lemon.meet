@@ -105,6 +105,12 @@ export function TeamPage() {
   const [configSaving, setConfigSaving] = useState(false)
   const [configError, setConfigError] = useState('')
 
+  // Excluir time
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [deleteConfirmText, setDeleteConfirmText] = useState('')
+  const [deleteLoading, setDeleteLoading] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
+
   // Link de convite
   const [showInviteLinkModal, setShowInviteLinkModal] = useState(false)
   const [inviteLink, setInviteLink] = useState<{
@@ -365,6 +371,38 @@ export function TeamPage() {
     navigator.clipboard.writeText(inviteLink.url)
     setLinkCopied(true)
     setTimeout(() => setLinkCopied(false), 2000)
+  }
+
+  const handleOpenDeleteModal = () => {
+    setDeleteConfirmText('')
+    setDeleteError('')
+    setShowDeleteModal(true)
+  }
+
+  const handleDeleteTeam = async () => {
+    if (!team) return
+    if (deleteConfirmText.trim() !== team.name) {
+      setDeleteError('O nome digitado não confere com o nome do time')
+      return
+    }
+    setDeleteLoading(true)
+    setDeleteError('')
+    try {
+      const data = await apiFetch(`/api/teams/${team.id}`, session, {
+        method: 'DELETE',
+        body: JSON.stringify({ name: deleteConfirmText.trim() }),
+      })
+      if (!data.success) throw new Error(data.message ?? 'Erro ao excluir time')
+      // Limpa estado local e recarrega lista
+      setShowDeleteModal(false)
+      setTeam(null)
+      setSelectedTeamId(null)
+      await loadTeams()
+    } catch (err: any) {
+      setDeleteError(err.message ?? 'Erro ao excluir')
+    } finally {
+      setDeleteLoading(false)
+    }
   }
 
   const handleOpenConfigModal = () => {
@@ -921,6 +959,27 @@ export function TeamPage() {
                     </li>
                   </ul>
                 </div>
+
+                {/* Danger zone — excluir time */}
+                <div className="bg-white border border-red-200 rounded-2xl p-5 shadow-sm space-y-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-red-50 flex items-center justify-center">
+                      <AlertCircle size={14} className="text-[#DC3545]" />
+                    </div>
+                    <span className="text-sm font-semibold text-[#333333]">Excluir time</span>
+                  </div>
+                  <p className="text-xs text-[#666666] leading-relaxed">
+                    Remove o time e todos os membros. As reuniões já registradas
+                    permanecem mas perdem o vínculo com o time. Esta ação é irreversível.
+                  </p>
+                  <button
+                    onClick={handleOpenDeleteModal}
+                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-[#DC3545] text-[#DC3545] text-sm font-semibold hover:bg-red-50 transition"
+                  >
+                    <Trash2 size={15} />
+                    Excluir este time
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -1114,6 +1173,96 @@ export function TeamPage() {
               >
                 {configSaving ? <Loader size={15} className="animate-spin" /> : <Check size={15} />}
                 Salvar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Excluir Time */}
+      {showDeleteModal && team && (
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={() => !deleteLoading && setShowDeleteModal(false)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center">
+                  <AlertCircle size={20} className="text-[#DC3545]" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-[#333333]">Excluir time</h3>
+                  <p className="text-xs text-[#666666] mt-0.5">Esta ação não pode ser desfeita</p>
+                </div>
+              </div>
+              <button
+                onClick={() => !deleteLoading && setShowDeleteModal(false)}
+                className="text-[#999999] hover:text-[#333333] transition"
+                disabled={deleteLoading}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* O que será removido */}
+            <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-xs text-[#7a1f2b] leading-relaxed space-y-1.5">
+              <p className="font-semibold">Ao excluir o time:</p>
+              <ul className="space-y-1 pl-4 list-disc">
+                <li>Todos os membros serão removidos</li>
+                <li>Links de convite ativos serão invalidados</li>
+                <li>Configurações de scheduling/round-robin serão apagadas</li>
+                <li>Reuniões existentes permanecem, mas perdem o vínculo com o time</li>
+              </ul>
+            </div>
+
+            {/* Confirmação por nome */}
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-[#666666] leading-relaxed block">
+                Para confirmar, digite o nome do time:{' '}
+                <span className="font-mono font-bold text-[#DC3545] bg-red-50 px-1.5 py-0.5 rounded">
+                  {team.name}
+                </span>
+              </label>
+              <input
+                type="text"
+                value={deleteConfirmText}
+                onChange={(e) => { setDeleteConfirmText(e.target.value); setDeleteError('') }}
+                placeholder={team.name}
+                autoFocus
+                disabled={deleteLoading}
+                className="w-full px-4 py-2.5 rounded-xl border border-[#E0E0E0] text-[#333333] text-sm focus:outline-none focus:ring-2 focus:ring-[#DC3545]/25 focus:border-[#DC3545] transition bg-white placeholder:text-[#999]"
+              />
+            </div>
+
+            {/* Erro */}
+            {deleteError && (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex gap-2">
+                <AlertCircle size={16} className="text-[#DC3545] shrink-0 mt-0.5" />
+                <p className="text-xs text-[#DC3545] leading-relaxed">{deleteError}</p>
+              </div>
+            )}
+
+            {/* Botões */}
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                disabled={deleteLoading}
+                className="flex-1 py-2.5 rounded-xl border border-[#E0E0E0] text-sm font-semibold text-[#666666] hover:bg-[#F8F9FA] transition disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleDeleteTeam}
+                disabled={deleteLoading || deleteConfirmText.trim() !== team.name}
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#DC3545] text-white text-sm font-semibold hover:bg-[#b9293a] transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {deleteLoading ? <Loader size={15} className="animate-spin" /> : <Trash2 size={15} />}
+                Excluir definitivamente
               </button>
             </div>
           </div>

@@ -781,6 +781,73 @@ router.patch('/:id/members/:memberId/role', authMiddleware, async (req: AuthRequ
   }
 })
 
+// ── DELETE /api/teams/:id ─────────────────────────────────────
+// Remove um time inteiro (owner-only). Exige confirmação por nome no body.
+// Cleanup:
+// - team_members (delete explícito como defesa em profundidade)
+// - team_invite_links e team_scheduling (CASCADE pelo FK)
+// - meetings.team_id (SET NULL pelo FK — histórico preservado)
+// - active_owner_team_id no user_metadata é limpo se apontava pra este time
+router.delete('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id
+    const { id: teamId } = req.params
+    const { name } = req.body
+
+    // Carrega o time
+    const { data: team } = await supabase
+      .from('teams')
+      .select('id, name, owner_id')
+      .eq('id', teamId)
+      .single()
+
+    if (!team) {
+      return res.status(404).json({ success: false, message: 'Time não encontrado' })
+    }
+    if (team.owner_id !== userId) {
+      return res.status(403).json({ success: false, message: 'Apenas o owner pode excluir o time' })
+    }
+
+    // Confirmação por nome — comparação trim-only, case-sensitive
+    if (typeof name !== 'string' || name.trim() !== team.name) {
+      return res.status(400).json({
+        success: false,
+        message: 'O nome digitado não confere com o nome do time',
+      })
+    }
+
+    // Defense-in-depth: remove team_members antes do time (caso FK não tenha CASCADE)
+    await supabase.from('team_members').delete().eq('team_id', teamId)
+
+    const { error: deleteError } = await supabase
+      .from('teams')
+      .delete()
+      .eq('id', teamId)
+
+    if (deleteError) throw deleteError
+
+    // Limpa active_owner_team_id se apontava pra este time
+    try {
+      const { data: profile } = await supabase.auth.admin.getUserById(userId)
+      const currentMetadata = profile.user?.user_metadata ?? {}
+      if (currentMetadata.active_owner_team_id === teamId) {
+        const next = { ...currentMetadata }
+        delete next.active_owner_team_id
+        await supabase.auth.admin.updateUserById(userId, { user_metadata: next })
+      }
+    } catch (metaErr) {
+      // Falha na limpeza do metadata não impede o sucesso da exclusão
+      logger.warn(`Falha ao limpar active_owner_team_id após delete do time ${teamId}:`, metaErr)
+    }
+
+    logger.info(`Team ${teamId} ("${team.name}") deleted by owner ${userId}`)
+    return res.json({ success: true })
+  } catch (err) {
+    logger.error('Error deleting team:', err)
+    return res.status(500).json({ success: false, message: 'Internal server error' })
+  }
+})
+
 // ── POST /api/teams/accept-invite ────────────────────────────
 // Chamado pelo frontend após login para ativar convites pendentes
 router.post('/accept-invite', authMiddleware, async (req: AuthRequest, res: Response) => {
