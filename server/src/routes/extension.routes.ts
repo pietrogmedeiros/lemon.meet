@@ -1124,7 +1124,19 @@ router.post('/:id/chat', authMiddleware, async (req: AuthRequest, res: Response)
     }
 
     logger.info(`[CHAT] Generating answer for meeting ${id}`);
-    const { answer, tokensUsed } = await meetingChatService.generateAnswer(question, transcript, id);
+    const [segments, meetingContext, conversationHistory] = await Promise.all([
+      meetingChatService.getMeetingSegments(id),
+      meetingChatService.getMeetingContext(id),
+      meetingChatService.getChatHistory(id, userId),
+    ]);
+    const { answer, tokensUsed } = await meetingChatService.generateAnswer({
+      question,
+      transcript,
+      meetingId: id,
+      segments: segments.length > 0 ? segments : undefined,
+      meetingContext,
+      conversationHistory,
+    });
 
     const chatMessage = await meetingChatService.saveChatMessage(id, userId, question, answer, tokensUsed);
     const remainingQuestions = await meetingChatService.getRemainingQuestions(id, userId);

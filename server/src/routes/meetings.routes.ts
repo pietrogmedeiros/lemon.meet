@@ -586,23 +586,29 @@ router.post('/:id/chat', authMiddleware, async (req: AuthRequest, res: Response)
       });
     }
 
-    // Busca segmentos estruturados com timestamps (se disponível)
-    const segments = await meetingChatService.getMeetingSegments(id);
-    
+    // Busca em paralelo: segmentos com timestamps + contexto da reunião + histórico de chat
+    const [segments, meetingContext, conversationHistory] = await Promise.all([
+      meetingChatService.getMeetingSegments(id),
+      meetingChatService.getMeetingContext(id),
+      meetingChatService.getChatHistory(id, userId),
+    ]);
+
     if (segments.length > 0) {
       logger.info(`[MeetingChat] ✅ Usando ${segments.length} segmentos com timestamps para meeting ${id}`);
     } else {
       logger.warn(`[MeetingChat] ⚠️  Nenhum segmento encontrado, usando transcrição completa sem timestamps para meeting ${id}`);
     }
 
-    // Gera resposta usando IA (com timestamps se tiver segmentos)
-    logger.info(`[MeetingChat] 🤖 Gerando resposta para meeting ${id}, user ${userId}`);
-    const { answer, tokensUsed } = await meetingChatService.generateAnswer(
+    // Gera resposta usando IA (com timestamps, contexto rico e multi-turn)
+    logger.info(`[MeetingChat] 🤖 Gerando resposta para meeting ${id}, user ${userId}, history=${conversationHistory.length}`);
+    const { answer, tokensUsed } = await meetingChatService.generateAnswer({
       question,
       transcript,
-      id,
-      segments.length > 0 ? segments : undefined
-    );
+      meetingId: id,
+      segments: segments.length > 0 ? segments : undefined,
+      meetingContext,
+      conversationHistory,
+    });
 
     // Salva no banco
     const chatMessage = await meetingChatService.saveChatMessage(

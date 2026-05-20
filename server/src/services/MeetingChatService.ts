@@ -17,6 +17,17 @@ const RATE_LIMIT = 10; // 10 perguntas por reunião a cada 24h
 const RATE_LIMIT_WINDOW_HOURS = 24;
 const MAX_QUESTION_LENGTH = 500;
 const MAX_CONTEXT_TOKENS = 10000; // ~7500 palavras
+const HISTORY_PAIRS_FOR_CONTEXT = 4; // últimas 4 trocas Q&A no contexto multi-turn
+
+export interface MeetingContext {
+  title: string | null;
+  startedAt: string | null;
+  endedAt: string | null;
+  durationSeconds: number | null;
+  participantEmails: string[] | null;
+  ownerName: string | null;
+  insights: Record<string, unknown> | null;
+}
 
 export interface ChatMessage {
   id: string;
@@ -143,10 +154,89 @@ export class MeetingChatService {
   }
 
   /**
-   * Gera resposta usando IA com contexto da transcrição
+   * Formata insights estruturados em texto legível pra IA usar como contexto.
+   * Suporta os 3 frameworks (BANT, SPIN, CS) + payloads legados sem framework.
    */
-  async generateAnswer(question: string, transcript: string, meetingId: string, segments?: TranscriptSegment[]): Promise<{ answer: string; tokensUsed: number }> {
+  private formatInsightsForContext(insights: Record<string, unknown> | null): string {
+    if (!insights || typeof insights !== 'object') return '(sem insights estruturados disponíveis)';
+
+    const i = insights as any;
+    const framework = i.framework ?? 'bant';
+    const lines: string[] = [`Framework: ${String(framework).toUpperCase()}`];
+
+    if (i.executiveContext) lines.push(`Resumo executivo: ${i.executiveContext}`);
+    if (i.sentiment) lines.push(`Sentimento: ${i.sentiment}`);
+
+    if (framework === 'cs') {
+      if (i.healthScore !== undefined) lines.push(`Health Score: ${i.healthScore}/100`);
+      if (i.churnRisk) lines.push(`Risco de churn: ${i.churnRisk}${i.churnRiskEvidence ? ` — ${i.churnRiskEvidence}` : ''}`);
+      if (i.satisfactionScore !== undefined) lines.push(`Satisfação: ${i.satisfactionScore}/10`);
+      if (Array.isArray(i.escalationFlags) && i.escalationFlags.length > 0) {
+        const flags = i.escalationFlags.map((f: any) => `[${f.severity}] ${f.description}`).join('; ');
+        lines.push(`Momentos críticos: ${flags}`);
+      }
+    } else {
+      // Sales (BANT ou SPIN)
+      if (i.commercialQuality !== undefined) lines.push(`Qualidade comercial: ${i.commercialQuality}/10`);
+      if (i.closingProbability !== undefined) lines.push(`Probabilidade de fechamento: ${i.closingProbability}%`);
+      if (i.bantScore) {
+        const b = i.bantScore;
+        lines.push(`BANT: Budget ${b.budget?.score ?? '?'}/10, Authority ${b.authority?.score ?? '?'}/10, Need ${b.need?.score ?? '?'}/10, Timeline ${b.timeline?.score ?? '?'}/10`);
+      }
+      if (i.spinScore) {
+        const s = i.spinScore;
+        lines.push(`SPIN: Situation ${s.situation?.score ?? '?'}/10, Problem ${s.problem?.score ?? '?'}/10, Implication ${s.implication?.score ?? '?'}/10, Need-payoff ${s.needPayoff?.score ?? '?'}/10`);
+      }
+    }
+
+    if (Array.isArray(i.keyTopics) && i.keyTopics.length > 0) {
+      lines.push(`Tópicos principais: ${i.keyTopics.join(', ')}`);
+    }
+    if (Array.isArray(i.actionItems) && i.actionItems.length > 0) {
+      lines.push(`Action items já identificados: ${i.actionItems.slice(0, 6).join('; ')}`);
+    }
+
+    return lines.join('\n');
+  }
+
+  /**
+   * Formata metadados da reunião pra contexto da IA.
+   */
+  private formatMeetingMetadata(ctx: MeetingContext | null): string {
+    if (!ctx) return '(metadados indisponíveis)';
+    const parts: string[] = [];
+    if (ctx.title) parts.push(`Título: ${ctx.title}`);
+    if (ctx.startedAt) {
+      const d = new Date(ctx.startedAt);
+      parts.push(`Data: ${d.toLocaleDateString('pt-BR')} ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`);
+    }
+    if (typeof ctx.durationSeconds === 'number' && ctx.durationSeconds > 0) {
+      parts.push(`Duração: ${Math.round(ctx.durationSeconds / 60)} min`);
+    } else if (ctx.startedAt && ctx.endedAt) {
+      const dur = Math.round((new Date(ctx.endedAt).getTime() - new Date(ctx.startedAt).getTime()) / 60000);
+      if (dur > 0) parts.push(`Duração: ${dur} min`);
+    }
+    if (ctx.ownerName) parts.push(`Conduzida por: ${ctx.ownerName}`);
+    if (ctx.participantEmails && ctx.participantEmails.length > 0) {
+      parts.push(`Participantes: ${ctx.participantEmails.join(', ')}`);
+    }
+    return parts.length > 0 ? parts.join('\n') : '(metadados indisponíveis)';
+  }
+
+  /**
+   * Gera resposta usando IA com contexto rico: transcrição + insights + metadados + histórico da conversa.
+   */
+  async generateAnswer(opts: {
+    question: string;
+    transcript: string;
+    meetingId: string;
+    segments?: TranscriptSegment[];
+    meetingContext?: MeetingContext | null;
+    conversationHistory?: ChatMessage[];
+  }): Promise<{ answer: string; tokensUsed: number }> {
     try {
+      const { question, transcript, meetingId, segments, meetingContext, conversationHistory } = opts;
+
       if (!question || question.trim().length === 0) {
         throw new Error('Question cannot be empty');
       }
@@ -159,82 +249,89 @@ export class MeetingChatService {
         throw new Error('Transcript is empty');
       }
 
-      logger.info(`Generating answer for meeting ${meetingId}, question length: ${question.length}`);
+      logger.info(`[MeetingChat] Generating answer for ${meetingId}, q.len=${question.length}, history=${conversationHistory?.length ?? 0}, hasInsights=${!!meetingContext?.insights}`);
 
-      // Se tiver segmentos estruturados, usar formato com timestamps
+      // Transcrição: com timestamps se houver segments, senão truncada
       let contextTranscript: string;
       let hasTimestamps = false;
-      
+
       if (segments && segments.length > 0) {
         contextTranscript = this.formatSegmentsWithTimestamps(segments);
         hasTimestamps = true;
-        logger.info(`[MeetingChat] ✅ Usando ${segments.length} segmentos COM TIMESTAMPS`);
-        logger.info(`[MeetingChat] 📝 Exemplo do contexto: ${contextTranscript.substring(0, 200)}...`);
       } else {
         contextTranscript = this.compressTranscript(transcript);
-        logger.warn(`[MeetingChat] ⚠️  SEM segmentos - usando transcrição completa SEM timestamps`);
       }
 
-      const systemPrompt = `Você é um assistente de IA especializado em analisar reuniões de vendas e negócios.
+      const metadataBlock = this.formatMeetingMetadata(meetingContext ?? null);
+      const insightsBlock = this.formatInsightsForContext(meetingContext?.insights ?? null);
 
-Sua função é responder perguntas sobre uma reunião específica com base EXCLUSIVAMENTE na transcrição fornecida.
+      const systemPrompt = `Você é um analista sênior de reuniões comerciais e de Customer Success. Sua missão NÃO é só extrair dados — é gerar valor real pro usuário: conectar pontos, identificar riscos não óbvios, sugerir próximos passos concretos, e antecipar perguntas que o usuário deveria estar fazendo.
 
-${hasTimestamps ? `ATENÇÃO: A transcrição contém timestamps [MM:SS] no início de cada fala. Você DEVE incluir esses timestamps nas suas respostas.
+## CONTEXTO DA REUNIÃO
 
-FORMATO OBRIGATÓRIO COM TIMESTAMPS:
-Cada bullet point DEVE começar com o timestamp em negrito seguido de hífen:
+### Metadados
+${metadataBlock}
 
-• **10:23** - Descrição do que foi dito nesse momento
-• **15:45** - Outra informação com dados específicos
+### Análise prévia (insights gerados automaticamente após a reunião)
+${insightsBlock}
 
-EXEMPLO DE RESPOSTA CORRETA:
-Pergunta: "Quando falaram sobre preço?"
-Resposta:
-**O preço foi discutido em 2 momentos:**
-
-• **10:23** - Cliente perguntou sobre valores, mencionou orçamento de R$ 50 mil
-• **25:17** - Vendedor apresentou proposta de R$ 15.000/mês com desconto de 10%
-
-FORMATO INCORRETO (NÃO FAÇA ASSIM):
-• Mencionou R$ 15.000/mês - 10:23 ❌
-• Cliente perguntou sobre valores 10:23 ❌
-• 10:23 Cliente perguntou ❌
-
-FORMATO CORRETO (FAÇA ASSIM):
-• **10:23** - Cliente perguntou sobre valores ✅
-` : `FORMATO DE RESPOSTA:
-Organize em tópicos com bullet points quando houver múltiplas informações.
-`}
-
-REGRAS IMPORTANTES:
-• Responda APENAS com base na transcrição fornecida
-• Se a informação não estiver na transcrição, diga: "❌ Essa informação não foi mencionada nesta reunião"
-• Seja específico com dados: nomes, valores, datas, números exatos
-• Use negrito para destacar informações-chave
-• Máximo 5-6 tópicos por resposta
-• Use emojis ocasionalmente (✅ ⚠️ 💰 📅 👤 🕐)
-
-Seja um analista preciso e orientado a dados.`;
-
-      const userPrompt = `Transcrição da reunião${hasTimestamps ? ' (com timestamps [MM:SS])' : ''}:
-
+### Transcrição${hasTimestamps ? ' (com timestamps [MM:SS] no início de cada fala)' : ''}
 ${contextTranscript}
 
----
+## DIRETRIZES DE RESPOSTA
 
-Pergunta: "${question}"
+### Estilo
+- Português brasileiro, tom de analista profissional — direto, sem rodeios.
+- Use **negrito** pra destacar nomes próprios, valores, datas, decisões.
+- Use markdown leve: listas quando ajudar, parágrafos quando narrativa for melhor. Sem forçar bullets em tudo.
+- Tamanho proporcional à pergunta: resposta curta pra pergunta simples; resposta detalhada pra pergunta analítica.
+- Emojis raros e funcionais (✅ ⚠️ 💡 💰 📅 🎯 📧). Nunca decorativos.
 
-Analise a transcrição e responda de forma estruturada e assertiva${hasTimestamps ? ', incluindo timestamps quando mencionar momentos específicos' : ''}:`;
+### Timestamps
+${hasTimestamps
+  ? '- Inclua **[MM:SS]** em negrito SOMENTE quando citar um momento específico ("o cliente disse X em **[12:34]**"). Não force timestamp em tudo. Em resumos e drafts de mensagem, geralmente NÃO use.'
+  : '- Não há timestamps disponíveis nesta transcrição.'}
 
-      // Chama DeepSeek
+### Conteúdo
+- Cite **evidências concretas** da transcrição (números, nomes, valores, frases).
+- **Conecte** a transcrição com os insights estruturados quando fizer sentido (ex: "isso reforça o BANT Need 8/10" ou "alinha com o Health Score 72").
+- Se a pergunta pedir um draft (email, mensagem, próximo passo), entregue o texto pronto pra copiar — sem placeholders tipo "[nome do cliente]".
+- Se a pergunta for genérica ("resume", "o que aconteceu"), seja completo mas conciso (sem repetir tudo).
+
+### Assertividade
+- **Afirme** o que está na transcrição. Evite "talvez", "acredito que", "parece".
+- Se a informação não estiver, diga "Não foi mencionado nesta reunião" — sem rodeios.
+- Se houver ambiguidade real, mostre as duas leituras possíveis.
+
+### Proatividade — OBRIGATÓRIO
+Ao final de TODA resposta, adicione uma seção curta (1-3 frases) com este header exato:
+
+**💡 Observação proativa**
+
+Conteúdo da observação: um insight que o usuário NÃO perguntou mas é relevante pro contexto. Exemplos: um risco não óbvio que aparece na fala, uma oportunidade de upsell/cross-sell, um momento de objeção mal endereçada, uma ação crítica pra próxima semana, um padrão entre essa reunião e a análise prévia.
+
+Se realmente não houver nada útil pra adicionar, OMITA a seção (não escreva "nenhuma observação"). Mas o default é incluir.
+
+Comece a responder diretamente, sem cabeçalho repetindo a pergunta.`;
+
+      // Multi-turn: monta messages com histórico (últimas N trocas) + pergunta atual
+      const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
+        { role: 'system', content: systemPrompt },
+      ];
+
+      const recentHistory = (conversationHistory ?? []).slice(-HISTORY_PAIRS_FOR_CONTEXT);
+      for (const turn of recentHistory) {
+        if (turn.question) messages.push({ role: 'user', content: turn.question });
+        if (turn.answer) messages.push({ role: 'assistant', content: turn.answer });
+      }
+
+      messages.push({ role: 'user', content: question });
+
       const response = await deepseek.chat.completions.create({
         model: 'deepseek-chat',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
-        ],
-        temperature: 0.3,
-        max_tokens: 1000,
+        messages,
+        temperature: 0.35,
+        max_tokens: 2000,
       });
 
       const answer = response.choices[0]?.message?.content?.trim();
@@ -245,13 +342,49 @@ Analise a transcrição e responda de forma estruturada e assertiva${hasTimestam
 
       const tokensUsed = response.usage?.total_tokens ?? 0;
 
-      logger.info(`Answer generated successfully for meeting ${meetingId}, tokens used: ${tokensUsed}`);
+      logger.info(`[MeetingChat] Answer generated for ${meetingId}, tokens=${tokensUsed}`);
 
       return { answer, tokensUsed };
 
     } catch (error: any) {
       logger.error('Error generating answer:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Busca metadados da reunião + nome do dono pra contexto da IA.
+   */
+  async getMeetingContext(meetingId: string): Promise<MeetingContext | null> {
+    try {
+      const { data: meeting, error } = await supabase
+        .from('meetings')
+        .select('title, started_at, ended_at, duration_seconds, participant_emails, insights, user_id')
+        .eq('id', meetingId)
+        .single();
+
+      if (error || !meeting) return null;
+
+      let ownerName: string | null = null;
+      try {
+        const { data: profile } = await supabase.auth.admin.getUserById(meeting.user_id);
+        ownerName = profile?.user?.user_metadata?.full_name ?? profile?.user?.user_metadata?.name ?? profile?.user?.email ?? null;
+      } catch {
+        // ignore — owner name é nice-to-have
+      }
+
+      return {
+        title: meeting.title ?? null,
+        startedAt: meeting.started_at ?? null,
+        endedAt: meeting.ended_at ?? null,
+        durationSeconds: meeting.duration_seconds ?? null,
+        participantEmails: (meeting.participant_emails as string[] | null) ?? null,
+        ownerName,
+        insights: (meeting.insights as Record<string, unknown> | null) ?? null,
+      };
+    } catch (err) {
+      logger.error('Error fetching meeting context:', err);
+      return null;
     }
   }
 

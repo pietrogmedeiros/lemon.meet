@@ -1,5 +1,20 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, Send, MessageCircle, Loader, AlertCircle } from 'lucide-react';
+import { X, Send, MessageCircle, Loader, AlertCircle, Sparkles } from 'lucide-react';
+
+interface QuickAction {
+  emoji: string;
+  label: string;
+  prompt: string;
+}
+
+const QUICK_ACTIONS: QuickAction[] = [
+  { emoji: '📋', label: 'Resumir reunião', prompt: 'Faça um resumo executivo dessa reunião destacando os 3-5 pontos mais importantes, decisões tomadas e o que ficou pendente.' },
+  { emoji: '✅', label: 'Próximos passos', prompt: 'Quais são os próximos passos concretos dessa reunião? Liste cada ação com responsável (se foi mencionado) e prazo (se foi mencionado).' },
+  { emoji: '⚠️', label: 'Riscos e objeções', prompt: 'Quais riscos, objeções e sinais de alerta apareceram nessa reunião? Cite a evidência da transcrição pra cada um e sugira como mitigar.' },
+  { emoji: '📧', label: 'Email de follow-up', prompt: 'Escreva um email de follow-up pronto pra enviar, em português brasileiro, referenciando pontos específicos discutidos e propondo os próximos passos. Inclua assunto.' },
+  { emoji: '🎯', label: 'Por que pode não fechar?', prompt: 'Olhando essa reunião, quais são os fatores que podem fazer esse deal NÃO fechar? Seja brutalmente honesto e cite evidências da transcrição.' },
+  { emoji: '👤', label: 'Quem é o decisor?', prompt: 'Quem foi identificado como decisor (ou potencial decisor) nessa reunião? Quem mais precisa estar envolvido na decisão? Cite evidências da fala.' },
+];
 
 interface ChatMessage {
   id: string;
@@ -157,6 +172,12 @@ export function MeetingChatPanel({ meetingId, isOpen, onClose, apiUrl, authToken
     }
   };
 
+  const handleQuickAction = (prompt: string) => {
+    setQuestion(prompt);
+    // foca no input pra usuário poder revisar/editar antes de enviar
+    setTimeout(() => inputRef.current?.focus(), 0);
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -178,7 +199,7 @@ export function MeetingChatPanel({ meetingId, isOpen, onClose, apiUrl, authToken
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-lg font-semibold text-[#333333]">Chat de IA</h2>
-                <span className="text-[10px] text-[#999999] font-mono">v1.2.0</span>
+                <span className="text-[10px] text-[#999999] font-mono">v2.0.0</span>
               </div>
               <p className="text-xs text-[#666666]">
                 {remainingQuestions} {remainingQuestions === 1 ? 'pergunta restante' : 'perguntas restantes'}
@@ -200,16 +221,30 @@ export function MeetingChatPanel({ meetingId, isOpen, onClose, apiUrl, authToken
               <Loader className="w-6 h-6 animate-spin text-[#2D5A27]" />
             </div>
           ) : chats.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <div className="w-16 h-16 rounded-2xl bg-[#F5F5F5] flex items-center justify-center mb-4">
-                <MessageCircle className="w-8 h-8 text-[#CCCCCC]" />
+            <div className="flex flex-col items-center text-center pt-2">
+              <div className="w-14 h-14 rounded-2xl bg-[#2D5A27]/10 flex items-center justify-center mb-3">
+                <Sparkles className="w-7 h-7 text-[#2D5A27]" />
               </div>
-              <p className="text-sm font-medium text-[#666666] mb-2">
-                Nenhuma pergunta ainda
+              <p className="text-base font-semibold text-[#333333] mb-1">
+                Como posso ajudar com essa reunião?
               </p>
-              <p className="text-xs text-[#999999] max-w-xs">
-                Faça perguntas sobre esta reunião para obter insights instantâneos da IA
+              <p className="text-xs text-[#666666] max-w-xs mb-6">
+                Escolha um atalho abaixo ou faça uma pergunta livre. A IA tem acesso à transcrição completa e à análise estruturada.
               </p>
+
+              <div className="grid grid-cols-1 gap-2 w-full">
+                {QUICK_ACTIONS.map((action) => (
+                  <button
+                    key={action.label}
+                    onClick={() => handleQuickAction(action.prompt)}
+                    disabled={isLoading || remainingQuestions <= 0}
+                    className="flex items-center gap-3 px-4 py-3 rounded-xl border border-[#E0E0E0] hover:border-[#2D5A27] hover:bg-[#2D5A27]/5 transition text-left disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <span className="text-lg leading-none" aria-hidden>{action.emoji}</span>
+                    <span className="text-sm font-medium text-[#333333]">{action.label}</span>
+                  </button>
+                ))}
+              </div>
             </div>
           ) : (
             chats.map((chat) => (
@@ -244,6 +279,24 @@ export function MeetingChatPanel({ meetingId, isOpen, onClose, apiUrl, authToken
 
         {/* Input */}
         <div className="p-4 border-t border-[#E0E0E0] bg-white">
+          {/* Quick-actions compactas (visíveis quando já tem histórico) */}
+          {chats.length > 0 && !error && (
+            <div className="mb-3 flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-thin">
+              {QUICK_ACTIONS.map((action) => (
+                <button
+                  key={action.label}
+                  onClick={() => handleQuickAction(action.prompt)}
+                  disabled={isLoading || remainingQuestions <= 0}
+                  className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-[#E0E0E0] hover:border-[#2D5A27] hover:bg-[#2D5A27]/5 transition text-xs font-medium text-[#666666] hover:text-[#2D5A27] disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
+                  title={action.prompt}
+                >
+                  <span aria-hidden>{action.emoji}</span>
+                  {action.label}
+                </button>
+              ))}
+            </div>
+          )}
+
           {error && (
             <div className="mb-3 flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-xl">
               <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
