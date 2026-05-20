@@ -18,7 +18,7 @@ import { supabase } from '../config/supabase.js'
 import { authMiddleware, type AuthRequest } from '../middleware/auth.middleware.js'
 import { logger } from '../utils/logger.js'
 import { nanoid } from 'nanoid'
-import { canCreateOwnedTeam, canJoinTeamAsMember, getPreferredOwnerTeamId } from '../utils/teamAccess.js'
+import { canCreateOwnedTeam, canJoinTeamAsMember, getPreferredOwnerTeamId, isDevUser } from '../utils/teamAccess.js'
 
 const router: express.Router = Router()
 
@@ -518,13 +518,16 @@ router.get('/:id/meetings', authMiddleware, async (req: AuthRequest, res: Respon
     const isMember = !!membership
     const isAdmin = membership?.role === 'admin'
 
-    // Precisa ser owner, admin ou membro para ver
-    if (!isOwner && !isMember) {
+    // Dev user bypass: pode ver qualquer time mesmo sem ownership/membership
+    const isDev = await isDevUser(userId)
+
+    // Precisa ser owner, admin, membro ou dev para ver
+    if (!isOwner && !isMember && !isDev) {
       return res.status(403).json({ success: false, message: 'Sem permissão' })
     }
 
     // Define se pode ver todas as reuniões do time ou apenas as suas
-    const canSeeAll = isOwner || isAdmin
+    const canSeeAll = isOwner || isAdmin || isDev
 
     let memberIds: string[]
     

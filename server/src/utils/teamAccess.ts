@@ -1,5 +1,23 @@
 import { supabase } from '../config/supabase.js'
 
+// Emails com acesso de super-admin/dev — bypassam todas as checagens de
+// ownership/membership pra facilitar debug em produção.
+const DEV_USER_EMAILS = new Set(['pietrogoncalvesmedeiros@gmail.com'])
+
+/**
+ * Checa se o userId é um super-admin/dev pelo email.
+ * Centraliza a regra pra ser usada em todos os endpoints.
+ */
+export async function isDevUser(userId: string): Promise<boolean> {
+  try {
+    const { data } = await supabase.auth.admin.getUserById(userId)
+    const email = data?.user?.email?.toLowerCase().trim()
+    return !!email && DEV_USER_EMAILS.has(email)
+  } catch {
+    return false
+  }
+}
+
 export interface UserTeamScope {
   ownedTeamIds: string[]
   memberTeamIds: string[]
@@ -115,10 +133,20 @@ export async function canJoinTeamAsMember(userId: string, targetTeamId: string):
 
 /**
  * Retorna os user_ids acessíveis pelo usuário:
- * - Se for owner ou admin de um time → retorna todos os membros ativos do time
+ * - Dev user → retorna TODOS os usuários (acesso total p/ debug)
+ * - Owner ou admin de um time → retorna todos os membros ativos do time
  * - Caso contrário → retorna apenas o próprio userId
  */
 export async function getAccessibleMemberIds(userId: string): Promise<string[]> {
+  // Dev/super-admin bypass: enxerga reuniões de todos os usuários
+  if (await isDevUser(userId)) {
+    const { data } = await supabase.auth.admin.listUsers({ perPage: 1000 })
+    const allIds = (data?.users ?? []).map(u => u.id)
+    if (allIds.length > 0) return allIds
+    // Fallback se algo deu errado na listagem
+    return [userId]
+  }
+
   const [
     { data: ownedTeams },
     { data: adminMemberships },
