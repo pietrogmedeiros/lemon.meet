@@ -221,14 +221,30 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
     logger.info(`[HubSpot] ✅ Token válido obtido para user ${userId}`)
 
     // Buscar ID do owner (usuário autenticado no HubSpot)
+    // user_id (OAuth) e hubspot_owner_id são entidades distintas no HubSpot:
+    // precisa traduzir via /crm/v3/owners/{userId}?idProperty=userId
     let authenticatedOwnerId: string | null = null
     try {
       const tokenInfoRes = await fetch(`${HUBSPOT_API_BASE}/oauth/v1/access-tokens/${token}`)
       if (tokenInfoRes.ok) {
         const tokenInfo = await tokenInfoRes.json() as { user_id?: number, hub_id?: number }
         if (tokenInfo.user_id) {
-          authenticatedOwnerId = String(tokenInfo.user_id)
-          logger.info(`[HubSpot] ✅ Owner ID do usuário autenticado: ${authenticatedOwnerId}`)
+          const ownerRes = await fetch(
+            `${HUBSPOT_API_BASE}/crm/v3/owners/${tokenInfo.user_id}?idProperty=userId`,
+            { headers: { Authorization: `Bearer ${token}` } }
+          )
+          if (ownerRes.ok) {
+            const owner = await ownerRes.json() as { id?: string }
+            if (owner.id) {
+              authenticatedOwnerId = owner.id
+              logger.info(`[HubSpot] ✅ Owner ID resolvido: ${authenticatedOwnerId} (user_id=${tokenInfo.user_id})`)
+            } else {
+              logger.warn(`[HubSpot] ⚠️  Resposta de owner sem id para user_id=${tokenInfo.user_id}`)
+            }
+          } else {
+            const errBody = await ownerRes.text()
+            logger.warn(`[HubSpot] ⚠️  Falha ao resolver owner para user_id=${tokenInfo.user_id} (status ${ownerRes.status}): ${errBody}`)
+          }
         }
       } else {
         logger.warn(`[HubSpot] ⚠️  Não foi possível obter owner ID do token`)
