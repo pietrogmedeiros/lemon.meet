@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase'
 import {
   Users, Plus, Trash2, CheckCircle, Clock,
   AlertCircle, Loader, Video, Crown, UserPlus, ChevronRight,
-  Shield, Link2, Copy, Check, Sparkles, X
+  Shield, Link2, Copy, Check, Sparkles, X, Settings
 } from 'lucide-react'
 import { formatDate } from '@/lib'
 import { useNavigate } from 'react-router-dom'
@@ -64,7 +64,7 @@ export function TeamPage() {
   const [isOwner, setIsOwner] = useState(false)
   const [loading, setLoading] = useState(true)
   const [teamLoading, setTeamLoading] = useState(false)
-  const [tab, setTab] = useState<'members' | 'meetings'>('members')
+  const [tab, setTab] = useState<'members' | 'meetings' | 'settings'>('members')
 
   // Criar time
   const [showCreateTeamModal, setShowCreateTeamModal] = useState(false)
@@ -688,49 +688,39 @@ export function TeamPage() {
     <MainLayout>
       <div className="space-y-6">
 
-        {/* Seletor de Times + Criar Novo */}
-        {teams.length > 1 || canCreateMore ? (
-          <div className="bg-white border border-[#E0E0E0] rounded-2xl p-4 shadow-sm">
-            <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
-              {/* Seletor */}
-              <div className="flex-1">
+        {/* Header de navegação: seletor (se >1 time) + ação primária criar */}
+        {(teams.length > 1 || canCreateMore) && (
+          <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-end">
+            {teams.length > 1 && (
+              <div className="flex-1 min-w-0">
                 <label className="text-xs font-semibold text-[#666666] uppercase tracking-wider mb-2 block">
                   Selecione um time ({teams.length}/5)
                 </label>
                 <select
                   value={selectedTeamId ?? ''}
-                  onChange={(e) => {
-                    console.log('[TeamPage] Selecionando time:', e.target.value)
-                    setSelectedTeamId(e.target.value)
-                  }}
-                  className="w-full px-4 py-2.5 rounded-xl border border-[#E0E0E0] text-[#333333] text-sm focus:outline-none focus:ring-2 focus:ring-[#2D5A27]/25 focus:border-[#2D5A27] transition bg-white"
+                  onChange={(e) => setSelectedTeamId(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-[#E0E0E0] text-[#333333] text-sm focus:outline-none focus:ring-2 focus:ring-[#2D5A27]/25 focus:border-[#2D5A27] transition bg-white shadow-sm"
                 >
-                  {teams.map(t => {
-                    console.log('[TeamPage] Renderizando option:', t.name, t.id, t.isOwner)
-                    return (
-                      <option key={t.id} value={t.id}>
-                        {t.name} {t.isOwner ? '(Owner)' : '(Membro)'}
-                      </option>
-                    )
-                  })}
+                  {teams.map(t => (
+                    <option key={t.id} value={t.id}>
+                      {t.name} {t.isOwner ? '(Owner)' : '(Membro)'}
+                    </option>
+                  ))}
                 </select>
               </div>
+            )}
 
-              {/* Criar novo time */}
-              {canCreateMore && (
-                <div className="sm:pt-6">
-                  <button
-                    onClick={openCreateTeamModal}
-                    className="px-4 py-2 rounded-lg bg-[#2D5A27] text-white text-sm font-medium hover:bg-[#1E3D1A] transition flex items-center gap-2 whitespace-nowrap"
-                  >
-                    <Plus size={14} />
-                    Novo time
-                  </button>
-                </div>
-              )}
-            </div>
+            {canCreateMore && (
+              <button
+                onClick={openCreateTeamModal}
+                className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-[#2D5A27] text-white text-sm font-semibold hover:bg-[#1E3D1A] transition whitespace-nowrap shadow-sm"
+              >
+                <Plus size={15} />
+                Novo time
+              </button>
+            )}
           </div>
-        ) : null}
+        )}
 
         {/* Header full-width */}
         <div className="bg-white border border-[#E0E0E0] rounded-2xl p-6 shadow-sm">
@@ -770,7 +760,7 @@ export function TeamPage() {
 
         {/* Tabs */}
         <div className="flex gap-1 bg-[#F5F5F5] rounded-xl p-1 w-fit">
-          {(['members', 'meetings'] as const).map((t) => (
+          {(isOwner ? (['members', 'meetings', 'settings'] as const) : (['members', 'meetings'] as const)).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -780,20 +770,16 @@ export function TeamPage() {
                   : 'text-[#666666] hover:text-[#333333]'
               }`}
             >
-              {t === 'members' ? (
-                <span className="flex items-center gap-2"><Users size={14} /> Membros</span>
-              ) : (
-                <span className="flex items-center gap-2"><Video size={14} /> Reuniões do Time</span>
-              )}
+              {t === 'members' && <span className="flex items-center gap-2"><Users size={14} /> Membros</span>}
+              {t === 'meetings' && <span className="flex items-center gap-2"><Video size={14} /> Reuniões do Time</span>}
+              {t === 'settings' && <span className="flex items-center gap-2"><Settings size={14} /> Configurações</span>}
             </button>
           ))}
         </div>
 
         {/* ── ABA MEMBROS ── */}
         {tab === 'members' && (
-          <div className={`grid gap-6 ${isOwner ? 'grid-cols-1 lg:grid-cols-[1fr_340px]' : 'grid-cols-1'}`}>
-
-            {/* Coluna principal: lista de membros */}
+          <div>
             <div className="bg-white border border-[#E0E0E0] rounded-2xl shadow-sm overflow-hidden">
               <div className="px-5 py-3.5 border-b border-[#F0F0F0] flex items-center justify-between">
                 <span className="text-xs font-semibold text-[#666666] uppercase tracking-wider">
@@ -874,114 +860,106 @@ export function TeamPage() {
               </div>
             </div>
 
-            {/* Coluna lateral: ações do owner */}
-            {isOwner && (
-              <div className="space-y-4">
-                {/* Avaliação por IA */}
-                <div className="bg-white border border-[#E0E0E0] rounded-2xl p-5 shadow-sm space-y-4">
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-lg bg-[#2D5A27]/10 flex items-center justify-center">
-                      <Sparkles size={14} className="text-[#2D5A27]" />
-                    </div>
-                    <span className="text-sm font-semibold text-[#333333]">Avaliação por IA</span>
-                  </div>
-                  <div className="bg-[#F8F9FA] rounded-xl p-3 space-y-1.5">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs text-[#666666]">Tipo do time</span>
-                      <span className="text-xs font-semibold text-[#333333]">
-                        {team.team_type === 'customer_success' ? 'Customer Success' : 'Sales'}
-                      </span>
-                    </div>
-                    {team.team_type !== 'customer_success' && (
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-xs text-[#666666]">Framework</span>
-                        <span className="text-xs font-semibold text-[#333333]">
-                          {(team.evaluation_framework ?? 'bant').toUpperCase()}
-                        </span>
-                      </div>
-                    )}
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs text-[#666666]">Instruções customizadas</span>
-                      <span className="text-xs font-semibold text-[#333333]">
-                        {team.custom_prompt_instructions ? 'Sim' : 'Não'}
-                      </span>
-                    </div>
-                  </div>
-                  <button
-                    onClick={handleOpenConfigModal}
-                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-[#2D5A27] text-[#2D5A27] text-sm font-semibold hover:bg-[#2D5A27]/5 transition"
-                  >
-                    <Sparkles size={15} />
-                    Configurar avaliação
-                  </button>
-                </div>
+          </div>
+        )}
 
-                {/* Link de convite */}
-                <div className="bg-white border border-[#E0E0E0] rounded-2xl p-5 shadow-sm space-y-4">
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-lg bg-[#2D5A27]/10 flex items-center justify-center">
-                      <Link2 size={14} className="text-[#2D5A27]" />
-                    </div>
-                    <span className="text-sm font-semibold text-[#333333]">Link de convite</span>
-                  </div>
-                  <p className="text-xs text-[#666666] leading-relaxed">
-                    Gere um link compartilhável que qualquer pessoa pode usar para entrar no time.
-                  </p>
-                  <button
-                    onClick={handleGenerateInviteLink}
-                    disabled={inviteLinkLoading}
-                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#2D5A27] text-white text-sm font-semibold hover:bg-[#1E3D1A] transition disabled:opacity-50 shadow-sm"
-                  >
-                    {inviteLinkLoading ? (
-                      <Loader size={15} className="animate-spin" />
-                    ) : (
-                      <Link2 size={15} />
-                    )}
-                    Gerar link de convite
-                  </button>
+        {/* ── ABA CONFIGURAÇÕES (owner-only) ── */}
+        {tab === 'settings' && isOwner && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Seção: Avaliação por IA */}
+            <div className="bg-white border border-[#E0E0E0] rounded-2xl shadow-sm overflow-hidden">
+              <div className="px-5 py-3.5 border-b border-[#F0F0F0] flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-[#2D5A27]/10 flex items-center justify-center">
+                  <Sparkles size={14} className="text-[#2D5A27]" />
                 </div>
-
-                {/* Info extra */}
-                <div className="bg-[#F8F9FA] border border-[#F0F0F0] rounded-2xl p-5 space-y-3">
-                  <p className="text-xs font-semibold text-[#666666] uppercase tracking-wider">Como funciona</p>
-                  <ul className="space-y-2.5 text-xs text-[#666666] leading-relaxed">
-                    <li className="flex items-start gap-2">
-                      <span className="w-4 h-4 rounded-full bg-[#2D5A27]/15 text-[#2D5A27] flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5">1</span>
-                      Clique em "Gerar link de convite" para criar um link compartilhável.
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="w-4 h-4 rounded-full bg-[#2D5A27]/15 text-[#2D5A27] flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5">2</span>
-                      Compartilhe o link com a pessoa que deseja convidar.
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="w-4 h-4 rounded-full bg-[#2D5A27]/15 text-[#2D5A27] flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5">3</span>
-                      Após fazer login, ela será automaticamente adicionada ao time.
-                    </li>
-                  </ul>
-                </div>
-
-                {/* Danger zone — excluir time */}
-                <div className="bg-white border border-red-200 rounded-2xl p-5 shadow-sm space-y-3">
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-lg bg-red-50 flex items-center justify-center">
-                      <AlertCircle size={14} className="text-[#DC3545]" />
-                    </div>
-                    <span className="text-sm font-semibold text-[#333333]">Excluir time</span>
-                  </div>
-                  <p className="text-xs text-[#666666] leading-relaxed">
-                    Remove o time e todos os membros. As reuniões já registradas
-                    permanecem mas perdem o vínculo com o time. Esta ação é irreversível.
-                  </p>
-                  <button
-                    onClick={handleOpenDeleteModal}
-                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-[#DC3545] text-[#DC3545] text-sm font-semibold hover:bg-red-50 transition"
-                  >
-                    <Trash2 size={15} />
-                    Excluir este time
-                  </button>
-                </div>
+                <span className="text-sm font-semibold text-[#333333]">Avaliação por IA</span>
               </div>
-            )}
+              <div className="p-5 space-y-4">
+                <p className="text-xs text-[#666666] leading-relaxed">
+                  Define como a IA analisa as reuniões deste time: tipo (Sales/CS), framework
+                  (BANT/SPIN) e instruções customizadas pro seu contexto.
+                </p>
+                <div className="bg-[#F8F9FA] rounded-xl p-3 space-y-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs text-[#666666]">Tipo do time</span>
+                    <span className="text-xs font-semibold text-[#333333]">
+                      {team.team_type === 'customer_success' ? 'Customer Success' : 'Sales'}
+                    </span>
+                  </div>
+                  {team.team_type !== 'customer_success' && (
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs text-[#666666]">Framework</span>
+                      <span className="text-xs font-semibold text-[#333333]">
+                        {(team.evaluation_framework ?? 'bant').toUpperCase()}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs text-[#666666]">Instruções customizadas</span>
+                    <span className="text-xs font-semibold text-[#333333]">
+                      {team.custom_prompt_instructions ? 'Sim' : 'Não'}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  onClick={handleOpenConfigModal}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-[#2D5A27] text-[#2D5A27] text-sm font-semibold hover:bg-[#2D5A27]/5 transition"
+                >
+                  <Sparkles size={15} />
+                  Configurar avaliação
+                </button>
+              </div>
+            </div>
+
+            {/* Seção: Convite de membros */}
+            <div className="bg-white border border-[#E0E0E0] rounded-2xl shadow-sm overflow-hidden">
+              <div className="px-5 py-3.5 border-b border-[#F0F0F0] flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-[#2D5A27]/10 flex items-center justify-center">
+                  <Link2 size={14} className="text-[#2D5A27]" />
+                </div>
+                <span className="text-sm font-semibold text-[#333333]">Convite de membros</span>
+              </div>
+              <div className="p-5 space-y-4">
+                <p className="text-xs text-[#666666] leading-relaxed">
+                  Gere um link compartilhável (válido por 7 dias) que qualquer pessoa pode
+                  usar pra entrar no time. Após login, ela é automaticamente adicionada.
+                </p>
+                <button
+                  onClick={handleGenerateInviteLink}
+                  disabled={inviteLinkLoading}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#2D5A27] text-white text-sm font-semibold hover:bg-[#1E3D1A] transition disabled:opacity-50 shadow-sm"
+                >
+                  {inviteLinkLoading ? <Loader size={15} className="animate-spin" /> : <Link2 size={15} />}
+                  Gerar link de convite
+                </button>
+              </div>
+            </div>
+
+            {/* Seção: Zona de perigo — span full width */}
+            <div className="lg:col-span-2 bg-white border border-red-200 rounded-2xl shadow-sm overflow-hidden">
+              <div className="px-5 py-3.5 border-b border-red-100 flex items-center gap-2 bg-red-50/50">
+                <div className="w-7 h-7 rounded-lg bg-red-100 flex items-center justify-center">
+                  <AlertCircle size={14} className="text-[#DC3545]" />
+                </div>
+                <span className="text-sm font-semibold text-[#DC3545]">Zona de perigo</span>
+              </div>
+              <div className="p-5 flex flex-col sm:flex-row sm:items-center gap-4">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-[#333333]">Excluir este time</p>
+                  <p className="text-xs text-[#666666] leading-relaxed mt-1">
+                    Remove o time e todos os membros. Reuniões já registradas permanecem mas
+                    perdem o vínculo com o time. <strong>Ação irreversível.</strong>
+                  </p>
+                </div>
+                <button
+                  onClick={handleOpenDeleteModal}
+                  className="shrink-0 flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl border border-[#DC3545] text-[#DC3545] text-sm font-semibold hover:bg-red-50 transition whitespace-nowrap"
+                >
+                  <Trash2 size={15} />
+                  Excluir time
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
