@@ -30,6 +30,7 @@ export interface Meeting {
   team_id?: string | null
   transcript?: string | null
   has_transcript?: boolean
+  failure_reason?: string | null
 }
 
 let cache: CacheEntry | null = null

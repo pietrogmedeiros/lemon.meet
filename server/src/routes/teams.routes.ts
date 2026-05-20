@@ -549,7 +549,7 @@ router.get('/:id/meetings', authMiddleware, async (req: AuthRequest, res: Respon
 
     const { data: meetings, error } = await supabase
       .from('meetings')
-      .select('id, title, platform, status, meet_link, started_at, ended_at, duration_seconds, insights, created_at, user_id')
+      .select('id, title, platform, status, meet_link, started_at, ended_at, duration_seconds, insights, created_at, user_id, failure_reason')
       .in('user_id', memberIds)
       .order('created_at', { ascending: false })
       .limit(200)

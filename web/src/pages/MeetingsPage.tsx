@@ -159,6 +159,16 @@ export function MeetingsPage() {
     return <Badge variant="secondary">{status ?? 'Desconhecido'}</Badge>;
   };
 
+  const describeFailureShort = (reason: string | null | undefined): string | null => {
+    if (!reason) return null;
+    if (reason.startsWith('no_transcript_in_webhook')) return 'O bot entrou mas não capturou áudio.';
+    if (reason.startsWith('no_transcription_url')) return 'Serviço externo não retornou link de transcrição.';
+    if (reason.startsWith('transcription_download_failed')) return 'Falha ao baixar a transcrição (instabilidade externa).';
+    if (reason.startsWith('insights_generation_failed')) return 'Transcrição existe, mas IA falhou ao analisar.';
+    if (reason.startsWith('extension_no_audio_captured')) return 'Extensão não capturou áudio.';
+    return reason;
+  };
+
   const formatDuration = (seconds: number | null) => {
     if (!seconds) return null;
     const m = Math.floor(seconds / 60);
@@ -410,6 +420,14 @@ export function MeetingsPage() {
 
                 <div className="mb-3 flex items-center gap-2 flex-wrap">
                   {getStatusBadge(meeting.status)}
+                  {meeting.failure_reason && (
+                    <span
+                      title={describeFailureShort(meeting.failure_reason) ?? meeting.failure_reason ?? ''}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-red-50 text-red-700 border border-red-200 cursor-help"
+                    >
+                      {describeFailureShort(meeting.failure_reason)}
+                    </span>
+                  )}
                   {(meeting.has_transcript ?? (meeting.transcript && meeting.transcript.trim().length > 0)) ? (
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-[#2D5A27]/10 text-[#2D5A27] border border-[#2D5A27]/20">
                       <FileText className="w-3 h-3" />
