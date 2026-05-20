@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase'
 import {
   Users, Plus, Trash2, CheckCircle, Clock,
   AlertCircle, Loader, Video, Crown, UserPlus, ChevronRight,
-  Shield, Link2, Copy, Check
+  Shield, Link2, Copy, Check, Sparkles, X
 } from 'lucide-react'
 import { formatDate } from '@/lib'
 import { useNavigate } from 'react-router-dom'
@@ -26,6 +26,9 @@ interface Team {
   name: string
   owner_id: string
   isOwner?: boolean
+  team_type?: 'sales' | 'customer_success'
+  evaluation_framework?: 'bant' | 'spin'
+  custom_prompt_instructions?: string | null
 }
 
 interface TeamMeeting {
@@ -77,6 +80,16 @@ export function TeamPage() {
 
   // Alterar papel
   const [promotingMember, setPromotingMember] = useState<string | null>(null)
+
+  // Config de avaliação por IA
+  const [showConfigModal, setShowConfigModal] = useState(false)
+  const [configForm, setConfigForm] = useState<{
+    team_type: 'sales' | 'customer_success'
+    evaluation_framework: 'bant' | 'spin'
+    custom_prompt_instructions: string
+  }>({ team_type: 'sales', evaluation_framework: 'bant', custom_prompt_instructions: '' })
+  const [configSaving, setConfigSaving] = useState(false)
+  const [configError, setConfigError] = useState('')
 
   // Link de convite
   const [showInviteLinkModal, setShowInviteLinkModal] = useState(false)
@@ -326,6 +339,51 @@ export function TeamPage() {
     navigator.clipboard.writeText(inviteLink.url)
     setLinkCopied(true)
     setTimeout(() => setLinkCopied(false), 2000)
+  }
+
+  const handleOpenConfigModal = () => {
+    if (!team) return
+    setConfigForm({
+      team_type: team.team_type ?? 'sales',
+      evaluation_framework: team.evaluation_framework ?? 'bant',
+      custom_prompt_instructions: team.custom_prompt_instructions ?? '',
+    })
+    setConfigError('')
+    setShowConfigModal(true)
+  }
+
+  const handleSaveConfig = async () => {
+    if (!team) return
+    setConfigSaving(true)
+    setConfigError('')
+    try {
+      const payload: Record<string, unknown> = {
+        team_type: configForm.team_type,
+        custom_prompt_instructions: configForm.custom_prompt_instructions.trim() || null,
+      }
+      // evaluation_framework só é relevante quando team_type='sales'
+      if (configForm.team_type === 'sales') {
+        payload.evaluation_framework = configForm.evaluation_framework
+      }
+
+      const data = await apiFetch(`/api/teams/${team.id}/evaluation-config`, session, {
+        method: 'PATCH',
+        body: JSON.stringify(payload),
+      })
+      if (!data.success) throw new Error(data.message ?? 'Erro ao salvar configuração')
+
+      setTeam(prev => prev ? {
+        ...prev,
+        team_type: data.team.team_type,
+        evaluation_framework: data.team.evaluation_framework,
+        custom_prompt_instructions: data.team.custom_prompt_instructions,
+      } : prev)
+      setShowConfigModal(false)
+    } catch (err: any) {
+      setConfigError(err.message ?? 'Erro ao salvar')
+    } finally {
+      setConfigSaving(false)
+    }
   }
 
   const formatDuration = (s: number | null) => {
@@ -635,6 +693,45 @@ export function TeamPage() {
             {/* Coluna lateral: ações do owner */}
             {isOwner && (
               <div className="space-y-4">
+                {/* Avaliação por IA */}
+                <div className="bg-white border border-[#E0E0E0] rounded-2xl p-5 shadow-sm space-y-4">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-[#2D5A27]/10 flex items-center justify-center">
+                      <Sparkles size={14} className="text-[#2D5A27]" />
+                    </div>
+                    <span className="text-sm font-semibold text-[#333333]">Avaliação por IA</span>
+                  </div>
+                  <div className="bg-[#F8F9FA] rounded-xl p-3 space-y-1.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs text-[#666666]">Tipo do time</span>
+                      <span className="text-xs font-semibold text-[#333333]">
+                        {team.team_type === 'customer_success' ? 'Customer Success' : 'Sales'}
+                      </span>
+                    </div>
+                    {team.team_type !== 'customer_success' && (
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs text-[#666666]">Framework</span>
+                        <span className="text-xs font-semibold text-[#333333]">
+                          {(team.evaluation_framework ?? 'bant').toUpperCase()}
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs text-[#666666]">Instruções customizadas</span>
+                      <span className="text-xs font-semibold text-[#333333]">
+                        {team.custom_prompt_instructions ? 'Sim' : 'Não'}
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleOpenConfigModal}
+                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-[#2D5A27] text-[#2D5A27] text-sm font-semibold hover:bg-[#2D5A27]/5 transition"
+                  >
+                    <Sparkles size={15} />
+                    Configurar avaliação
+                  </button>
+                </div>
+
                 {/* Link de convite */}
                 <div className="bg-white border border-[#E0E0E0] rounded-2xl p-5 shadow-sm space-y-4">
                   <div className="flex items-center gap-2">
@@ -738,6 +835,142 @@ export function TeamPage() {
         )}
 
       </div>
+
+      {/* Modal de Config de Avaliação */}
+      {showConfigModal && team && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => !configSaving && setShowConfigModal(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 space-y-5 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            {/* Header */}
+            <div className="flex items-start justify-between">
+              <div>
+                <h3 className="text-xl font-bold text-[#333333]">Configurar avaliação por IA</h3>
+                <p className="text-sm text-[#666666] mt-1">Como a IA deve analisar as reuniões deste time</p>
+              </div>
+              <button
+                onClick={() => !configSaving && setShowConfigModal(false)}
+                className="text-[#999999] hover:text-[#333333] transition"
+                disabled={configSaving}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Tipo do time */}
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-[#666666] uppercase tracking-wider">
+                Tipo do time
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {([
+                  { value: 'sales' as const, label: 'Sales', desc: 'Reuniões comerciais (prospecção, qualificação, fechamento)' },
+                  { value: 'customer_success' as const, label: 'Customer Success', desc: 'Reuniões com clientes ativos (health, retenção, expansão)' },
+                ]).map(opt => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setConfigForm(prev => ({ ...prev, team_type: opt.value }))}
+                    className={`text-left p-3 rounded-xl border-2 transition ${
+                      configForm.team_type === opt.value
+                        ? 'border-[#2D5A27] bg-[#2D5A27]/5'
+                        : 'border-[#E0E0E0] hover:border-[#CCCCCC]'
+                    }`}
+                  >
+                    <div className="text-sm font-semibold text-[#333333]">{opt.label}</div>
+                    <div className="text-xs text-[#666666] mt-1 leading-relaxed">{opt.desc}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Framework (só Sales) */}
+            {configForm.team_type === 'sales' && (
+              <div className="space-y-2">
+                <label className="text-xs font-semibold text-[#666666] uppercase tracking-wider">
+                  Framework de avaliação
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {([
+                    { value: 'bant' as const, label: 'BANT', desc: 'Budget, Authority, Need, Timeline' },
+                    { value: 'spin' as const, label: 'SPIN Selling', desc: 'Situation, Problem, Implication, Need-payoff' },
+                  ]).map(opt => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setConfigForm(prev => ({ ...prev, evaluation_framework: opt.value }))}
+                      className={`text-left p-3 rounded-xl border-2 transition ${
+                        configForm.evaluation_framework === opt.value
+                          ? 'border-[#2D5A27] bg-[#2D5A27]/5'
+                          : 'border-[#E0E0E0] hover:border-[#CCCCCC]'
+                      }`}
+                    >
+                      <div className="text-sm font-semibold text-[#333333]">{opt.label}</div>
+                      <div className="text-xs text-[#666666] mt-1 leading-relaxed">{opt.desc}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Instruções customizadas */}
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-[#666666] uppercase tracking-wider">
+                Instruções customizadas (opcional)
+              </label>
+              <p className="text-xs text-[#666666] leading-relaxed">
+                Instruções adicionais que serão incluídas no prompt da IA. Use para contextualizar seu ICP,
+                tom desejado, sinais específicos a observar, etc. Não substitui o framework — complementa.
+              </p>
+              <textarea
+                value={configForm.custom_prompt_instructions}
+                onChange={(e) => setConfigForm(prev => ({ ...prev, custom_prompt_instructions: e.target.value }))}
+                placeholder="Ex: Nosso ICP é diretor de RH de empresa de 100-500 funcionários. Foque em sinais de adoção do módulo de pesquisa de clima e mencione integração com SAP se for citada."
+                maxLength={4000}
+                rows={6}
+                className="w-full text-sm text-[#333333] bg-[#F8F9FA] border border-[#E0E0E0] rounded-xl p-3 focus:outline-none focus:border-[#2D5A27] resize-y"
+              />
+              <div className="text-xs text-[#999999] text-right">
+                {configForm.custom_prompt_instructions.length} / 4000
+              </div>
+            </div>
+
+            {/* Aviso histórico */}
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex gap-2">
+              <AlertCircle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+              <p className="text-xs text-amber-800 leading-relaxed">
+                Reuniões já processadas permanecem com a análise no framework original.
+                A nova configuração só vale para reuniões processadas a partir de agora.
+              </p>
+            </div>
+
+            {/* Erro */}
+            {configError && (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex gap-2">
+                <AlertCircle size={16} className="text-[#DC3545] shrink-0 mt-0.5" />
+                <p className="text-xs text-[#DC3545] leading-relaxed">{configError}</p>
+              </div>
+            )}
+
+            {/* Botões */}
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowConfigModal(false)}
+                disabled={configSaving}
+                className="flex-1 py-2.5 rounded-xl border border-[#E0E0E0] text-sm font-semibold text-[#666666] hover:bg-[#F8F9FA] transition disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSaveConfig}
+                disabled={configSaving}
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#2D5A27] text-white text-sm font-semibold hover:bg-[#1E3D1A] transition disabled:opacity-50"
+              >
+                {configSaving ? <Loader size={15} className="animate-spin" /> : <Check size={15} />}
+                Salvar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal de Link de Convite */}
       {showInviteLinkModal && inviteLink && (
