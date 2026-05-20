@@ -105,20 +105,23 @@ interface TeamEvaluationConfig {
   customInstructions: string | null;
 }
 
-export class InsightsService {
-  /**
-   * Gera insights usando GPT-4o a partir da transcrição
-   */
-  async generateInsights(transcript: string, meetingId: string): Promise<MeetingInsights> {
-    try {
-      logger.info(`Generating insights for meeting ${meetingId}`);
+// Framework efetivo derivado da config do time
+type EffectiveFramework = 'bant' | 'spin' | 'cs';
 
-      if (!transcript || transcript.trim().length === 0) {
-        throw new Error('Transcript is empty');
-      }
+function resolveFramework(config: TeamEvaluationConfig): EffectiveFramework {
+  if (config.teamType === 'customer_success') return 'cs';
+  return config.framework; // 'bant' | 'spin'
+}
 
-      // Prompt estruturado para GPT-4o
-      const systemPrompt = `Você é um assistente especializado em análise de reuniões comerciais para times de vendas. 
+const DEFAULT_TEAM_CONFIG: TeamEvaluationConfig = {
+  teamType: 'sales',
+  framework: 'bant',
+  customInstructions: null,
+};
+
+// ------------- System prompts por framework -------------
+
+const BANT_SYSTEM_PROMPT = `Você é um assistente especializado em análise de reuniões comerciais para times de vendas.
 Analise a transcrição fornecida e retorne um JSON estruturado com os seguintes campos:
 
 {
@@ -151,11 +154,147 @@ Critérios:
 
 Retorne APENAS o JSON válido, sem texto adicional.`;
 
+const SPIN_SYSTEM_PROMPT = `Você é um assistente especializado em análise de reuniões comerciais usando a metodologia SPIN Selling (Neil Rackham).
+Analise a transcrição fornecida e retorne um JSON estruturado com os seguintes campos:
+
+{
+  "sentiment": "positive" | "neutral" | "negative",
+  "commercialQuality": <número de 0 a 10>,
+  "executiveContext": "<resumo executivo em 2-3 frases>",
+  "closingProbability": <número de 0 a 100>,
+  "followUp": ["<ação 1>", "<ação 2>", ...],
+  "followUpSuggestions": ["<sugestão 1>", "<sugestão 2>", "<sugestão 3>", "<sugestão 4>"],
+  "keyTopics": ["<tópico 1>", "<tópico 2>", ...],
+  "actionItems": ["<item 1>", "<item 2>", ...],
+  "spinScore": {
+    "situation": { "score": <0-10>, "evidence": "<evidência da transcrição>" },
+    "problem": { "score": <0-10>, "evidence": "<evidência da transcrição>" },
+    "implication": { "score": <0-10>, "evidence": "<evidência da transcrição>" },
+    "needPayoff": { "score": <0-10>, "evidence": "<evidência da transcrição>" }
+  }
+}
+
+Critérios SPIN (avalie cada dimensão de 0-10, com evidência concreta da transcrição):
+- situation: Quão bem o vendedor entendeu o contexto/situação atual do cliente? Perguntas sobre processo atual, ferramentas em uso, estrutura do time, etc.
+- problem: O vendedor identificou problemas/dores explícitas que o cliente enfrenta hoje?
+- implication: O vendedor explorou as consequências/impactos desses problemas (custo, tempo perdido, oportunidades não capturadas)?
+- needPayoff: O cliente verbalizou ou foi guiado a perceber o valor de resolver os problemas? Houve articulação de ROI ou ganho esperado?
+
+Score 0 = ausente/não explorado. Score 10 = explorado profundamente com evidência forte.
+Se uma dimensão não foi tocada, use score 0 e evidence "Não explorado na reunião".
+
+Demais critérios:
+- sentiment: Tom geral da conversa
+- commercialQuality: Qualidade comercial geral (engajamento, condução, clareza)
+- executiveContext: Resumo executivo em 2-3 frases
+- closingProbability: Probabilidade de fechamento (0-100) baseado nos sinais da reunião
+- followUpSuggestions: EXATAMENTE 4 mensagens prontas para enviar ao cliente (primeira pessoa, português BR, tom profissional, referenciando algo específico da reunião, com CTA claro). Ordene da mais urgente para a menos urgente.
+
+Retorne APENAS o JSON válido, sem texto adicional.`;
+
+const CS_SYSTEM_PROMPT = `Você é um assistente especializado em análise de reuniões de Customer Success.
+Diferente de vendas, o objetivo aqui é avaliar a saúde da conta, satisfação do cliente e sinais de risco de churn.
+Analise a transcrição fornecida e retorne um JSON estruturado com os seguintes campos:
+
+{
+  "sentiment": "positive" | "neutral" | "negative",
+  "executiveContext": "<resumo executivo em 2-3 frases>",
+  "healthScore": <número de 0 a 100>,
+  "churnRisk": "low" | "medium" | "high",
+  "churnRiskEvidence": "<evidência da transcrição que justifica o nível de risco>",
+  "satisfactionScore": <número de 0 a 10>,
+  "escalationFlags": [
+    { "description": "<momento crítico da call>", "severity": "low" | "medium" | "high" }
+  ],
+  "followUp": ["<ação 1>", "<ação 2>", ...],
+  "followUpSuggestions": ["<sugestão 1>", "<sugestão 2>", "<sugestão 3>", "<sugestão 4>"],
+  "keyTopics": ["<tópico 1>", "<tópico 2>", ...],
+  "actionItems": ["<item 1>", "<item 2>", ...]
+}
+
+Critérios:
+- sentiment: Tom emocional do cliente durante a conversa
+- executiveContext: Resumo executivo (2-3 frases) focado em saúde da conta
+- healthScore (0-100): Saúde geral da conta. 0 = relacionamento gravemente comprometido; 100 = conta engajada, expandindo, advocate. Considere engajamento, uso do produto reportado, satisfação verbalizada, sentiment, alinhamento de expectativas.
+- churnRisk: Avalie o risco de churn. "low" = sem sinais; "medium" = sinais sutis (reclamações pontuais, comparação com concorrentes, desengajamento); "high" = sinais explícitos (cancelamento mencionado, frustração consistente, redução de uso, escalação)
+- churnRiskEvidence: Cite o trecho ou descreva o sinal específico que justifica o nível de risco. Se "low" sem sinais, use "Sem sinais de risco identificados".
+- satisfactionScore (0-10): Nível de satisfação do cliente baseado em verbalizações diretas e tom
+- escalationFlags: Liste momentos críticos da call que merecem atenção (reclamações, bugs, expectativas desalinhadas, pedidos urgentes). Vazio se nada crítico ocorreu.
+- followUp: Próximos passos sugeridos do ponto de vista do CS (check-in, treinamento, workaround, escalação interna)
+- followUpSuggestions: EXATAMENTE 4 mensagens prontas para enviar ao cliente (primeira pessoa, português BR, tom empático e profissional, referenciando algo específico da reunião, focando em parceria de longo prazo e não em venda). Ordene da mais urgente para a menos urgente.
+- keyTopics: Principais temas discutidos
+- actionItems: Itens de ação identificados
+
+Retorne APENAS o JSON válido, sem texto adicional.`;
+
+function buildSystemPrompt(framework: EffectiveFramework, customInstructions: string | null): string {
+  const base =
+    framework === 'cs' ? CS_SYSTEM_PROMPT :
+    framework === 'spin' ? SPIN_SYSTEM_PROMPT :
+    BANT_SYSTEM_PROMPT;
+
+  if (customInstructions && customInstructions.trim().length > 0) {
+    return `${base}\n\nINSTRUÇÕES ADICIONAIS DO TIME (priorize estas quando aplicáveis, mas mantenha o schema JSON acima):\n${customInstructions.trim()}`;
+  }
+  return base;
+}
+
+export class InsightsService {
+  /**
+   * Carrega config de avaliação do time da reunião.
+   * Default seguro (sales/bant) se a reunião não tem time vinculado ou o time não foi encontrado.
+   */
+  private async getTeamEvaluationConfig(meetingId: string): Promise<TeamEvaluationConfig> {
+    try {
+      const { data: meeting, error: meetingErr } = await supabase
+        .from('meetings')
+        .select('team_id')
+        .eq('id', meetingId)
+        .single();
+
+      if (meetingErr || !meeting?.team_id) return DEFAULT_TEAM_CONFIG;
+
+      const { data: team, error: teamErr } = await supabase
+        .from('teams')
+        .select('team_type, evaluation_framework, custom_prompt_instructions')
+        .eq('id', meeting.team_id)
+        .single();
+
+      if (teamErr || !team) return DEFAULT_TEAM_CONFIG;
+
+      return {
+        teamType: (team.team_type as TeamEvaluationConfig['teamType']) ?? 'sales',
+        framework: (team.evaluation_framework as TeamEvaluationConfig['framework']) ?? 'bant',
+        customInstructions: team.custom_prompt_instructions ?? null,
+      };
+    } catch (err) {
+      logger.warn(`Failed to load team config for meeting ${meetingId}, using default:`, err);
+      return DEFAULT_TEAM_CONFIG;
+    }
+  }
+
+  /**
+   * Gera insights a partir da transcrição.
+   * Framework (BANT/SPIN/CS) é determinado pela config do time da reunião.
+   */
+  async generateInsights(transcript: string, meetingId: string): Promise<MeetingInsights> {
+    try {
+      logger.info(`Generating insights for meeting ${meetingId}`);
+
+      if (!transcript || transcript.trim().length === 0) {
+        throw new Error('Transcript is empty');
+      }
+
+      const teamConfig = await this.getTeamEvaluationConfig(meetingId);
+      const framework = resolveFramework(teamConfig);
+      const systemPrompt = buildSystemPrompt(framework, teamConfig.customInstructions);
+
+      logger.info(`Meeting ${meetingId} using framework: ${framework} (team_type=${teamConfig.teamType})`);
+
       const userPrompt = `Transcrição da reunião:\n\n${transcript}`;
 
-      // Chama DeepSeek V3
       const response = await deepseek.chat.completions.create({
-        model: 'deepseek-chat', // deepseek-chat = DeepSeek V3
+        model: 'deepseek-chat',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
@@ -170,12 +309,10 @@ Retorne APENAS o JSON válido, sem texto adicional.`;
         throw new Error('No content in DeepSeek response');
       }
 
-      // Parse JSON. Por enquanto (Fase 2a) toda chamada gera no formato BANT —
-      // o branching por framework vem na Fase 2b com a config do time.
       const parsed = JSON.parse(content);
-      const insights = { ...parsed, framework: 'bant' as const } as BantInsights;
+      const insights = { ...parsed, framework } as MeetingInsights;
 
-      // Validações básicas
+      // Validações básicas (campos comuns)
       if (!insights.sentiment || !insights.executiveContext) {
         throw new Error('Invalid insights format from DeepSeek');
       }
