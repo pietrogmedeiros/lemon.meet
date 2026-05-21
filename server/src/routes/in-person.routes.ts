@@ -86,6 +86,7 @@ router.post(
       user_id: userId,
       team_id: teamId,
       title,
+      meet_link: '',
       platform: null,
       source: 'in_person',
       status: 'processing',
