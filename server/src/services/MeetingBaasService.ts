@@ -48,7 +48,7 @@ export class MeetingBaasService {
   /**
    * Envia o bot para uma reunião. Retorna o bot_id do MeetingBaas.
    */
-  async sendBot(meetingUrl: string, meetingId: string): Promise<string> {
+  async sendBot(meetingUrl: string, meetingId: string, dedupKey?: string): Promise<string> {
     const response = await fetch(`${BAAS_API_URL}/v2/bots`, {
       method: 'POST',
       headers: {
@@ -64,7 +64,7 @@ export class MeetingBaasService {
         callback_enabled: true,
         callback_config: { url: this.webhookUrl },
         timeout_config: { waiting_room_timeout: 600 },
-        extra: { deduplication_key: meetingId },
+        extra: { deduplication_key: dedupKey ?? meetingId },
       }),
     })
 
@@ -83,7 +83,7 @@ export class MeetingBaasService {
    * Agenda o bot para entrar na reunião em um horário específico.
    * Retorna o bot_id do MeetingBaas.
    */
-  async scheduleBotAt(meetingUrl: string, meetingId: string, joinAt: Date): Promise<string> {
+  async scheduleBotAt(meetingUrl: string, meetingId: string, joinAt: Date, dedupKey?: string): Promise<string> {
     const response = await fetch(`${BAAS_API_URL}/v2/bots/scheduled`, {
       method: 'POST',
       headers: {
@@ -100,7 +100,7 @@ export class MeetingBaasService {
         callback_config: { url: this.webhookUrl },
         timeout_config: { waiting_room_timeout: 600 },
         join_at: joinAt.toISOString(),
-        extra: { deduplication_key: meetingId },
+        extra: { deduplication_key: dedupKey ?? meetingId },
       }),
     })
 
