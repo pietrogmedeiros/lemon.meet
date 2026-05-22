@@ -137,7 +137,7 @@ export function Sidebar() {
         )}>
           <img src="/logo.png" alt="Lemon.meet" className="w-9 h-9 object-contain shrink-0" />
           {expanded && (
-            <span className="font-bold text-[17px] text-[#111] tracking-tight truncate">Lemon.meet</span>
+            <span className="font-bold text-[14px] text-[#111] tracking-tight truncate">Lemon.meet</span>
           )}
         </div>
 
@@ -146,7 +146,7 @@ export function Sidebar() {
           {groups.map((group, gi) => (
             <div key={gi} className={clsx(gi > 0 && 'mt-5')}>
               {expanded && group.section && (
-                <p className="px-5 pt-2 pb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9CA3AF]">
+                <p className="px-5 pt-2 pb-1.5 text-[9.5px] font-semibold uppercase tracking-[0.14em] text-[#9CA3AF]">
                   {group.section}
                 </p>
               )}
@@ -187,7 +187,7 @@ export function Sidebar() {
                       )}
 
                       <Icon
-                        size={18}
+                        size={16}
                         strokeWidth={1.75}
                         className={clsx(
                           'shrink-0 transition-colors',
@@ -197,17 +197,17 @@ export function Sidebar() {
 
                       {expanded && (
                         <span className={clsx(
-                          'text-[14px] leading-5 truncate flex-1 flex items-center gap-1.5 text-left',
+                          'text-[12.5px] leading-5 truncate flex-1 flex items-center gap-1.5 text-left',
                           active ? 'font-semibold text-[#2D5A27]' : 'font-medium text-[#1F2937]'
                         )}>
                           {item.label}
                           {item.id === 'router' && (
-                            <span className="text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded bg-[#2D5A27]/10 text-[#2D5A27] tracking-wide">
+                            <span className="text-[8.5px] font-semibold uppercase px-1.5 py-0.5 rounded bg-[#2D5A27]/10 text-[#2D5A27] tracking-wide">
                               Novo
                             </span>
                           )}
                           {item.id === 'webinar' && (
-                            <span className="text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded bg-[#2D5A27]/10 text-[#2D5A27] tracking-wide">
+                            <span className="text-[8.5px] font-semibold uppercase px-1.5 py-0.5 rounded bg-[#2D5A27]/10 text-[#2D5A27] tracking-wide">
                               Novo
                             </span>
                           )}
@@ -248,13 +248,13 @@ export function Sidebar() {
                           key={child.id}
                           onClick={() => navigate(child.path)}
                           className={clsx(
-                            'w-full flex items-center gap-3 pl-12 pr-5 py-2 text-[13px] transition-colors',
+                            'w-full flex items-center gap-3 pl-12 pr-5 py-1.5 text-[11.5px] transition-colors',
                             childActive
                               ? 'text-[#2D5A27] font-semibold bg-[#F3F4F6]'
                               : 'text-[#6B7280] hover:text-[#2D5A27] hover:bg-[#F8F9FA]'
                           )}
                         >
-                          <ChildIcon size={14} strokeWidth={1.75} className="shrink-0" />
+                          <ChildIcon size={13} strokeWidth={1.75} className="shrink-0" />
                           {child.label}
                         </button>
                       )
@@ -277,8 +277,8 @@ export function Sidebar() {
               expanded ? 'gap-3 px-5 py-2.5' : 'justify-center py-2.5'
             )}
           >
-            <HelpCircle size={16} strokeWidth={1.75} className="shrink-0" />
-            {expanded && <span className="text-[13px] font-medium">Como Usar</span>}
+            <HelpCircle size={14} strokeWidth={1.75} className="shrink-0" />
+            {expanded && <span className="text-[11.5px] font-medium">Como Usar</span>}
             {!expanded && (
               <div className="absolute left-full ml-3 px-2.5 py-1.5 bg-[#1a1a1a] text-white text-xs font-medium rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 shadow-lg">
                 Como Usar
@@ -302,8 +302,8 @@ export function Sidebar() {
             {expanded && (
               <>
                 <div className="flex-1 min-w-0">
-                  <p className="text-[13px] font-semibold text-[#1F2937] truncate leading-tight">{userName}</p>
-                  <p className="text-[11px] text-[#9CA3AF] truncate leading-tight mt-0.5">Usuário</p>
+                  <p className="text-[12px] font-semibold text-[#1F2937] truncate leading-tight">{userName}</p>
+                  <p className="text-[10px] text-[#9CA3AF] truncate leading-tight mt-0.5">Usuário</p>
                 </div>
                 <button
                   onClick={() => navigate('/settings')}
@@ -326,7 +326,7 @@ export function Sidebar() {
             )}
           >
             {expanded ? (
-              <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#6B7280] group-hover:text-[#DC3545]">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#6B7280] group-hover:text-[#DC3545]">
                 Sair da Conta
               </span>
             ) : (
@@ -349,8 +349,8 @@ export function Sidebar() {
             title={expanded ? 'Recolher' : 'Expandir'}
           >
             {expanded
-              ? <><ChevronLeft size={14} /><span className="text-[11px] font-medium">Recolher</span></>
-              : <ChevronRight size={14} />
+              ? <><ChevronLeft size={12} /><span className="text-[10px] font-medium">Recolher</span></>
+              : <ChevronRight size={12} />
             }
           </button>
         </div>
