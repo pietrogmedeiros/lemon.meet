@@ -324,6 +324,14 @@ export function PublicWebinarPage() {
           <p className="text-xs text-[#666]">
             Powered by <span className="font-semibold text-[#2D5A27]">Lemon Meet</span>
           </p>
+          <a
+            href="https://espremaseulimao.web.app/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-[#2D5A27] hover:underline mt-1 inline-block"
+          >
+            Conheça mais sobre o Lemon.meet
+          </a>
         </div>
       </div>
     </div>
