@@ -5,7 +5,7 @@
 
 import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
-import { Calendar, Clock, CheckCircle, Loader, ChevronLeft, Copy, Check, ExternalLink } from 'lucide-react'
+import { Calendar, Clock, CheckCircle, Loader, ChevronLeft, Copy, Check, ExternalLink, CalendarPlus } from 'lucide-react'
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:3000'
 
@@ -30,6 +30,36 @@ function formatPretty(iso: string): string {
     hour: '2-digit',
     minute: '2-digit'
   })
+}
+
+// Formata Date em YYYYMMDDTHHmmssZ (UTC) — exigido pelo Google Calendar render
+function toGCalDate(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return (
+    d.getUTCFullYear().toString() +
+    pad(d.getUTCMonth() + 1) +
+    pad(d.getUTCDate()) +
+    'T' +
+    pad(d.getUTCHours()) +
+    pad(d.getUTCMinutes()) +
+    pad(d.getUTCSeconds()) +
+    'Z'
+  )
+}
+
+// Gera URL de "Adicionar ao Google Calendar" — abre numa nova aba o template
+// pré-preenchido. Duração default: 1h (configurável depois se necessário).
+function buildGoogleCalendarUrl(title: string, scheduledAtISO: string, webinarLink: string): string {
+  const start = new Date(scheduledAtISO)
+  const end = new Date(start.getTime() + 60 * 60 * 1000)
+  const params = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: title,
+    dates: `${toGCalDate(start)}/${toGCalDate(end)}`,
+    details: `Link do webinar: ${webinarLink}`,
+    location: webinarLink,
+  })
+  return `https://calendar.google.com/calendar/render?${params.toString()}`
 }
 
 export function PublicWebinarPage() {
@@ -167,7 +197,7 @@ export function PublicWebinarPage() {
               <div className="p-4 bg-[#F8F9FA] border border-[#E0E0E0] rounded-xl break-all text-sm text-[#333] mb-4">
                 {resultLink}
               </div>
-              <div className="flex gap-3 justify-center">
+              <div className="flex flex-wrap gap-3 justify-center">
                 <button
                   onClick={copyLink}
                   className="flex items-center gap-2 bg-[#2D5A27] text-white px-6 py-3 rounded-xl hover:bg-[#234520] transition-colors font-medium"
@@ -175,6 +205,17 @@ export function PublicWebinarPage() {
                   {linkCopied ? <Check size={18} /> : <Copy size={18} />}
                   {linkCopied ? 'Copiado!' : 'Copiar link'}
                 </button>
+                {selectedSession && (
+                  <a
+                    href={buildGoogleCalendarUrl(config.title, selectedSession.scheduled_at, resultLink)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 border border-[#2D5A27] text-[#2D5A27] px-6 py-3 rounded-xl hover:bg-[#2D5A27]/5 transition-colors font-medium"
+                  >
+                    <CalendarPlus size={18} />
+                    Adicionar à agenda
+                  </a>
+                )}
                 <a
                   href={resultLink}
                   target="_blank"
