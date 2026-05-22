@@ -29,6 +29,8 @@ const TeamSchedulingListPage  = lazy(() => import('@/pages/TeamSchedulingListPag
 const PublicSchedulingPage    = lazy(() => import('@/pages/PublicSchedulingPage').then(m => ({ default: m.PublicSchedulingPage })))
 const FeatureRequestsPage     = lazy(() => import('@/pages/FeatureRequestsPage').then(m => ({ default: m.FeatureRequestsPage })))
 const AdminMetricsPage        = lazy(() => import('@/pages/AdminMetricsPage').then(m => ({ default: m.AdminMetricsPage })))
+const WebinarConfigPage       = lazy(() => import('@/pages/WebinarConfigPage').then(m => ({ default: m.WebinarConfigPage })))
+const PublicWebinarPage       = lazy(() => import('@/pages/PublicWebinarPage').then(m => ({ default: m.PublicWebinarPage })))
 
 function App() {
   const { shouldShow, markSubmitted } = useFeedbackSurvey();
@@ -46,6 +48,7 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/join/:token" element={<JoinTeamPage />} />
           <Route path="/agenda/:slug" element={<PublicSchedulingPage />} />
+          <Route path="/webinar/:slug" element={<PublicWebinarPage />} />
           <Route
             path="/dashboard"
             element={
@@ -192,6 +195,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <AdminMetricsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/webinars"
+            element={
+              <ProtectedRoute>
+                <WebinarConfigPage />
               </ProtectedRoute>
             }
           />

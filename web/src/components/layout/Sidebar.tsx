@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Home, Video, TrendingUp, LogOut, Settings, ChevronLeft, ChevronRight, Users, CreditCard, Plug, GraduationCap, FileText, Lock, HelpCircle, CalendarClock, Shield, Webhook, ChevronDown, Calendar, Repeat } from 'lucide-react'
+import { Home, Video, TrendingUp, LogOut, Settings, ChevronLeft, ChevronRight, Users, CreditCard, Plug, GraduationCap, FileText, Lock, HelpCircle, CalendarClock, Shield, Webhook, ChevronDown, Calendar, Repeat, Radio } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth, useSubscription } from '@/contexts'
@@ -40,6 +40,14 @@ export function Sidebar() {
   }
   
   const [isTeamOwner, setIsTeamOwner] = useState(getCachedOwnership())
+
+  // Allowlist de emails com acesso a features admin (Webinars)
+  const WEBINAR_ALLOWLIST = new Set([
+    'pietrogoncalvesmedeiros@gmail.com',
+    'deive.oliveira@starbem.app',
+  ])
+  const userEmail = session?.user?.email?.toLowerCase().trim() ?? ''
+  const isWebinarAdmin = WEBINAR_ALLOWLIST.has(userEmail)
 
   const toggleGroup = (id: string) => setOpenGroups(prev => ({ ...prev, [id]: !prev[id] }))
 
@@ -105,6 +113,7 @@ export function Sidebar() {
       items: [
         { id: 'team',         path: '/team',                    icon: Users,      label: t('nav.team', 'Meu Time') },
         ...(isTeamOwner ? [{ id: 'router',       path: '/team-scheduling',         icon: Repeat,     label: 'Round Robin' }] : []),
+        ...(isWebinarAdmin ? [{ id: 'webinar',    path: '/webinars',                icon: Radio,      label: 'Webinar' }] : []),
         {
           id: 'integrations',
           path: '/integrations/permissions',
