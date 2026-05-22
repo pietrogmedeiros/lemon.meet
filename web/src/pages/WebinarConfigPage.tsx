@@ -28,7 +28,6 @@ import {
 } from 'lucide-react'
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:3000'
-const ADMIN_KEY_STORAGE = 'admin-metrics-key'
 const DEV_ALLOWLIST = new Set([
   'pietrogoncalvesmedeiros@gmail.com',
   'deive.oliveira@starbem.app',
@@ -83,9 +82,6 @@ export function WebinarConfigPage() {
   const [authChecked, setAuthChecked] = useState(false)
   const [userEmail, setUserEmail] = useState<string | null>(null)
   const [accessToken, setAccessToken] = useState<string | null>(null)
-  const [adminKey, setAdminKey] = useState<string>(() => localStorage.getItem(ADMIN_KEY_STORAGE) || '')
-  const [keyPrompt, setKeyPrompt] = useState('')
-  const [keyError, setKeyError] = useState<string | null>(null)
 
   // Data
   const [config, setConfig] = useState<WebinarConfig | null>(null)
@@ -135,11 +131,10 @@ export function WebinarConfigPage() {
 
   const adminHeaders = useMemo(() => ({
     Authorization: `Bearer ${accessToken}`,
-    'x-admin-key': adminKey,
-  }), [accessToken, adminKey])
+  }), [accessToken])
 
   const fetchAll = useCallback(async () => {
-    if (!accessToken || !adminKey || !isAllowed) return
+    if (!accessToken || !isAllowed) return
     setLoading(true)
     try {
       const [configRes, sessionsRes, regsRes] = await Promise.all([
@@ -147,15 +142,6 @@ export function WebinarConfigPage() {
         fetch(`${API}/api/webinars/sessions`, { headers: adminHeaders }),
         fetch(`${API}/api/webinars/registrations`, { headers: adminHeaders }),
       ])
-
-      if (configRes.status === 403) {
-        const body = await configRes.json().catch(() => ({}))
-        if (body.error === 'invalid_admin_key') {
-          setKeyError('Chave inválida. Limpe e tente de novo.')
-          setLoading(false)
-          return
-        }
-      }
 
       const configJson = await configRes.json()
       if (configJson.config) {
@@ -171,29 +157,16 @@ export function WebinarConfigPage() {
 
       const regsJson = await regsRes.json()
       setRegistrations(regsJson.registrations ?? [])
-      setKeyError(null)
     } catch (err: any) {
       showNotif('error', err.message || 'Erro ao carregar dados')
     } finally {
       setLoading(false)
     }
-  }, [accessToken, adminKey, isAllowed, adminHeaders])
+  }, [accessToken, isAllowed, adminHeaders])
 
   useEffect(() => { fetchAll() }, [fetchAll])
 
   // Handlers
-  const handleSaveKey = () => {
-    const k = keyPrompt.trim()
-    if (k.length < 16) {
-      setKeyError('Token muito curto (mín. 16 chars).')
-      return
-    }
-    localStorage.setItem(ADMIN_KEY_STORAGE, k)
-    setAdminKey(k)
-    setKeyPrompt('')
-    setKeyError(null)
-  }
-
   const handleSaveConfig = async () => {
     if (!slug.trim()) {
       showNotif('error', 'Slug é obrigatório')
@@ -329,34 +302,6 @@ export function WebinarConfigPage() {
             <h1 className="text-lg font-semibold mb-2">Acesso restrito</h1>
             <p className="text-sm text-[#666]">Apenas admins autorizados podem acessar esta página.</p>
             <p className="text-xs text-[#999] mt-2">Logado como: {userEmail ?? '—'}</p>
-          </Card>
-        </div>
-      </MainLayout>
-    )
-  }
-  if (!adminKey) {
-    return (
-      <MainLayout>
-        <div className="p-6 max-w-md">
-          <Card>
-            <h1 className="text-lg font-semibold mb-2">Token do painel</h1>
-            <p className="text-sm text-[#666] mb-3">Cole o <code>ADMIN_METRICS_KEY</code> configurado no servidor.</p>
-            <input
-              type="password"
-              value={keyPrompt}
-              onChange={e => setKeyPrompt(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') handleSaveKey() }}
-              placeholder="x-admin-key"
-              className="w-full px-3 py-2 border border-[#E5E7EB] rounded text-sm"
-              autoFocus
-            />
-            {keyError && <p className="text-xs text-red-600 mt-2">{keyError}</p>}
-            <button
-              onClick={handleSaveKey}
-              className="mt-3 px-4 py-2 bg-[#2D5A27] text-white rounded text-sm hover:bg-[#244520]"
-            >
-              Salvar e entrar
-            </button>
           </Card>
         </div>
       </MainLayout>
