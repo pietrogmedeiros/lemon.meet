@@ -163,6 +163,17 @@ async function handleComplete(data: BaasCompletePayload & { event_uuid?: string 
 
   logger.info(`[MeetingBaas] ${segments.length} segmentos processados para meeting ${meetingId}`)
 
+  if (segments.length === 0 || fullTranscript.trim().length === 0) {
+    logger.warn(`[MeetingBaas] Transcrição efetiva vazia para meeting ${meetingId} (payload tinha ${transcript.length} entradas, 0 segmentos úteis)`)
+    await supabase.from('meetings').update({
+      status: 'failed',
+      failure_reason: 'no_transcript_in_webhook',
+    }).eq('id', meetingId)
+
+    await notificationService.notifyMeetingNoTranscription(meeting.user_id, meetingId, meeting.title)
+    return
+  }
+
   // Salva segmentos na tabela transcript_segments
   const rows = segments.map(seg => ({
     meeting_id: meetingId,
@@ -174,13 +185,11 @@ async function handleComplete(data: BaasCompletePayload & { event_uuid?: string 
     chunk_index: 0,
   }))
 
-  if (rows.length > 0) {
-    const { error: insertError } = await supabase
-      .from('transcript_segments')
-      .insert(rows)
-    if (insertError) {
-      logger.error(`[MeetingBaas] Erro ao salvar segmentos para meeting ${meetingId}:`, insertError)
-    }
+  const { error: insertError } = await supabase
+    .from('transcript_segments')
+    .insert(rows)
+  if (insertError) {
+    logger.error(`[MeetingBaas] Erro ao salvar segmentos para meeting ${meetingId}:`, insertError)
   }
 
   // Salva transcrição completa
@@ -351,10 +360,20 @@ async function handleBotCompleted(data: Record<string, any>) {
     s.speaker ? `${s.speaker}: ${s.text}` : s.text
   ).join('\n')
 
-  if (segments.length > 0) {
-    const { error: insertError } = await supabase.from('transcript_segments').insert(segments)
-    if (insertError) logger.error(`[MeetingBaas] Erro ao salvar segmentos:`, insertError)
+  if (segments.length === 0 || fullTranscript.trim().length === 0) {
+    logger.warn(`[MeetingBaas] bot.completed: transcrição vazia para meeting ${meetingId} (${rawTranscription.length} entradas brutas, 0 segmentos úteis)`)
+    await supabase.from('meetings').update({
+      status: 'failed',
+      failure_reason: 'no_transcript_in_webhook',
+      ended_at: data.exited_at ?? new Date().toISOString(),
+    }).eq('id', meetingId)
+
+    await notificationService.notifyMeetingNoTranscription(meeting.user_id, meetingId, meeting.title)
+    return
   }
+
+  const { error: insertError } = await supabase.from('transcript_segments').insert(segments)
+  if (insertError) logger.error(`[MeetingBaas] Erro ao salvar segmentos:`, insertError)
 
   await supabase.from('meetings').update({
     transcript: fullTranscript,

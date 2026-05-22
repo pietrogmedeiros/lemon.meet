@@ -159,6 +159,17 @@ async function processInPersonRecording(params: {
     }
 
     const fullTranscript = transcriptionService.mergeTranscripts(chunks)
+
+    if (fullTranscript.trim().length === 0) {
+      logger.warn(`[InPerson] Transcrição vazia após merge para meeting ${meetingId} (${chunks.length} chunks)`)
+      await supabase
+        .from('meetings')
+        .update({ status: 'failed', failure_reason: 'no_transcript' })
+        .eq('id', meetingId)
+      await notificationService.notifyMeetingNoTranscription(userId, meetingId)
+      return
+    }
+
     await supabase
       .from('meetings')
       .update({ transcript: fullTranscript })
