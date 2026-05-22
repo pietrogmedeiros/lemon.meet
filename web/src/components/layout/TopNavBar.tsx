@@ -1,5 +1,5 @@
 import { Lightbulb } from 'lucide-react'
-import { useAuth, useSubscription } from '@/contexts'
+import { useSubscription } from '@/contexts'
 import { NotificationBell } from './NotificationBell'
 import { useNavigate } from 'react-router-dom'
 
@@ -10,7 +10,6 @@ const PLAN_CONFIG: Record<string, { label: string; cls: string }> = {
 }
 
 export function TopNavBar() {
-  const { user } = useAuth()
   const { subscription, loading: subLoading } = useSubscription()
   const navigate = useNavigate()
 
@@ -21,7 +20,7 @@ export function TopNavBar() {
         Esprema o melhor das suas reuniões
       </p>
 
-      {/* Right: Plan badge, Language, Profile */}
+      {/* Right: Plan badge, Notifications, Sugestões */}
       <div className="flex items-center gap-3">
 
         {/* Plan badge */}
@@ -33,10 +32,10 @@ export function TopNavBar() {
             </span>
           ) : null
         })()}
-        
+
         {/* Notification Bell */}
         <NotificationBell />
-        
+
         {/* Sugestões de Melhorias */}
         <button
           onClick={() => navigate('/feature-requests')}
@@ -45,20 +44,6 @@ export function TopNavBar() {
         >
           <Lightbulb size={20} />
         </button>
-
-        {/* User Profile */}
-        {user?.user_metadata?.avatar_url ? (
-          <img
-            src={user.user_metadata.avatar_url}
-            alt={user.user_metadata.full_name || 'Perfil'}
-            className="w-10 h-10 rounded-full object-cover cursor-pointer ring-2 ring-primary/20 hover:ring-primary transition-all"
-            referrerPolicy="no-referrer"
-          />
-        ) : (
-          <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center text-accent font-bold font-display cursor-pointer">
-            {user?.email?.[0]?.toUpperCase() || 'L'}
-          </div>
-        )}
       </div>
     </header>
   )
