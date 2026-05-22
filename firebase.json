@@ -16,6 +16,23 @@
       ],
       "headers": [
         {
+          "source": "**",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "no-cache, no-store, must-revalidate"
+            },
+            {
+              "key": "Content-Security-Policy",
+              "value": "frame-ancestors 'self'"
+            },
+            {
+              "key": "X-Content-Type-Options",
+              "value": "nosniff"
+            }
+          ]
+        },
+        {
           "source": "**/*.png",
           "headers": [
             {
@@ -29,20 +46,7 @@
           "headers": [
             {
               "key": "Cache-Control",
-              "value": "max-age=31536000"
-            }
-          ]
-        },
-        {
-          "source": "**",
-          "headers": [
-            {
-              "key": "Content-Security-Policy",
-              "value": "frame-ancestors 'self'"
-            },
-            {
-              "key": "X-Content-Type-Options",
-              "value": "nosniff"
+              "value": "max-age=31536000, immutable"
             }
           ]
         }
@@ -64,6 +68,27 @@
       ],
       "headers": [
         {
+          "source": "**",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "no-cache, no-store, must-revalidate"
+            },
+            {
+              "key": "Content-Security-Policy",
+              "value": "frame-ancestors 'self'"
+            },
+            {
+              "key": "X-Content-Type-Options",
+              "value": "nosniff"
+            },
+            {
+              "key": "X-Robots-Tag",
+              "value": "noindex, nofollow"
+            }
+          ]
+        },
+        {
           "source": "**/*.png",
           "headers": [
             {
@@ -77,24 +102,7 @@
           "headers": [
             {
               "key": "Cache-Control",
-              "value": "max-age=31536000"
-            }
-          ]
-        },
-        {
-          "source": "**",
-          "headers": [
-            {
-              "key": "Content-Security-Policy",
-              "value": "frame-ancestors 'self'"
-            },
-            {
-              "key": "X-Content-Type-Options",
-              "value": "nosniff"
-            },
-            {
-              "key": "X-Robots-Tag",
-              "value": "noindex, nofollow"
+              "value": "max-age=31536000, immutable"
             }
           ]
         }

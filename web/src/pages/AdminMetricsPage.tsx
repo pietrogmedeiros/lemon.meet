@@ -9,7 +9,7 @@
 // Backend: /api/admin/metrics?range=7d|30d|90d|all
 // ============================================================
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { MainLayout } from '@/components/layout'
 import { Card } from '@/components/ui'
@@ -165,24 +165,84 @@ function colorForSource(s: string): string {
 }
 
 // ── tiny bar/line components (sem dep nova) ──────────────────
-function BarChart({ labels, values, color = '#2D5A27', height = 140 }: { labels: string[]; values: number[]; color?: string; height?: number }) {
+function ChartTooltip({ hover, containerWidth, n }: {
+  hover: { i: number; lines: Array<{ label: string; value: string; color?: string }>; title: string } | null
+  containerWidth: number
+  n: number
+}) {
+  if (!hover || !containerWidth) return null
+  // Posiciona acima da barra hover-ada
+  const colW = containerWidth / n
+  const x = colW * (hover.i + 0.5)
+  // Largura do tooltip estimada — clampa pra não vazar
+  const tipW = 180
+  const left = Math.max(4, Math.min(containerWidth - tipW - 4, x - tipW / 2))
+  return (
+    <div
+      className="absolute pointer-events-none z-10 bg-white rounded-md shadow-lg border border-[#E5E7EB] px-2.5 py-1.5 text-xs"
+      style={{ left, top: -8, transform: 'translateY(-100%)', minWidth: 120, maxWidth: tipW }}
+    >
+      <div className="font-medium text-[#1F2937] mb-1">{hover.title}</div>
+      {hover.lines.map((l, idx) => (
+        <div key={idx} className="flex items-center justify-between gap-3">
+          <span className="flex items-center gap-1.5 text-[#444]">
+            {l.color && <span className="inline-block w-2 h-2 rounded-sm" style={{ background: l.color }} />}
+            <span>{l.label}</span>
+          </span>
+          <span className="tabular-nums text-[#1F2937] font-medium">{l.value}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function BarChart({ labels, values, color = '#2D5A27', height = 140, formatValue }: {
+  labels: string[]
+  values: number[]
+  color?: string
+  height?: number
+  formatValue?: (v: number) => string
+}) {
+  const [hover, setHover] = useState<number | null>(null)
+  const [containerWidth, setContainerWidth] = useState(0)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!ref.current) return
+    const el = ref.current
+    const update = () => setContainerWidth(el.offsetWidth)
+    update()
+    const ro = new ResizeObserver(update)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
   if (!values.length) return null
   const max = Math.max(...values, 1)
+  const hoverState = hover === null ? null : {
+    i: hover,
+    title: labels[hover] ?? '',
+    lines: [{ label: 'valor', value: formatValue ? formatValue(values[hover]) : values[hover].toLocaleString('pt-BR') }],
+  }
+
   return (
-    <div className="flex items-end gap-px h-full" style={{ height }}>
-      {values.map((v, i) => (
-        <div
-          key={i}
-          className="flex-1 rounded-t"
-          title={`${labels[i]}: ${v}`}
-          style={{
-            height: `${(v / max) * 100}%`,
-            background: color,
-            minHeight: v > 0 ? 2 : 0,
-            opacity: v > 0 ? 1 : 0.15,
-          }}
-        />
-      ))}
+    <div ref={ref} className="relative" style={{ height }}>
+      <ChartTooltip hover={hoverState} containerWidth={containerWidth} n={values.length} />
+      <div className="flex items-end gap-px h-full" onMouseLeave={() => setHover(null)}>
+        {values.map((v, i) => (
+          <div
+            key={i}
+            className="flex-1 rounded-t transition-opacity cursor-default"
+            onMouseEnter={() => setHover(i)}
+            style={{
+              height: `${(v / max) * 100}%`,
+              background: color,
+              minHeight: v > 0 ? 2 : 0,
+              opacity: hover === null ? (v > 0 ? 1 : 0.15) : hover === i ? 1 : 0.5,
+            }}
+          />
+        ))}
+      </div>
     </div>
   )
 }
@@ -192,6 +252,20 @@ function StackedBarChart({ labels, series, height = 160 }: {
   series: Array<{ name: string; values: number[]; color: string }>
   height?: number
 }) {
+  const [hover, setHover] = useState<number | null>(null)
+  const [containerWidth, setContainerWidth] = useState(0)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!ref.current) return
+    const el = ref.current
+    const update = () => setContainerWidth(el.offsetWidth)
+    update()
+    const ro = new ResizeObserver(update)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
   if (!series.length) return null
   const n = labels.length
   const totals: number[] = []
@@ -201,22 +275,47 @@ function StackedBarChart({ labels, series, height = 160 }: {
     totals.push(s)
   }
   const max = Math.max(...totals, 1)
+
+  const hoverState = hover === null ? null : {
+    i: hover,
+    title: `${labels[hover] ?? ''} · total ${totals[hover]}`,
+    lines: series
+      .map(ser => ({ label: ser.name, value: (ser.values[hover] ?? 0).toLocaleString('pt-BR'), color: ser.color, raw: ser.values[hover] ?? 0 }))
+      .filter(l => l.raw > 0)
+      .sort((a, b) => b.raw - a.raw),
+  }
+
   return (
-    <div className="flex items-end gap-px" style={{ height }}>
-      {Array.from({ length: n }).map((_, i) => {
-        const total = totals[i]
-        return (
-          <div key={i} className="flex-1 flex flex-col-reverse rounded-t overflow-hidden" title={`${labels[i]}: ${total}`} style={{ height: `${(total / max) * 100}%`, minHeight: total > 0 ? 2 : 0 }}>
-            {series.map((ser, j) => (
-              <div
-                key={j}
-                style={{ background: ser.color, height: `${total > 0 ? ((ser.values[i] ?? 0) / total) * 100 : 0}%`, minHeight: (ser.values[i] ?? 0) > 0 ? 1 : 0 }}
-                title={`${ser.name} ${labels[i]}: ${ser.values[i] ?? 0}`}
-              />
-            ))}
-          </div>
-        )
-      })}
+    <div ref={ref} className="relative" style={{ height }}>
+      <ChartTooltip hover={hoverState} containerWidth={containerWidth} n={n} />
+      <div className="flex items-end gap-px h-full" onMouseLeave={() => setHover(null)}>
+        {Array.from({ length: n }).map((_, i) => {
+          const total = totals[i]
+          return (
+            <div
+              key={i}
+              className="flex-1 flex flex-col-reverse rounded-t overflow-hidden cursor-default transition-opacity"
+              onMouseEnter={() => setHover(i)}
+              style={{
+                height: `${(total / max) * 100}%`,
+                minHeight: total > 0 ? 2 : 0,
+                opacity: hover === null ? 1 : hover === i ? 1 : 0.5,
+              }}
+            >
+              {series.map((ser, j) => (
+                <div
+                  key={j}
+                  style={{
+                    background: ser.color,
+                    height: `${total > 0 ? ((ser.values[i] ?? 0) / total) * 100 : 0}%`,
+                    minHeight: (ser.values[i] ?? 0) > 0 ? 1 : 0,
+                  }}
+                />
+              ))}
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
