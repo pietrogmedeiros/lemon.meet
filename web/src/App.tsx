@@ -28,6 +28,7 @@ const TeamSchedulingPage      = lazy(() => import('@/pages/TeamSchedulingPage').
 const TeamSchedulingListPage  = lazy(() => import('@/pages/TeamSchedulingListPage').then(m => ({ default: m.TeamSchedulingListPage })))
 const PublicSchedulingPage    = lazy(() => import('@/pages/PublicSchedulingPage').then(m => ({ default: m.PublicSchedulingPage })))
 const FeatureRequestsPage     = lazy(() => import('@/pages/FeatureRequestsPage').then(m => ({ default: m.FeatureRequestsPage })))
+const AdminMetricsPage        = lazy(() => import('@/pages/AdminMetricsPage').then(m => ({ default: m.AdminMetricsPage })))
 
 function App() {
   const { shouldShow, markSubmitted } = useFeedbackSurvey();
@@ -183,6 +184,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <FeatureRequestsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/metrics"
+            element={
+              <ProtectedRoute>
+                <AdminMetricsPage />
               </ProtectedRoute>
             }
           />

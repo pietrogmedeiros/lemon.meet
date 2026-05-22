@@ -23,6 +23,7 @@ import notificationsRouter from './routes/notifications.routes.js'
 import feedbackRouter from './routes/feedback.routes.js'
 import schedulingRouter from './routes/scheduling.routes.js'
 import featureRequestsRouter from './routes/feature-requests.routes.js'
+import adminMetricsRouter from './routes/admin-metrics.routes.js'
 import { calendarCronService } from './services/CalendarCronService.js'
 import { setupSocketIO } from './config/socket.js'
 
@@ -134,6 +135,7 @@ app.use('/api/notifications', notificationsRouter)
 app.use('/api/feedback', feedbackRouter)
 app.use('/api/scheduling', schedulingRouter)
 app.use('/api/feature-requests', featureRequestsRouter)
+app.use('/api/admin/metrics', adminMetricsRouter)
 
 // 404 handler
 app.use((req, res) => {
