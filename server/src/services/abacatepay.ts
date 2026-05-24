@@ -46,7 +46,9 @@ export function createCustomer(input: {
   name?: string
   metadata?: Record<string, unknown>
 }): Promise<AbacateCustomer> {
-  return call<AbacateCustomer>('/customers/create', { data: input })
+  // A API espera os campos no top-level (a doc oficial mostra `{data: {...}}`
+  // mas isso retorna "Expected property 'email' ... found: undefined").
+  return call<AbacateCustomer>('/customers/create', input)
 }
 
 // ── Subscription checkout ────────────────────────────────────
