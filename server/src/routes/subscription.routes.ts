@@ -174,7 +174,6 @@ router.get('/details', authMiddleware as RequestHandler, async (req: AuthRequest
 // e retorna a URL hospedada de pagamento.
 router.post('/checkout', authMiddleware as RequestHandler, async (req: AuthRequest, res: Response) => {
   const userId = req.user!.id
-  const userEmail = req.user!.email ?? ''
   const { plan } = req.body as { plan: 'starter' | 'professional' }
 
   if (plan !== 'starter' && plan !== 'professional') {
@@ -182,6 +181,17 @@ router.post('/checkout', authMiddleware as RequestHandler, async (req: AuthReque
   }
 
   try {
+    // Garante email — fallback via Supabase admin caso o middleware não tenha populado
+    // (acontece com tokens cacheados criados antes do login ter email visível).
+    let userEmail = req.user!.email
+    if (!userEmail) {
+      const { data: adminData } = await supabase.auth.admin.getUserById(userId)
+      userEmail = adminData?.user?.email ?? undefined
+    }
+    if (!userEmail) {
+      return res.status(400).json({ error: 'Email do usuário não encontrado.' })
+    }
+
     const { data: sub } = await supabase
       .from('user_subscriptions')
       .select('abacate_customer_id')
