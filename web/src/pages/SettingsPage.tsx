@@ -13,11 +13,11 @@ export function SettingsPage() {
   const { subscription, loading: subLoading, isTrial, isExpired, daysLeft, refetch } = useSubscription()
   const navigate = useNavigate()
 
-  // --- Checkout Stripe ---
+  // --- Checkout ---
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null)
 
-  // Feedback de retorno do Stripe
-  const stripeMsg = useMemo<'success' | 'cancelled' | null>(() => {
+  // Feedback de retorno do gateway de pagamento
+  const checkoutMsg = useMemo<'success' | 'cancelled' | null>(() => {
     const params = new URLSearchParams(window.location.search)
     if (params.get('checkout') === 'success') return 'success'
     if (params.get('checkout') === 'cancelled') return 'cancelled'
@@ -25,12 +25,11 @@ export function SettingsPage() {
   }, [])
 
   useEffect(() => {
-    if (stripeMsg === 'success') {
+    if (checkoutMsg === 'success') {
       refetch()
-      // Limpa query param da URL sem reload
       window.history.replaceState({}, '', '/settings')
     }
-  }, [stripeMsg, refetch])
+  }, [checkoutMsg, refetch])
 
   const handleCheckout = async (plan: 'starter' | 'professional') => {
     if (!session?.access_token) return
@@ -380,14 +379,14 @@ export function SettingsPage() {
           <h2 className="text-lg font-bold text-[#333333] mb-1">Plano & Assinatura</h2>
           <p className="text-sm text-[#666666] mb-4">Gerencie seu plano de acesso ao Lemon.meet.</p>
 
-          {/* Feedback do Stripe */}
-          {stripeMsg === 'success' && (
+          {/* Feedback do gateway de pagamento */}
+          {checkoutMsg === 'success' && (
             <div className="flex items-center gap-2 text-sm text-[#4CAF50] font-medium bg-green-50 border border-green-200 px-4 py-3 rounded-xl mb-4">
               <CheckCircle size={16} />
               Pagamento confirmado! Seu plano foi ativado.
             </div>
           )}
-          {stripeMsg === 'cancelled' && (
+          {checkoutMsg === 'cancelled' && (
             <div className="flex items-center gap-2 text-sm text-[#666666] bg-gray-50 border border-gray-200 px-4 py-3 rounded-xl mb-4">
               <AlertCircle size={16} />
               Pagamento cancelado. Você pode tentar novamente quando quiser.

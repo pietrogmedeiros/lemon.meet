@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { MainLayout } from '@/components/layout'
 import { useAuth, useSubscription } from '@/contexts'
 import {
-  CreditCard, CheckCircle, XCircle, Clock, Calendar,
-  ArrowLeft, ExternalLink, Loader, RefreshCw
+  CheckCircle, XCircle, Clock, Calendar,
+  ArrowLeft, Loader, RefreshCw, XOctagon
 } from 'lucide-react'
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:3000'
@@ -41,11 +41,11 @@ function CardBrandIcon({ brand }: { brand: string }) {
 
 export function SubscriptionPage() {
   const { session } = useAuth()
-  const { isTrial, isExpired, daysLeft } = useSubscription()
+  const { isTrial, isExpired, daysLeft, refetch } = useSubscription()
   const navigate = useNavigate()
   const [details, setDetails] = useState<SubscriptionDetails | null>(null)
   const [loading, setLoading] = useState(true)
-  const [portalLoading, setPortalLoading] = useState(false)
+  const [cancelLoading, setCancelLoading] = useState(false)
 
   const fetchDetails = async () => {
     if (!session?.access_token) return
@@ -67,30 +67,35 @@ export function SubscriptionPage() {
     fetchDetails()
   }, [session])
 
-  const handlePortal = async () => {
+  const handleCancel = async () => {
     if (!session?.access_token) return
-    setPortalLoading(true)
+    const ok = window.confirm(
+      'Tem certeza que deseja cancelar sua assinatura? O acesso ao plano será encerrado imediatamente.',
+    )
+    if (!ok) return
+
+    setCancelLoading(true)
     try {
-      const res = await fetch(`${API}/api/subscription/portal`, {
+      const res = await fetch(`${API}/api/subscription/cancel`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${session.access_token}` },
       })
       const data = await res.json()
-      if (data.url) {
-        window.location.href = data.url
-      } else {
-        // Sem customer Stripe vinculado — redireciona para fazer o checkout
-        navigate('/settings')
+      if (!res.ok) {
+        alert(data.error ?? 'Erro ao cancelar assinatura.')
+        return
       }
+      await refetch()
+      await fetchDetails()
     } catch {
       alert('Erro ao conectar com o servidor.')
     } finally {
-      setPortalLoading(false)
+      setCancelLoading(false)
     }
   }
 
-  // Tem dados reais do Stripe vinculados (passou pelo checkout)
-  const hasStripeData = !!(details && details.amount !== null)
+  // Tem assinatura paga ativa (passou pelo checkout)
+  const hasActiveSubscription = !!(details && details.amount !== null)
 
   const planLabel: Record<string, string> = {
     trial: 'Trial',
@@ -119,15 +124,14 @@ export function SubscriptionPage() {
             <ArrowLeft size={16} />
             Configurações
           </button>
-          {!loading && details && details.plan !== 'trial' && hasStripeData && (
+          {!loading && details && details.plan !== 'trial' && hasActiveSubscription && details.status === 'active' && (
             <button
-              onClick={handlePortal}
-              disabled={portalLoading}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#2D5A27] text-white text-sm font-semibold hover:bg-[#1E3D1A] transition disabled:opacity-50"
+              onClick={handleCancel}
+              disabled={cancelLoading}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg border border-[#DC3545] text-[#DC3545] text-sm font-semibold hover:bg-red-50 transition disabled:opacity-50"
             >
-              {portalLoading ? <Loader size={13} className="animate-spin" /> : <CreditCard size={13} />}
-              Gerenciar via Stripe
-              <ExternalLink size={11} />
+              {cancelLoading ? <Loader size={13} className="animate-spin" /> : <XOctagon size={13} />}
+              Cancelar assinatura
             </button>
           )}
         </div>

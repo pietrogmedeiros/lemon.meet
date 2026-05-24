@@ -1,36 +1,19 @@
 import { Router, type RequestHandler, type Request, type Response } from 'express'
-import Stripe from 'stripe'
 import { authMiddleware } from '../middleware/auth.middleware.js'
 import { supabase } from '../config/supabase.js'
 import type { AuthRequest } from '../middleware/auth.middleware.js'
+import {
+  createCustomer,
+  createSubscriptionCheckout,
+  cancelSubscription,
+  verifyWebhookSignature,
+  planFromProductId,
+  productIdForPlan,
+} from '../services/abacatepay.js'
 
 const router: Router = Router()
 
 const TRIAL_DAYS = 7
-
-// ── Stripe client (lazy — evita crash na inicialização sem env var) ──
-let _stripe: Stripe | null = null
-function getStripe(): Stripe {
-  if (!_stripe) {
-    if (!process.env.STRIPE_SECRET_KEY) {
-      throw new Error('STRIPE_SECRET_KEY não configurada. Adicione a variável de ambiente no Railway.')
-    }
-    _stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2026-03-25.dahlia' })
-  }
-  return _stripe
-}
-
-const PRICE_IDS: Record<string, string> = {
-  starter:      process.env.STRIPE_PRICE_ID_STARTER!,
-  professional: process.env.STRIPE_PRICE_ID_PROFESSIONAL!,
-}
-
-function planFromPriceId(priceId: string): 'starter' | 'professional' | null {
-  for (const [plan, id] of Object.entries(PRICE_IDS)) {
-    if (id === priceId) return plan as 'starter' | 'professional'
-  }
-  return null
-}
 
 /**
  * POST /api/subscription/init
@@ -50,7 +33,6 @@ router.post('/init', authMiddleware as RequestHandler, async (req: AuthRequest, 
 
     if (fetchError) throw fetchError
 
-    // Usuário sem assinatura → cria trial
     if (!existing) {
       const trialEndsAt = new Date()
       trialEndsAt.setDate(trialEndsAt.getDate() + TRIAL_DAYS)
@@ -70,7 +52,6 @@ router.post('/init', authMiddleware as RequestHandler, async (req: AuthRequest, 
       return res.json({ subscription: data })
     }
 
-    // Trial ativo mas já expirou → marca como expired
     if (
       existing.plan === 'trial' &&
       existing.status === 'active' &&
@@ -97,7 +78,6 @@ router.post('/init', authMiddleware as RequestHandler, async (req: AuthRequest, 
 
 /**
  * GET /api/subscription/me
- * Retorna a assinatura atual, verificando expiração em tempo real.
  */
 router.get('/me', authMiddleware as RequestHandler, async (req: AuthRequest, res) => {
   const userId = req.user!.id
@@ -112,7 +92,6 @@ router.get('/me', authMiddleware as RequestHandler, async (req: AuthRequest, res
     if (error) throw error
     if (!data) return res.json({ subscription: null })
 
-    // Verifica expiração do trial em tempo real
     if (
       data.plan === 'trial' &&
       data.status === 'active' &&
@@ -137,7 +116,8 @@ router.get('/me', authMiddleware as RequestHandler, async (req: AuthRequest, res
 })
 
 // ── GET /api/subscription/details ────────────────────────────
-// Retorna detalhes ricos da assinatura: plano, valor, pagamentos, método de pagamento.
+// Detalhes ricos (valor, próximo vencimento, cartão) — todos vêm do cache
+// em user_subscriptions, populados pelo handler de webhook.
 router.get('/details', authMiddleware as RequestHandler, async (req: AuthRequest, res: Response) => {
   const userId = req.user!.id
 
@@ -150,8 +130,7 @@ router.get('/details', authMiddleware as RequestHandler, async (req: AuthRequest
 
     if (!sub) return res.json({ details: null })
 
-    // Sem assinatura Stripe ainda (trial)
-    if (!sub.stripe_subscription_id || !sub.stripe_customer_id) {
+    if (!sub.abacate_subscription_id) {
       return res.json({
         details: {
           plan: sub.plan,
@@ -161,43 +140,28 @@ router.get('/details', authMiddleware as RequestHandler, async (req: AuthRequest
           currentPeriodEnd: sub.plan_ends_at ?? sub.trial_ends_at,
           lastPayment: null,
           paymentMethod: null,
-        }
+        },
       })
     }
-
-    const stripe = getStripe()
-
-    // Busca subscription, último invoice e método de pagamento em paralelo
-    const [stripeSub, invoices] = await Promise.all([
-      stripe.subscriptions.retrieve(sub.stripe_subscription_id, { expand: ['default_payment_method'] }),
-      stripe.invoices.list({ customer: sub.stripe_customer_id, limit: 1, status: 'paid' }),
-    ])
-
-    const rawSub = stripeSub as any
-    const price = stripeSub.items.data[0]?.price
-    const pm = (stripeSub as any).default_payment_method as any
-    const lastInvoice = invoices.data[0]
 
     return res.json({
       details: {
         plan: sub.plan,
         status: sub.status,
-        amount: price?.unit_amount ?? null,
-        currency: price?.currency ?? null,
-        currentPeriodEnd: rawSub.current_period_end
-          ? new Date(rawSub.current_period_end * 1000).toISOString()
-          : sub.plan_ends_at,
-        lastPayment: lastInvoice
+        amount: sub.last_amount_cents ?? null,
+        currency: sub.last_amount_cents ? 'BRL' : null,
+        currentPeriodEnd: sub.plan_ends_at,
+        lastPayment: sub.last_payment_at
           ? {
-              amount: lastInvoice.amount_paid,
-              currency: lastInvoice.currency,
-              date: new Date(((lastInvoice as any).status_transitions?.paid_at || lastInvoice.created) * 1000).toISOString(),
+              amount: sub.last_amount_cents,
+              currency: 'BRL',
+              date: sub.last_payment_at,
             }
           : null,
-        paymentMethod: pm?.card
-          ? { brand: pm.card.brand, last4: pm.card.last4, expMonth: pm.card.exp_month, expYear: pm.card.exp_year }
+        paymentMethod: sub.card_brand
+          ? { brand: sub.card_brand, last4: sub.card_last4 ?? '', expMonth: 0, expYear: 0 }
           : null,
-      }
+      },
     })
   } catch (err: any) {
     console.error('[subscription/details]', err)
@@ -206,28 +170,28 @@ router.get('/details', authMiddleware as RequestHandler, async (req: AuthRequest
 })
 
 // ── POST /api/subscription/checkout ──────────────────────────
-// Cria uma Stripe Checkout Session e retorna a URL de pagamento.
+// Cria customer (se ainda não tiver) + checkout de subscription no AbacatePay
+// e retorna a URL hospedada de pagamento.
 router.post('/checkout', authMiddleware as RequestHandler, async (req: AuthRequest, res: Response) => {
   const userId = req.user!.id
   const userEmail = req.user!.email ?? ''
   const { plan } = req.body as { plan: 'starter' | 'professional' }
 
-  if (!plan || !PRICE_IDS[plan]) {
+  if (plan !== 'starter' && plan !== 'professional') {
     return res.status(400).json({ error: 'Plano inválido. Use "starter" ou "professional".' })
   }
 
   try {
     const { data: sub } = await supabase
       .from('user_subscriptions')
-      .select('stripe_customer_id')
+      .select('abacate_customer_id')
       .eq('user_id', userId)
       .maybeSingle()
 
-    // Reutiliza ou cria o Customer no Stripe
-    let customerId: string | undefined = sub?.stripe_customer_id ?? undefined
+    let customerId = sub?.abacate_customer_id ?? null
 
     if (!customerId) {
-      const customer = await getStripe().customers.create({
+      const customer = await createCustomer({
         email: userEmail,
         metadata: { supabase_user_id: userId },
       })
@@ -235,172 +199,178 @@ router.post('/checkout', authMiddleware as RequestHandler, async (req: AuthReque
 
       await supabase
         .from('user_subscriptions')
-        .update({ stripe_customer_id: customerId, updated_at: new Date().toISOString() })
+        .update({ abacate_customer_id: customerId, updated_at: new Date().toISOString() })
         .eq('user_id', userId)
     }
 
     const frontendUrl = process.env.FRONTEND_URL || 'https://lemon-meet.web.app'
 
-    const session = await getStripe().checkout.sessions.create({
-      customer: customerId,
-      mode: 'subscription',
-      line_items: [{ price: PRICE_IDS[plan], quantity: 1 }],
-      success_url: `${frontendUrl}/settings?checkout=success`,
-      cancel_url: `${frontendUrl}/settings?checkout=cancelled`,
-      subscription_data: {
-        metadata: { supabase_user_id: userId, plan },
-      },
-      allow_promotion_codes: true,
+    const checkout = await createSubscriptionCheckout({
+      productId: productIdForPlan(plan),
+      customerId,
+      returnUrl: `${frontendUrl}/settings?checkout=cancelled`,
+      completionUrl: `${frontendUrl}/settings?checkout=success`,
+      externalId: userId,
+      metadata: { supabase_user_id: userId, plan },
     })
 
-    return res.json({ url: session.url })
+    // Guarda o bill_xxx para rastrear até o webhook subscription.completed chegar.
+    await supabase
+      .from('user_subscriptions')
+      .update({
+        abacate_checkout_id: checkout.id,
+        abacate_product_id: productIdForPlan(plan),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('user_id', userId)
+
+    return res.json({ url: checkout.url })
   } catch (err: any) {
     console.error('[subscription/checkout]', err)
     return res.status(500).json({ error: 'Erro ao criar sessão de pagamento.' })
   }
 })
 
-// ── POST /api/subscription/portal ────────────────────────────
-// Cria uma sessão no Customer Portal do Stripe para gerenciar a assinatura.
-router.post('/portal', authMiddleware as RequestHandler, async (req: AuthRequest, res: Response) => {
+// ── POST /api/subscription/cancel ────────────────────────────
+// Substitui o antigo /portal — AbacatePay não tem Billing Portal,
+// então o cancelamento é uma ação direta exposta pela UI.
+router.post('/cancel', authMiddleware as RequestHandler, async (req: AuthRequest, res: Response) => {
   const userId = req.user!.id
 
   try {
     const { data: sub } = await supabase
       .from('user_subscriptions')
-      .select('stripe_customer_id')
+      .select('abacate_subscription_id')
       .eq('user_id', userId)
       .maybeSingle()
 
-    if (!sub?.stripe_customer_id) {
+    if (!sub?.abacate_subscription_id) {
       return res.status(400).json({ error: 'Nenhuma assinatura ativa encontrada.' })
     }
 
-    const frontendUrl = process.env.FRONTEND_URL || 'https://lemon-meet.web.app'
+    await cancelSubscription(sub.abacate_subscription_id)
 
-    const portalParams: Stripe.BillingPortal.SessionCreateParams = {
-      customer: sub.stripe_customer_id,
-      return_url: `${frontendUrl}/settings`,
-    }
-    if (process.env.STRIPE_PORTAL_CONFIG_ID) {
-      portalParams.configuration = process.env.STRIPE_PORTAL_CONFIG_ID
-    }
-    const session = await getStripe().billingPortal.sessions.create(portalParams)
+    // A atualização da linha vem pelo webhook subscription.cancelled,
+    // mas marcamos otimisticamente para a UI refletir na hora.
+    await supabase
+      .from('user_subscriptions')
+      .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+      .eq('user_id', userId)
 
-    return res.json({ url: session.url })
+    return res.json({ ok: true })
   } catch (err: any) {
-    console.error('[subscription/portal]', err)
-    return res.status(500).json({ error: 'Erro ao abrir portal de assinatura.' })
+    console.error('[subscription/cancel]', err)
+    return res.status(500).json({ error: 'Erro ao cancelar assinatura.' })
   }
 })
 
 // ── POST /api/subscription/webhook ───────────────────────────
-// Handler do webhook Stripe — deve receber o body RAW (registrado no server.ts antes do express.json())
-export async function stripeWebhookHandler(req: Request, res: Response): Promise<void> {
-  const sig = req.headers['stripe-signature'] as string
+// Handler do webhook AbacatePay v2 — recebe body RAW (registrado em server.ts
+// antes do express.json()) para que a verificação HMAC bata com o corpo enviado.
+export async function abacatepayWebhookHandler(req: Request, res: Response): Promise<void> {
+  const secret = process.env.ABACATEPAY_WEBHOOK_SECRET
+  if (!secret) {
+    console.error('[webhook] ABACATEPAY_WEBHOOK_SECRET não configurado.')
+    res.status(500).send('Webhook secret missing')
+    return
+  }
 
-  let event: Stripe.Event
+  const signature = req.headers['x-webhook-signature'] as string | undefined
+  const rawBody = req.body as Buffer
+
+  if (!verifyWebhookSignature(rawBody, signature, secret)) {
+    console.error('[webhook] Assinatura HMAC inválida.')
+    res.status(400).send('Invalid signature')
+    return
+  }
+
+  let event: any
   try {
-    event = getStripe().webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET!)
-  } catch (err: any) {
-    console.error('[webhook] Assinatura inválida:', err.message)
-    res.status(400).send(`Webhook Error: ${err.message}`)
+    event = JSON.parse(rawBody.toString('utf8'))
+  } catch (err) {
+    console.error('[webhook] Body não é JSON válido:', err)
+    res.status(400).send('Invalid body')
     return
   }
 
   try {
-    switch (event.type) {
-      case 'checkout.session.completed': {
-        const session = event.data.object as Stripe.Checkout.Session
-        const customerId = session.customer as string
-        const subscriptionId = session.subscription as string
-
-        // Busca detalhes da subscription para pegar o price id
-        const stripeSub = await getStripe().subscriptions.retrieve(subscriptionId)
-        const priceId = stripeSub.items.data[0]?.price.id
-        const plan = planFromPriceId(priceId) ?? 'starter'
-        const rawSub = stripeSub as any
-        const periodEnd = rawSub.current_period_end
-          ? new Date(rawSub.current_period_end * 1000).toISOString()
-          : null
+    switch (event.event) {
+      case 'subscription.completed': {
+        const { subscription, customer, payment, payerInformation, checkout } = event.data
+        const productId = checkout?.items?.[0]?.id
+        const plan = (productId && planFromProductId(productId)) ?? 'starter'
+        const nextRenewal = monthFromNow(subscription.updatedAt)
+        const card = payerInformation?.CARD
 
         await supabase
           .from('user_subscriptions')
           .update({
             plan,
             status: 'active',
-            stripe_subscription_id: subscriptionId,
-            stripe_price_id: priceId,
-            plan_ends_at: periodEnd,
+            abacate_subscription_id: subscription.id,
+            abacate_checkout_id: checkout?.id ?? null,
+            abacate_product_id: productId,
+            plan_ends_at: nextRenewal,
+            last_amount_cents: payment?.paidAmount ?? subscription.amount,
+            last_payment_at: payment?.updatedAt ?? subscription.updatedAt,
+            card_brand: card?.brand?.toLowerCase() ?? null,
+            card_last4: card?.number ?? null,
             updated_at: new Date().toISOString(),
           })
-          .eq('stripe_customer_id', customerId)
+          .eq('abacate_customer_id', customer.id)
 
-        console.log(`[webhook] checkout.session.completed — customer ${customerId} → plano ${plan}`)
+        console.log(`[webhook] subscription.completed — ${customer.id} → ${plan}`)
         break
       }
 
-      case 'customer.subscription.updated': {
-        const stripeSub = event.data.object as Stripe.Subscription
-        const customerId = stripeSub.customer as string
-        const priceId = stripeSub.items.data[0]?.price.id
-        const plan = planFromPriceId(priceId) ?? 'starter'
-        const rawSub = stripeSub as any
-        const periodEnd = rawSub.current_period_end
-          ? new Date(rawSub.current_period_end * 1000).toISOString()
-          : null
-        const status = (stripeSub as any).status === 'active' ? 'active' : 'expired'
+      case 'subscription.renewed': {
+        const { subscription, customer, payment, payerInformation, checkout } = event.data
+        const productId = checkout?.items?.[0]?.id
+        const plan = (productId && planFromProductId(productId)) ?? undefined
+        const nextRenewal = monthFromNow(subscription.updatedAt)
+        const card = payerInformation?.CARD
 
         await supabase
           .from('user_subscriptions')
           .update({
-            plan,
-            status,
-            stripe_price_id: priceId,
-            plan_ends_at: periodEnd,
+            status: 'active',
+            ...(plan ? { plan } : {}),
+            abacate_subscription_id: subscription.id,
+            plan_ends_at: nextRenewal,
+            last_amount_cents: payment?.paidAmount ?? subscription.amount,
+            last_payment_at: payment?.updatedAt ?? subscription.updatedAt,
+            card_brand: card?.brand?.toLowerCase() ?? null,
+            card_last4: card?.number ?? null,
             updated_at: new Date().toISOString(),
           })
-          .eq('stripe_customer_id', customerId)
+          .eq('abacate_customer_id', customer.id)
 
-        console.log(`[webhook] subscription.updated — customer ${customerId} → ${plan}/${status}`)
+        console.log(`[webhook] subscription.renewed — ${customer.id}`)
         break
       }
 
-      case 'customer.subscription.deleted': {
-        const stripeSub = event.data.object as Stripe.Subscription
-        const customerId = stripeSub.customer as string
+      case 'subscription.cancelled': {
+        const { subscription, customer } = event.data
 
         await supabase
           .from('user_subscriptions')
           .update({
             plan: 'trial',
             status: 'cancelled',
-            stripe_subscription_id: null,
-            stripe_price_id: null,
+            abacate_subscription_id: null,
+            abacate_checkout_id: null,
+            abacate_product_id: null,
             plan_ends_at: null,
             updated_at: new Date().toISOString(),
           })
-          .eq('stripe_customer_id', customerId)
+          .eq('abacate_customer_id', customer.id)
 
-        console.log(`[webhook] subscription.deleted — customer ${customerId}`)
-        break
-      }
-
-      case 'invoice.payment_failed': {
-        const invoice = event.data.object as Stripe.Invoice
-        const customerId = invoice.customer as string
-
-        await supabase
-          .from('user_subscriptions')
-          .update({ status: 'expired', updated_at: new Date().toISOString() })
-          .eq('stripe_customer_id', customerId)
-
-        console.log(`[webhook] invoice.payment_failed — customer ${customerId}`)
+        console.log(`[webhook] subscription.cancelled — ${customer.id} (subs ${subscription.id})`)
         break
       }
 
       default:
-        console.log(`[webhook] Evento ignorado: ${event.type}`)
+        console.log(`[webhook] Evento ignorado: ${event.event}`)
     }
 
     res.json({ received: true })
@@ -408,6 +378,12 @@ export async function stripeWebhookHandler(req: Request, res: Response): Promise
     console.error('[webhook] Erro ao processar evento:', err)
     res.status(500).json({ error: 'Erro interno ao processar webhook.' })
   }
+}
+
+function monthFromNow(fromIso: string): string {
+  const base = new Date(fromIso)
+  base.setMonth(base.getMonth() + 1)
+  return base.toISOString()
 }
 
 export default router

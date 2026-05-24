@@ -11,7 +11,7 @@ import transcricoesRouter from './routes/transcricoes.routes.js'
 import extensionRouter from './routes/extension.routes.js'
 import inPersonRouter from './routes/in-person.routes.js'
 import teamsRouter from './routes/teams.routes.js'
-import subscriptionRouter, { stripeWebhookHandler } from './routes/subscription.routes.js'
+import subscriptionRouter, { abacatepayWebhookHandler } from './routes/subscription.routes.js'
 import integrationsRouter from './routes/integrations.routes.js'
 import coachingRouter from './routes/coaching.routes.js'
 import meetingBaasRouter from './routes/meetingbaas.routes.js'
@@ -96,8 +96,9 @@ app.use(cors({
 }))
 app.use(morgan('dev'))
 
-// Stripe webhook — deve usar raw body, registrado ANTES do express.json()
-app.post('/api/subscription/webhook', express.raw({ type: 'application/json' }), stripeWebhookHandler)
+// AbacatePay webhook — deve usar raw body, registrado ANTES do express.json()
+// (necessário para verificação HMAC-SHA256 da assinatura)
+app.post('/api/subscription/webhook', express.raw({ type: 'application/json' }), abacatepayWebhookHandler)
 
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
