@@ -13,6 +13,8 @@ import { randomUUID } from 'crypto'
 import { supabase } from '../config/supabase.js'
 import { logger } from '../utils/logger.js'
 import { meetingBaasService } from './MeetingBaasService.js'
+import { botRouter } from './bots/BotRouter.js'
+import type { BotProviderName } from './bots/IBotProvider.js'
 import { resolveMeetingTeamId } from '../utils/teamAccess.js'
 import {
   getValidAccessToken,
@@ -158,7 +160,7 @@ export class CalendarCronService {
     // Usa .limit(1) para evitar erro do maybeSingle() com múltiplas linhas
     const { data: existingRows, error: checkError } = await supabase
       .from('meetings')
-      .select('id, status, started_at, baas_bot_id')
+      .select('id, status, started_at, baas_bot_id, bot_provider')
       .eq('user_id', userId)
       .eq('baas_event_uuid', eventId)
       .limit(1)
@@ -169,13 +171,14 @@ export class CalendarCronService {
     }
 
     if (existingRows && existingRows.length > 0) {
-      const existing = existingRows[0] as { id: string; status: string; started_at: string | null; baas_bot_id: string | null }
+      const existing = existingRows[0] as { id: string; status: string; started_at: string | null; baas_bot_id: string | null; bot_provider: string | null }
 
       // Detecta reagendamento: bot ainda não entrou (status=requesting) e o
       // horário do evento mudou significativamente (>60s). Necessário porque
       // bots agendados no MeetingBaas têm join_at fixo — sem reagendar, o bot
       // entra no horário antigo e fica sozinho até o timeout.
-      if (existing.status === 'requesting' && startedAt && existing.started_at) {
+      // Só se aplica a bots agendados (sempre MeetingBaas); Attendee é só imediato.
+      if (existing.status === 'requesting' && (existing.bot_provider ?? 'meetingbaas') === 'meetingbaas' && startedAt && existing.started_at) {
         const newStartMs = new Date(startedAt).getTime()
         const oldStartMs = new Date(existing.started_at).getTime()
         if (Number.isFinite(newStartMs) && Number.isFinite(oldStartMs) && Math.abs(newStartMs - oldStartMs) > 60_000) {
@@ -216,18 +219,23 @@ export class CalendarCronService {
       }
     }
 
-    // Envia ou agenda o bot via MeetingBaas
+    // Imediato → roteador híbrido (MeetingBaas/Attendee). Agendado → sempre MeetingBaas.
     const meetingId = randomUUID()
     const now = new Date()
     const startTime = item.start?.dateTime ? new Date(item.start.dateTime) : null
     // Usa bot agendado se a reunião começa daqui mais de 2 minutos
     const useScheduled = startTime !== null && startTime.getTime() - now.getTime() > 2 * 60 * 1000
 
-    let baasBotId: string
+    let provider: BotProviderName = 'meetingbaas'
+    let externalId: string
     try {
-      baasBotId = useScheduled
-        ? await meetingBaasService.scheduleBotAt(meetingUrl, meetingId, startTime!)
-        : await meetingBaasService.sendBot(meetingUrl, meetingId)
+      if (useScheduled) {
+        externalId = await meetingBaasService.scheduleBotAt(meetingUrl, meetingId, startTime!)
+      } else {
+        const dispatch = await botRouter.dispatchImmediateBot(meetingUrl, meetingId)
+        provider = dispatch.provider
+        externalId = dispatch.externalId
+      }
     } catch (err) {
       logger.error(`[CalendarCron] Falha ao enviar bot para evento ${eventId}:`, err)
       return
@@ -250,7 +258,9 @@ export class CalendarCronService {
       platform,
       source:            'calendar',
       status:            'requesting',
-      baas_bot_id:       baasBotId,
+      bot_provider:      provider,
+      baas_bot_id:       provider === 'meetingbaas' ? externalId : null,
+      attendee_bot_id:   provider === 'attendee' ? externalId : null,
       baas_event_uuid:   eventId,
       participant_emails: participantEmails.length > 0 ? participantEmails : null,
       started_at:      startedAt ?? new Date().toISOString(),
@@ -258,12 +268,12 @@ export class CalendarCronService {
 
     if (insertError) {
       logger.error(`[CalendarCron] Erro ao salvar reunião no banco (evento ${eventId}):`, insertError)
-      // Remove o bot para não deixar órfão no MeetingBaas
-      meetingBaasService.removeBot(baasBotId).catch(e =>
-        logger.warn(`[CalendarCron] Falha ao remover bot órfão ${baasBotId}:`, e)
+      // Remove o bot para não deixar órfão no provider
+      botRouter.removeBot(provider, externalId).catch(e =>
+        logger.warn(`[CalendarCron] Falha ao remover bot órfão ${externalId} (${provider}):`, e)
       )
     } else {
-      logger.info(`[CalendarCron] ✅ Bot enviado: event=${eventId} meeting=${meetingId} bot=${baasBotId} title="${title}"`)
+      logger.info(`[CalendarCron] ✅ Bot enviado: event=${eventId} meeting=${meetingId} bot=${externalId} provider=${provider} title="${title}"`)
     }
   }
 

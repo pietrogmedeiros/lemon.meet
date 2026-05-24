@@ -13,7 +13,7 @@ import { randomUUID } from 'crypto'
 import { authMiddleware, type AuthRequest } from '../middleware/auth.middleware.js'
 import { supabase } from '../config/supabase.js'
 import { logger } from '../utils/logger.js'
-import { meetingBaasService } from '../services/MeetingBaasService.js'
+import { botRouter, type DispatchResult } from '../services/bots/BotRouter.js'
 import { insightsService } from '../services/InsightsService.js'
 import { rapportService } from '../services/RapportService.js'
 import { meetingChatService } from '../services/MeetingChatService.js'
@@ -51,19 +51,24 @@ router.post('/start', authMiddleware, async (req: AuthRequest, res: Response) =>
       return res.status(500).json({ success: false, message: 'Error creating meeting' })
     }
 
-    // Envia o bot para a reunião via MeetingBaas
-    let baasBotId: string
+    // Envia o bot via roteador híbrido (MeetingBaas padrão; Attendee para a
+    // fatia configurada, com fallback automático para MeetingBaas em caso de erro)
+    let dispatch: DispatchResult
     try {
-      baasBotId = await meetingBaasService.sendBot(meetLink, meetingId)
+      dispatch = await botRouter.dispatchImmediateBot(meetLink, meetingId)
     } catch (err) {
-      logger.error('Error sending MeetingBaas bot:', err)
+      logger.error('Error dispatching bot:', err)
       await supabase.from('meetings').update({ status: 'failed' }).eq('id', meetingId)
       return res.status(502).json({ success: false, message: 'Failed to send bot to meeting' })
     }
 
-    await supabase.from('meetings').update({ baas_bot_id: baasBotId }).eq('id', meetingId)
+    await supabase.from('meetings').update(
+      dispatch.provider === 'attendee'
+        ? { bot_provider: 'attendee', attendee_bot_id: dispatch.externalId }
+        : { bot_provider: 'meetingbaas', baas_bot_id: dispatch.externalId }
+    ).eq('id', meetingId)
 
-    logger.info(`Meeting started via MeetingBaas: ${meetingId} bot=${baasBotId} user=${userId}`)
+    logger.info(`Meeting started via ${dispatch.provider}: ${meetingId} bot=${dispatch.externalId} user=${userId}`)
     return res.status(201).json({ success: true, meetingId })
   } catch (err) {
     logger.error('Unexpected error in POST /meetings/start:', err)
@@ -84,7 +89,7 @@ router.post('/:id/stop', authMiddleware, async (req: AuthRequest, res: Response)
     // Verifica ownership
     const { data: meeting, error: fetchError } = await supabase
       .from('meetings')
-      .select('id, baas_bot_id, status')
+      .select('id, baas_bot_id, attendee_bot_id, bot_provider, status')
       .eq('id', id)
       .eq('user_id', userId)
       .single()
@@ -93,12 +98,13 @@ router.post('/:id/stop', authMiddleware, async (req: AuthRequest, res: Response)
       return res.status(404).json({ success: false, message: 'Meeting not found' })
     }
 
-    // Remove o bot do MeetingBaas — isso dispara o webhook complete
-    if (meeting.baas_bot_id) {
+    // Remove o bot no provider correto — dispara o webhook de conclusão
+    const externalId = meeting.bot_provider === 'attendee' ? meeting.attendee_bot_id : meeting.baas_bot_id
+    if (externalId) {
       try {
-        await meetingBaasService.removeBot(meeting.baas_bot_id)
+        await botRouter.removeBot(meeting.bot_provider ?? 'meetingbaas', externalId)
       } catch (err) {
-        logger.warn(`Could not remove bot ${meeting.baas_bot_id}:`, err)
+        logger.warn(`Could not remove bot ${externalId} (${meeting.bot_provider}):`, err)
         // Continua mesmo se falhar — o bot pode já ter saído da reunião
       }
     }

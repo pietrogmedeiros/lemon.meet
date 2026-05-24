@@ -47,6 +47,7 @@ interface MeetingRow {
   source: string | null
   platform: string | null
   failure_reason: string | null
+  bot_provider: string | null
   duration_seconds: number | null
   transcript: string | null
   insights: any
@@ -93,7 +94,7 @@ async function fetchAllMeetings(): Promise<MeetingRow[]> {
   for (;;) {
     const { data, error } = await supabase
       .from('meetings')
-      .select('id,user_id,team_id,status,source,platform,failure_reason,duration_seconds,transcript,insights,created_at,ended_at,started_at,updated_at,title')
+      .select('id,user_id,team_id,status,source,platform,failure_reason,bot_provider,duration_seconds,transcript,insights,created_at,ended_at,started_at,updated_at,title')
       .order('created_at', { ascending: true })
       .range(from, from + PAGE - 1)
     if (error) throw new Error(`meetings fetch: ${error.message}`)
@@ -400,6 +401,47 @@ function buildRetention(meetings: MeetingRow[], users: UserLite[]): any {
   return { cohorts, maxWeek: maxWeekTracked }
 }
 
+// Saúde por provider de bot (MeetingBaas vs Attendee).
+// Permite ver no painel se o Attendee está degradando: failurePct sobe e
+// o failureBreakdown mostra 'attendee_*'.
+function buildProviders(meetings: MeetingRow[]): any {
+  const ACTIVE = new Set(['requesting', 'recording', 'processing'])
+  const byProvider = new Map<string, {
+    total: number; completed: number; failed: number; withTranscript: number; active: number; failures: Map<string, number>
+  }>()
+
+  for (const m of meetings) {
+    const p = m.bot_provider || 'meetingbaas'
+    const e = byProvider.get(p) ?? { total: 0, completed: 0, failed: 0, withTranscript: 0, active: 0, failures: new Map() }
+    e.total += 1
+    if (m.status === 'completed' && !m.failure_reason) e.completed += 1
+    if (m.status === 'failed' || m.failure_reason) {
+      e.failed += 1
+      const reason = (m.failure_reason ?? 'unknown').split(':')[0]
+      e.failures.set(reason, (e.failures.get(reason) ?? 0) + 1)
+    }
+    if ((m.transcript ?? '').trim().length > 0) e.withTranscript += 1
+    if (m.status && ACTIVE.has(m.status)) e.active += 1
+    byProvider.set(p, e)
+  }
+
+  return [...byProvider.entries()]
+    .map(([provider, e]) => ({
+      provider,
+      total: e.total,
+      completed: e.completed,
+      failed: e.failed,
+      active: e.active,
+      successPct: safePct(e.completed, e.total),
+      failurePct: safePct(e.failed, e.total),
+      transcriptPct: safePct(e.withTranscript, e.total),
+      failureBreakdown: [...e.failures.entries()]
+        .map(([reason, count]) => ({ reason, count }))
+        .sort((a, b) => b.count - a.count),
+    }))
+    .sort((a, b) => b.total - a.total)
+}
+
 function buildAdoption(
   users: UserLite[],
   calendarIntegrations: Array<{ user_id: string; status: string }>,
@@ -519,6 +561,7 @@ router.get('/', authMiddleware, adminMetricsGate, async (req: AuthRequest, res: 
     const overview = buildOverview(meetingsAll, users)
     const timeseries = buildTimeseries(meetingsAll, users, days)
     const quality = buildQuality(meetingsInRange)
+    const providers = buildProviders(meetingsInRange)
     const teamsBlock = buildTeams(meetingsAll, teams, members)
     const retention = buildRetention(meetingsAll, users)
     const adoption = buildAdoption(users, calInts, meetingsAll, aiChats)
@@ -540,6 +583,7 @@ router.get('/', authMiddleware, adminMetricsGate, async (req: AuthRequest, res: 
       overview,
       timeseries,
       quality,
+      providers,
       teams: teamsBlock,
       retention,
       adoption,

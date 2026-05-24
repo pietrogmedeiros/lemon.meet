@@ -15,6 +15,7 @@ import subscriptionRouter, { abacatepayWebhookHandler } from './routes/subscript
 import integrationsRouter from './routes/integrations.routes.js'
 import coachingRouter from './routes/coaching.routes.js'
 import meetingBaasRouter from './routes/meetingbaas.routes.js'
+import { attendeeWebhookHandler } from './routes/attendee.routes.js'
 import calendarRouter from './routes/calendar.routes.js'
 import pipedriveRouter from './routes/pipedrive.routes.js'
 import hubspotRouter from './routes/hubspot.routes.js'
@@ -99,6 +100,10 @@ app.use(morgan('dev'))
 // AbacatePay webhook — deve usar raw body, registrado ANTES do express.json()
 // (necessário para verificação HMAC-SHA256 da assinatura)
 app.post('/api/subscription/webhook', express.raw({ type: 'application/json' }), abacatepayWebhookHandler)
+
+// Attendee webhook — mesma exigência de raw body para validar a assinatura
+// HMAC-SHA256 (X-Webhook-Signature). Registrado ANTES do express.json().
+app.post('/api/attendee/webhook', express.raw({ type: 'application/json' }), attendeeWebhookHandler)
 
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
