@@ -19,12 +19,15 @@ const SERVER_URL = process.env.RAILWAY_PUBLIC_DOMAIN
 
 const REDIRECT_URI = `${SERVER_URL}/api/hubspot/callback`
 
-// Requested scopes — must match what was configured in the HubSpot app
+// Requested scopes — must match what was configured in the HubSpot app.
+// crm.objects.owners.read é obrigatório para resolver o hubspot_owner_id via
+// /crm/v3/owners; sem ele a API retorna 403 e o deal sai sempre sem owner.
 const SCOPES = [
   'crm.objects.deals.read',
   'crm.objects.deals.write',
   'crm.objects.contacts.read',
   'crm.objects.contacts.write',
+  'crm.objects.owners.read',
 ].join(' ')
 
 // ── Helper: get a valid access token, refreshing if expired ────────────────
@@ -728,7 +731,11 @@ async function resolveOwnerIdByEmail(token: string, email: string): Promise<stri
       const match = data.results?.find(o => o.email?.toLowerCase().trim() === target) ?? data.results?.[0]
       if (match?.id) return match.id
     } else {
-      logger.warn(`[HubSpot] ⚠️  Filtro de owner por email retornou status ${res.status} para ${email}`)
+      // 403 aqui normalmente significa falta do escopo crm.objects.owners.read
+      // (necessário re-conectar o HubSpot após adicionar o escopo). Logamos o
+      // corpo para deixar o motivo explícito nas logs de produção.
+      const body = await res.text().catch(() => '')
+      logger.warn(`[HubSpot] ⚠️  Filtro de owner por email retornou status ${res.status} para ${email}: ${body.slice(0, 300)}`)
     }
   } catch (err) {
     logger.warn(`[HubSpot] ⚠️  Filtro de owner por email falhou para ${email}:`, err)
