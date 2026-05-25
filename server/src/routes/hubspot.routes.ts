@@ -2,6 +2,7 @@ import { Router, Response, IRouter } from 'express'
 import { authMiddleware, AuthRequest } from '../middleware/auth.middleware.js'
 import { supabase } from '../config/supabase.js'
 import { logger } from '../utils/logger.js'
+import { getAccessibleMemberIds } from '../utils/teamAccess.js'
 
 const router: IRouter = Router()
 
@@ -196,11 +197,15 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
   logger.info(`[HubSpot] 🚀 Iniciando sync para meeting ${meetingId}, user ${userId}`)
 
   try {
+    // Acesso por time: quem enxerga a reunião (dono ou via time) pode sincronizar.
+    // Espelha o GET /api/meetings/:id. Antes filtrava só por user_id e dava 404
+    // (PGRST116) ao sincronizar reuniões de colegas de time que o usuário vê na UI.
+    const memberIds = await getAccessibleMemberIds(userId)
     const { data: meeting, error: meetingError } = await supabase
       .from('meetings')
       .select('id, title, platform, started_at, ended_at, duration_seconds, insights, meet_link, participant_emails')
       .eq('id', meetingId)
-      .eq('user_id', userId)
+      .in('user_id', memberIds)
       .single()
 
     if (meetingError || !meeting) {
@@ -220,66 +225,35 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
 
     logger.info(`[HubSpot] ✅ Token válido obtido para user ${userId}`)
 
-    // Buscar ID do owner (usuário autenticado no HubSpot)
-    // user_id (OAuth) e hubspot_owner_id são entidades distintas no HubSpot:
-    // precisa traduzir via /crm/v3/owners/{userId}?idProperty=userId.
-    // Se o user_id não tiver licença de Sales Hub Owner, esse endpoint falha;
-    // nesse caso tentamos fallback por email (também retornado pelo token info).
+    // Owner do deal = usuário que clicou em "Enviar para HubSpot" (req.user.email),
+    // e não quem conectou o OAuth. Resolvemos o hubspot_owner_id casando esse email
+    // com a lista de owners do HubSpot. Também capturamos o hub_id (portal) do token
+    // para montar o link do deal ao final.
     let authenticatedOwnerId: string | null = null
+    let hubId: number | null = null
+    const clickingEmail = req.user!.email ?? null
+
     try {
       const tokenInfoRes = await fetch(`${HUBSPOT_API_BASE}/oauth/v1/access-tokens/${token}`)
       if (tokenInfoRes.ok) {
-        const tokenInfo = await tokenInfoRes.json() as { user_id?: number, hub_id?: number, user?: string }
-
-        // Tentativa 1: resolver via userId
-        if (tokenInfo.user_id) {
-          const ownerRes = await fetch(
-            `${HUBSPOT_API_BASE}/crm/v3/owners/${tokenInfo.user_id}?idProperty=userId`,
-            { headers: { Authorization: `Bearer ${token}` } }
-          )
-          if (ownerRes.ok) {
-            const owner = await ownerRes.json() as { id?: string }
-            if (owner.id) {
-              authenticatedOwnerId = owner.id
-              logger.info(`[HubSpot] ✅ Owner ID resolvido via userId: ${authenticatedOwnerId} (user_id=${tokenInfo.user_id})`)
-            } else {
-              logger.warn(`[HubSpot] ⚠️  Resposta de owner sem id para user_id=${tokenInfo.user_id}`)
-            }
-          } else {
-            const errBody = await ownerRes.text()
-            logger.warn(`[HubSpot] ⚠️  Owner via userId falhou (status ${ownerRes.status}): ${errBody}`)
-          }
-        }
-
-        // Tentativa 2: fallback por email do usuário do token
-        if (!authenticatedOwnerId && tokenInfo.user) {
-          logger.info(`[HubSpot] 🔁 Tentando resolver owner via email: ${tokenInfo.user}`)
-          const listRes = await fetch(
-            `${HUBSPOT_API_BASE}/crm/v3/owners?email=${encodeURIComponent(tokenInfo.user)}&limit=1`,
-            { headers: { Authorization: `Bearer ${token}` } }
-          )
-          if (listRes.ok) {
-            const list = await listRes.json() as { results?: Array<{ id?: string, email?: string }> }
-            if (list.results && list.results.length > 0 && list.results[0].id) {
-              authenticatedOwnerId = list.results[0].id
-              logger.info(`[HubSpot] ✅ Owner ID resolvido via email: ${authenticatedOwnerId} (email=${tokenInfo.user})`)
-            } else {
-              logger.warn(`[HubSpot] ⚠️  Lista de owners por email retornou vazia para ${tokenInfo.user}`)
-            }
-          } else {
-            const errBody = await listRes.text()
-            logger.warn(`[HubSpot] ⚠️  Fallback de owner por email falhou (status ${listRes.status}): ${errBody}`)
-          }
-        }
-
-        if (!authenticatedOwnerId) {
-          logger.error(`[HubSpot] ❌ Não foi possível resolver authenticatedOwnerId (user_id=${tokenInfo.user_id}, email=${tokenInfo.user}). Deal será criado sem owner.`)
-        }
+        const tokenInfo = await tokenInfoRes.json() as { hub_id?: number }
+        hubId = tokenInfo.hub_id ?? null
       } else {
         logger.warn(`[HubSpot] ⚠️  Não foi possível obter info do token (status ${tokenInfoRes.status})`)
       }
     } catch (err) {
-      logger.error(`[HubSpot] ❌ Erro ao buscar owner ID:`, err)
+      logger.error(`[HubSpot] ❌ Erro ao buscar info do token:`, err)
+    }
+
+    if (clickingEmail) {
+      authenticatedOwnerId = await resolveOwnerIdByEmail(token, clickingEmail)
+      if (authenticatedOwnerId) {
+        logger.info(`[HubSpot] ✅ Owner resolvido pelo email de quem clicou: ${authenticatedOwnerId} (${clickingEmail})`)
+      } else {
+        logger.error(`[HubSpot] ❌ Não foi possível resolver owner para ${clickingEmail} (usuário não é owner ativo no HubSpot?). Deal será criado sem owner.`)
+      }
+    } else {
+      logger.error(`[HubSpot] ❌ Usuário autenticado sem email — deal será criado sem owner.`)
     }
 
     const insights = meeting.insights as any
@@ -706,9 +680,15 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
       }
     }
 
-    const result = { 
-      success: true, 
-      dealId, 
+    const dealUrl = (hubId && dealId)
+      ? `https://app.hubspot.com/contacts/${hubId}/record/0-3/${dealId}`
+      : null
+
+    const result = {
+      success: true,
+      dealId,
+      dealUrl,
+      ownerAssigned: !!authenticatedOwnerId,
       contactId,
       phone,
       tasksCreated: tasksCreated.length,
@@ -727,6 +707,59 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
 })
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
+
+/**
+ * Resolve o hubspot_owner_id casando um email com a lista de owners do HubSpot.
+ * Primeiro tenta o filtro por email; se não casar, pagina a lista completa e
+ * compara case-insensitive (o filtro ?email= é exato e às vezes retorna vazio).
+ */
+async function resolveOwnerIdByEmail(token: string, email: string): Promise<string | null> {
+  const target = email.toLowerCase().trim()
+  const authHeader = { Authorization: `Bearer ${token}` }
+
+  // Tentativa rápida: filtro por email
+  try {
+    const res = await fetch(
+      `${HUBSPOT_API_BASE}/crm/v3/owners?email=${encodeURIComponent(email)}&limit=1`,
+      { headers: authHeader }
+    )
+    if (res.ok) {
+      const data = await res.json() as { results?: Array<{ id?: string, email?: string }> }
+      const match = data.results?.find(o => o.email?.toLowerCase().trim() === target) ?? data.results?.[0]
+      if (match?.id) return match.id
+    } else {
+      logger.warn(`[HubSpot] ⚠️  Filtro de owner por email retornou status ${res.status} para ${email}`)
+    }
+  } catch (err) {
+    logger.warn(`[HubSpot] ⚠️  Filtro de owner por email falhou para ${email}:`, err)
+  }
+
+  // Fallback: paginar a lista completa de owners e casar por email (case-insensitive)
+  try {
+    let after: string | undefined
+    for (let page = 0; page < 20; page++) {
+      let url = `${HUBSPOT_API_BASE}/crm/v3/owners?limit=100`
+      if (after) url += `&after=${encodeURIComponent(after)}`
+      const res = await fetch(url, { headers: authHeader })
+      if (!res.ok) {
+        logger.warn(`[HubSpot] ⚠️  Listagem de owners retornou status ${res.status} ao resolver ${email}`)
+        break
+      }
+      const data = await res.json() as {
+        results?: Array<{ id?: string, email?: string }>
+        paging?: { next?: { after?: string } }
+      }
+      const match = data.results?.find(o => o.email?.toLowerCase().trim() === target)
+      if (match?.id) return match.id
+      after = data.paging?.next?.after
+      if (!after) break
+    }
+  } catch (err) {
+    logger.warn(`[HubSpot] ⚠️  Paginação de owners falhou ao resolver ${email}:`, err)
+  }
+
+  return null
+}
 
 function buildDealDescription(params: {
   title: string

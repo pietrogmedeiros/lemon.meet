@@ -4,7 +4,7 @@ import { MainLayout } from '../components/layout/MainLayout';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
-import { ArrowLeft, Clock, Calendar, Mic, Target, CheckCircle, Mail, BookOpen, Sparkles, X, Copy, Check, Trash2, Lock, Users, RefreshCw, Download, Phone, Edit2, Save, MessageCircle, Heart, AlertTriangle, Smile } from 'lucide-react';
+import { ArrowLeft, Clock, Calendar, Mic, Target, CheckCircle, Mail, BookOpen, Sparkles, X, Copy, Check, Trash2, Lock, Users, RefreshCw, Download, Phone, Edit2, Save, MessageCircle, Heart, AlertTriangle, Smile, ExternalLink } from 'lucide-react';
 import { RapportSection } from '../components/ui/RapportSection';
 import { MeetingChatPanel } from '../components/MeetingChatPanel';
 import { supabase } from '../lib/supabase';
@@ -590,6 +590,9 @@ export function TranscricaoDetalhesPage() {
   const [hubspotConnected, setHubspotConnected] = useState(false);
   const [hubspotSyncing, setHubspotSyncing] = useState(false);
   const [hubspotSynced, setHubspotSynced] = useState(false);
+  const [hubspotError, setHubspotError] = useState<string | null>(null);
+  const [hubspotNeedsConnect, setHubspotNeedsConnect] = useState(false);
+  const [hubspotResult, setHubspotResult] = useState<{ action: string; dealUrl: string | null; ownerAssigned: boolean } | null>(null);
 
   // Contact phone state
   const [contactPhone, setContactPhone] = useState<string | null>(null);
@@ -769,18 +772,40 @@ export function TranscricaoDetalhesPage() {
   const handleSyncHubspot = async () => {
     if (!id || hubspotSyncing) return;
     setHubspotSyncing(true);
+    setHubspotError(null);
+    setHubspotNeedsConnect(false);
+    setHubspotResult(null);
     try {
       const headers = await getAuthHeader();
       const res = await fetch(`${apiUrl}/api/hubspot/sync/${id}`, {
         method: 'POST',
         headers,
       });
-      if (res.ok) {
+      const data = await res.json().catch(() => null);
+      if (res.ok && data?.success) {
         setHubspotSynced(true);
-        setTimeout(() => setHubspotSynced(false), 4000);
+        setHubspotResult({
+          action: data.action ?? 'created',
+          dealUrl: data.dealUrl ?? null,
+          ownerAssigned: data.ownerAssigned !== false,
+        });
+      } else {
+        const code = data?.error as string | undefined;
+        const notConnected = res.status === 401 || code === 'HubSpot not connected or invalid token';
+        if (notConnected) {
+          setHubspotNeedsConnect(true);
+          setHubspotError('Você ainda não conectou o HubSpot (ou a sessão expirou). Conecte sua conta para enviar o negócio.');
+        } else {
+          const msg =
+            code === 'Meeting not found' ? 'Reunião não encontrada ou você não tem permissão para sincronizá-la.'
+            : code === 'Failed to create deal in HubSpot' ? 'Não foi possível criar o negócio no HubSpot. Tente novamente.'
+            : code === 'Deal was not properly created/updated in HubSpot' ? 'O negócio não foi confirmado no HubSpot. Tente novamente.'
+            : code || `Falha ao enviar (HTTP ${res.status}).`;
+          setHubspotError(msg);
+        }
       }
     } catch {
-      // Silent fail
+      setHubspotError('Erro de conexão ao enviar para o HubSpot. Tente novamente.');
     } finally {
       setHubspotSyncing(false);
     }
@@ -1042,25 +1067,75 @@ export function TranscricaoDetalhesPage() {
           </div>
           {/* HubSpot sync button */}
           {hubspotConnected && meeting.status === 'completed' && meeting.insights && (
-            <button
-              onClick={handleSyncHubspot}
-              disabled={hubspotSyncing || hubspotSynced}
-              className={`flex items-center gap-2 text-[13px] font-medium px-3 py-2 rounded-lg border transition-all mt-1 ${
-                hubspotSynced
-                  ? 'border-[#FF7A59] text-[#FF7A59] bg-[#FF7A59]/8'
-                  : 'border-[#E0E0E0] text-[#555] hover:border-[#FF7A59] hover:text-[#FF7A59] bg-white'
-              }`}
-              title="Enviar resumo e deal para o HubSpot"
-            >
-              {hubspotSyncing ? (
-                <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-r-transparent" />
-              ) : hubspotSynced ? (
-                <CheckCircle className="h-4 w-4" />
-              ) : (
-                <img src="/hubspot.webp" alt="HubSpot" className="w-4 h-4 object-contain" />
+            <div className="mt-1 flex flex-col gap-2 items-start">
+              <button
+                onClick={handleSyncHubspot}
+                disabled={hubspotSyncing}
+                className={`flex items-center gap-2 text-[13px] font-medium px-3 py-2 rounded-lg border transition-all disabled:opacity-60 ${
+                  hubspotSynced
+                    ? 'border-[#FF7A59] text-[#FF7A59] bg-[#FF7A59]/8'
+                    : 'border-[#E0E0E0] text-[#555] hover:border-[#FF7A59] hover:text-[#FF7A59] bg-white'
+                }`}
+                title="Enviar resumo e deal para o HubSpot"
+              >
+                {hubspotSyncing ? (
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-r-transparent" />
+                ) : hubspotSynced ? (
+                  <CheckCircle className="h-4 w-4" />
+                ) : (
+                  <img src="/hubspot.webp" alt="HubSpot" className="w-4 h-4 object-contain" />
+                )}
+                {hubspotSyncing
+                  ? 'Enviando...'
+                  : hubspotSynced
+                    ? (hubspotResult?.action === 'updated' ? 'Negócio atualizado' : 'Negócio criado')
+                    : 'Enviar para HubSpot'}
+              </button>
+
+              {/* Sucesso: link do negócio criado/atualizado */}
+              {hubspotResult && (
+                <div className="flex flex-col gap-1.5 text-[12px] text-[#555] bg-[#FF7A59]/8 border border-[#FF7A59]/30 rounded-lg px-3 py-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <CheckCircle className="h-3.5 w-3.5 text-[#FF7A59] shrink-0" />
+                    <span>Negócio {hubspotResult.action === 'updated' ? 'atualizado' : 'criado'} no HubSpot.</span>
+                    {hubspotResult.dealUrl && (
+                      <a
+                        href={hubspotResult.dealUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 font-medium text-[#FF7A59] hover:underline"
+                      >
+                        Abrir negócio <ExternalLink className="h-3 w-3" />
+                      </a>
+                    )}
+                  </div>
+                  {!hubspotResult.ownerAssigned && (
+                    <div className="flex items-start gap-2 text-[#92400E]">
+                      <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                      <span>Seu usuário não foi encontrado como proprietário (owner) no HubSpot, então o negócio ficou sem proprietário.</span>
+                    </div>
+                  )}
+                </div>
               )}
-              {hubspotSynced ? 'Enviado!' : 'Enviar para HubSpot'}
-            </button>
+
+              {/* Erro visível */}
+              {hubspotError && (
+                <div className="flex flex-col gap-1.5 text-[12px] text-[#B91C1C] bg-[#FEF2F2] border border-[#FECACA] rounded-lg px-3 py-2">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                    <span>{hubspotError}</span>
+                  </div>
+                  {hubspotNeedsConnect && (
+                    <button
+                      onClick={() => navigate('/integrations/apps')}
+                      className="inline-flex items-center gap-1 font-medium text-[#FF7A59] hover:underline self-start"
+                    >
+                      Conectar HubSpot <ExternalLink className="h-3 w-3" />
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
           )}
         </div>
 
