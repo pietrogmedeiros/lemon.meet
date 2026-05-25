@@ -65,12 +65,21 @@ async function handleStatusChange(data: { bot_id: string; status: { code: string
   const meetingStatus = statusMap[code]
   if (!meetingStatus) return // ignora joining_call, in_waiting_room, etc.
 
+  // Em falha, registra o motivo (antes era descartado → failure_reason ficava null)
+  // e marca ended_at, para a falha deixar de ser silenciosa/indiagnosticável.
+  const isFailure = meetingStatus === 'failed'
+  const updatePayload: Record<string, any> = { status: meetingStatus, baas_bot_id: bot_id }
+  if (isFailure) {
+    updatePayload.failure_reason = `bot_failed: ${code}`
+    updatePayload.ended_at = new Date().toISOString()
+  }
+
   // Tenta atualizar pelo bot_id — funciona para bots manuais (extensão)
   const { data: updated, error } = await supabase
     .from('meetings')
-    .update({ status: meetingStatus, baas_bot_id: bot_id })
+    .update(updatePayload)
     .eq('baas_bot_id', bot_id)
-    .select('id')
+    .select('id, user_id, title')
 
   if (error) {
     logger.error(`[MeetingBaas] Erro ao atualizar status para bot ${bot_id}:`, error)
@@ -78,7 +87,11 @@ async function handleStatusChange(data: { bot_id: string; status: { code: string
   }
 
   if (updated && updated.length > 0) {
-    logger.info(`[MeetingBaas] Status → ${meetingStatus} (bot ${bot_id})`)
+    logger.info(`[MeetingBaas] Status → ${meetingStatus} (bot ${bot_id})${isFailure ? ` motivo=${code}` : ''}`)
+    if (isFailure) {
+      const m = updated[0]
+      await notificationService.notifyMeetingBotFailed(m.user_id, m.id, code, m.title)
+    }
     return
   }
 
@@ -96,15 +109,19 @@ async function handleStatusChange(data: { bot_id: string; status: { code: string
 
     const { data: calUpdated, error: calError } = await supabase
       .from('meetings')
-      .update({ status: meetingStatus, baas_bot_id: bot_id })
+      .update(updatePayload)
       .eq('baas_event_uuid', eventUuid)
       .is('baas_bot_id', null)
-      .select('id')
+      .select('id, user_id, title')
 
     if (calError) {
       logger.error(`[MeetingBaas] Erro ao atualizar status via event_uuid ${eventUuid}:`, calError)
     } else {
-      logger.info(`[MeetingBaas] Status → ${meetingStatus} (bot ${bot_id}, event ${eventUuid}, rows=${calUpdated?.length ?? 0})`)
+      logger.info(`[MeetingBaas] Status → ${meetingStatus} (bot ${bot_id}, event ${eventUuid}, rows=${calUpdated?.length ?? 0})${isFailure ? ` motivo=${code}` : ''}`)
+      if (isFailure && calUpdated && calUpdated.length > 0) {
+        const m = calUpdated[0]
+        await notificationService.notifyMeetingBotFailed(m.user_id, m.id, code, m.title)
+      }
     }
   } catch (err) {
     logger.error(`[MeetingBaas] Erro ao buscar event_uuid para bot ${bot_id}:`, err)
@@ -401,17 +418,32 @@ async function handleFailed(data: { bot_id: string; error?: string; error_messag
   const errorMsg = data.error_message ?? data.error ?? data.error_code ?? 'unknown'
   logger.warn(`[MeetingBaas] Bot ${bot_id} falhou: ${errorMsg}`)
 
+  // Persiste o motivo (antes só era logado) + ended_at, e notifica o usuário.
+  const failurePayload = {
+    status: 'failed',
+    failure_reason: `bot_failed: ${errorMsg}`.slice(0, 300),
+    ended_at: new Date().toISOString(),
+  }
+
   const { data: failedUpdated } = await supabase
     .from('meetings')
-    .update({ status: 'failed' })
+    .update(failurePayload)
     .eq('baas_bot_id', bot_id)
-    .select('id')
+    .select('id, user_id, title')
 
-  if ((!failedUpdated || failedUpdated.length === 0) && event_uuid) {
-    await supabase
+  let target = failedUpdated && failedUpdated.length > 0 ? failedUpdated[0] : null
+
+  if (!target && event_uuid) {
+    const { data: byEvent } = await supabase
       .from('meetings')
-      .update({ status: 'failed', baas_bot_id: bot_id })
+      .update({ ...failurePayload, baas_bot_id: bot_id })
       .eq('baas_event_uuid', event_uuid)
+      .select('id, user_id, title')
+    target = byEvent && byEvent.length > 0 ? byEvent[0] : null
+  }
+
+  if (target) {
+    await notificationService.notifyMeetingBotFailed(target.user_id, target.id, data.error_code ?? errorMsg, target.title)
   }
 }
 

@@ -8,6 +8,15 @@ import { logger } from '../utils/logger.js'
 const BAAS_API_URL = 'https://api.meetingbaas.com'
 const BOT_NAME = 'Lemon Notetaker'
 
+// Tempos (s) antes do bot desistir e sair — aumentados de 600 para reduzir
+// falhas de admissão (bot saía do lobby após 10 min sem ser admitido).
+//   waiting_room_timeout: aguardando admissão na sala de espera (Google Meet etc.)
+//   noone_joined_timeout: admitido, mas ninguém entrou na call
+// Enviamos em timeout_config (usado historicamente) e em automatic_leave (nome
+// documentado na API v2) — a API tolera campos extras, então o maior valor vale
+// independente de qual chave ela honra.
+const LEAVE_TIMEOUTS = { waiting_room_timeout: 1200, noone_joined_timeout: 900 }
+
 export interface BaasTranscriptWord {
   start: number
   end: number
@@ -63,7 +72,8 @@ export class MeetingBaasService {
         transcription_config: { provider: 'gladia' },
         callback_enabled: true,
         callback_config: { url: this.webhookUrl },
-        timeout_config: { waiting_room_timeout: 600 },
+        timeout_config: LEAVE_TIMEOUTS,
+        automatic_leave: LEAVE_TIMEOUTS,
         extra: { deduplication_key: dedupKey ?? meetingId },
       }),
     })
@@ -98,7 +108,8 @@ export class MeetingBaasService {
         transcription_config: { provider: 'gladia' },
         callback_enabled: true,
         callback_config: { url: this.webhookUrl },
-        timeout_config: { waiting_room_timeout: 600 },
+        timeout_config: LEAVE_TIMEOUTS,
+        automatic_leave: LEAVE_TIMEOUTS,
         join_at: joinAt.toISOString(),
         extra: { deduplication_key: dedupKey ?? meetingId },
       }),

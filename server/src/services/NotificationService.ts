@@ -73,6 +73,30 @@ class NotificationService {
   }
 
   /**
+   * Notifica quando o bot falhou ao entrar/gravar a reunião.
+   * `reason` pode ser um código conhecido (ex: waiting_room_timeout) ou texto livre.
+   */
+  async notifyMeetingBotFailed(userId: string, meetingId: string, reason: string, meetingTitle?: string): Promise<void> {
+    const title = meetingTitle || 'Reunião'
+
+    const reasonMap: Record<string, string> = {
+      waiting_room_timeout: 'o bot ficou na sala de espera e não foi admitido a tempo. Peça para um participante admitir o "Lemon Notetaker" assim que ele pedir para entrar.',
+      bot_rejected: 'o bot foi recusado ao tentar entrar na reunião.',
+      meeting_error: 'ocorreu um erro na plataforma da reunião e o bot não conseguiu permanecer.',
+      invalid_meeting_url: 'o link da reunião era inválido ou a reunião não existia mais.',
+    }
+    const detail = reasonMap[reason] ?? `o bot encerrou com a falha "${reason}".`
+
+    await this.notify({
+      user_id: userId,
+      type: 'meeting_bot_failed',
+      title: '⚠️ Bot não conseguiu gravar',
+      message: `A reunião "${title}" não foi gravada: ${detail}`,
+      meeting_id: meetingId,
+    })
+  }
+
+  /**
    * Notifica quando reunião é processada com sucesso
    */
   async notifyMeetingCompleted(userId: string, meetingId: string, meetingTitle?: string): Promise<void> {
