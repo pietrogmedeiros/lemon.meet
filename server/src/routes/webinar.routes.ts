@@ -43,17 +43,30 @@ const upload = multer({
 // HELPERS
 // ============================================================
 
-// Resolve o team_id "ativo" do admin: o time onde ele é owner. Se houver mais de um,
-// pega o primeiro (allowlist é uma só pessoa hoje, então não é problema).
-async function resolveOwnerTeamId(userId: string): Promise<string | null> {
-  const { data } = await supabase
+// Resolve o team_id do admin de webinar (e-mail na allowlist). Preferimos o time
+// onde ele é OWNER; se não for owner de nenhum (ex.: convidado como MEMBRO de um
+// time que já tem webinar — caso do deive na Starbem), caímos pra primeira
+// associação ativa em team_members. O acesso à feature já é restrito pela
+// allowlist no middleware, então resolver por associação é seguro.
+async function resolveWebinarTeamId(userId: string): Promise<string | null> {
+  const { data: owned } = await supabase
     .from('teams')
     .select('id')
     .eq('owner_id', userId)
     .order('created_at', { ascending: true })
     .limit(1)
     .maybeSingle()
-  return data?.id ?? null
+  if (owned?.id) return owned.id
+
+  const { data: member } = await supabase
+    .from('team_members')
+    .select('team_id')
+    .eq('user_id', userId)
+    .eq('status', 'active')
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+  return member?.team_id ?? null
 }
 
 async function ensureConfig(teamId: string) {
@@ -74,9 +87,9 @@ const adminGate = [authMiddleware, webinarAdminGate]
 // ── GET /api/webinars/config ──────────────────────────────────
 router.get('/config', ...adminGate, async (req: AuthRequest, res: Response) => {
   try {
-    const teamId = await resolveOwnerTeamId(req.user!.id)
+    const teamId = await resolveWebinarTeamId(req.user!.id)
     if (!teamId) {
-      return res.status(400).json({ success: false, message: 'Você precisa ser owner de um time' })
+      return res.status(400).json({ success: false, message: 'Você precisa pertencer a um time' })
     }
     const config = await ensureConfig(teamId)
     return res.json({ success: true, config, team_id: teamId })
@@ -89,9 +102,9 @@ router.get('/config', ...adminGate, async (req: AuthRequest, res: Response) => {
 // ── POST /api/webinars/config ─────────────────────────────────
 router.post('/config', ...adminGate, async (req: AuthRequest, res: Response) => {
   try {
-    const teamId = await resolveOwnerTeamId(req.user!.id)
+    const teamId = await resolveWebinarTeamId(req.user!.id)
     if (!teamId) {
-      return res.status(400).json({ success: false, message: 'Você precisa ser owner de um time' })
+      return res.status(400).json({ success: false, message: 'Você precisa pertencer a um time' })
     }
 
     const { slug, title, description, is_active } = req.body
@@ -145,9 +158,9 @@ router.post('/config', ...adminGate, async (req: AuthRequest, res: Response) => 
 // ── POST /api/webinars/config/logo ────────────────────────────
 router.post('/config/logo', ...adminGate, upload.single('logo'), async (req: AuthRequest, res: Response) => {
   try {
-    const teamId = await resolveOwnerTeamId(req.user!.id)
+    const teamId = await resolveWebinarTeamId(req.user!.id)
     if (!teamId) {
-      return res.status(400).json({ success: false, message: 'Você precisa ser owner de um time' })
+      return res.status(400).json({ success: false, message: 'Você precisa pertencer a um time' })
     }
     const file = req.file
     if (!file) {
@@ -197,7 +210,7 @@ router.post('/config/logo', ...adminGate, upload.single('logo'), async (req: Aut
 // ── GET /api/webinars/sessions ────────────────────────────────
 router.get('/sessions', ...adminGate, async (req: AuthRequest, res: Response) => {
   try {
-    const teamId = await resolveOwnerTeamId(req.user!.id)
+    const teamId = await resolveWebinarTeamId(req.user!.id)
     if (!teamId) return res.json({ success: true, sessions: [] })
     const config = await ensureConfig(teamId)
     if (!config) return res.json({ success: true, sessions: [] })
@@ -218,9 +231,9 @@ router.get('/sessions', ...adminGate, async (req: AuthRequest, res: Response) =>
 // ── POST /api/webinars/sessions ───────────────────────────────
 router.post('/sessions', ...adminGate, async (req: AuthRequest, res: Response) => {
   try {
-    const teamId = await resolveOwnerTeamId(req.user!.id)
+    const teamId = await resolveWebinarTeamId(req.user!.id)
     if (!teamId) {
-      return res.status(400).json({ success: false, message: 'Você precisa ser owner de um time' })
+      return res.status(400).json({ success: false, message: 'Você precisa pertencer a um time' })
     }
     const { scheduled_at, webinar_link, is_active } = req.body
     if (!scheduled_at || !webinar_link) {
@@ -257,7 +270,7 @@ router.post('/sessions', ...adminGate, async (req: AuthRequest, res: Response) =
 // ── PATCH /api/webinars/sessions/:id ──────────────────────────
 router.patch('/sessions/:id', ...adminGate, async (req: AuthRequest, res: Response) => {
   try {
-    const teamId = await resolveOwnerTeamId(req.user!.id)
+    const teamId = await resolveWebinarTeamId(req.user!.id)
     if (!teamId) return res.status(403).json({ success: false, message: 'Forbidden' })
     const config = await ensureConfig(teamId)
     if (!config) return res.status(404).json({ success: false, message: 'Config não encontrada' })
@@ -291,7 +304,7 @@ router.patch('/sessions/:id', ...adminGate, async (req: AuthRequest, res: Respon
 // ── DELETE /api/webinars/sessions/:id ─────────────────────────
 router.delete('/sessions/:id', ...adminGate, async (req: AuthRequest, res: Response) => {
   try {
-    const teamId = await resolveOwnerTeamId(req.user!.id)
+    const teamId = await resolveWebinarTeamId(req.user!.id)
     if (!teamId) return res.status(403).json({ success: false, message: 'Forbidden' })
     const config = await ensureConfig(teamId)
     if (!config) return res.status(404).json({ success: false, message: 'Config não encontrada' })
@@ -313,7 +326,7 @@ router.delete('/sessions/:id', ...adminGate, async (req: AuthRequest, res: Respo
 // ── GET /api/webinars/registrations ───────────────────────────
 router.get('/registrations', ...adminGate, async (req: AuthRequest, res: Response) => {
   try {
-    const teamId = await resolveOwnerTeamId(req.user!.id)
+    const teamId = await resolveWebinarTeamId(req.user!.id)
     if (!teamId) return res.json({ success: true, registrations: [] })
     const config = await ensureConfig(teamId)
     if (!config) return res.json({ success: true, registrations: [] })
