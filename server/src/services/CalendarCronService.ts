@@ -12,8 +12,7 @@
 import { randomUUID } from 'crypto'
 import { supabase } from '../config/supabase.js'
 import { logger } from '../utils/logger.js'
-import { meetingBaasService } from './MeetingBaasService.js'
-import { botRouter } from './bots/BotRouter.js'
+import { botRouter, type DispatchResult } from './bots/BotRouter.js'
 import type { BotProviderName } from './bots/IBotProvider.js'
 import { resolveMeetingTeamId } from '../utils/teamAccess.js'
 import {
@@ -160,7 +159,7 @@ export class CalendarCronService {
     // Usa .limit(1) para evitar erro do maybeSingle() com múltiplas linhas
     const { data: existingRows, error: checkError } = await supabase
       .from('meetings')
-      .select('id, status, started_at, baas_bot_id, bot_provider')
+      .select('id, status, started_at, baas_bot_id, attendee_bot_id, bot_provider')
       .eq('user_id', userId)
       .eq('baas_event_uuid', eventId)
       .limit(1)
@@ -171,14 +170,13 @@ export class CalendarCronService {
     }
 
     if (existingRows && existingRows.length > 0) {
-      const existing = existingRows[0] as { id: string; status: string; started_at: string | null; baas_bot_id: string | null; bot_provider: string | null }
+      const existing = existingRows[0] as { id: string; status: string; started_at: string | null; baas_bot_id: string | null; attendee_bot_id: string | null; bot_provider: string | null }
 
       // Detecta reagendamento: bot ainda não entrou (status=requesting) e o
       // horário do evento mudou significativamente (>60s). Necessário porque
-      // bots agendados no MeetingBaas têm join_at fixo — sem reagendar, o bot
-      // entra no horário antigo e fica sozinho até o timeout.
-      // Só se aplica a bots agendados (sempre MeetingBaas); Attendee é só imediato.
-      if (existing.status === 'requesting' && (existing.bot_provider ?? 'meetingbaas') === 'meetingbaas' && startedAt && existing.started_at) {
+      // bots agendados têm join_at fixo (MeetingBaas e Attendee) — sem reagendar,
+      // o bot entra no horário antigo e fica sozinho até o timeout.
+      if (existing.status === 'requesting' && startedAt && existing.started_at) {
         const newStartMs = new Date(startedAt).getTime()
         const oldStartMs = new Date(existing.started_at).getTime()
         if (Number.isFinite(newStartMs) && Number.isFinite(oldStartMs) && Math.abs(newStartMs - oldStartMs) > 60_000) {
@@ -219,23 +217,22 @@ export class CalendarCronService {
       }
     }
 
-    // Imediato → roteador híbrido (MeetingBaas/Attendee). Agendado → sempre MeetingBaas.
+    // Roteador híbrido capacity-first (MeetingBaas/Attendee), tanto para
+    // join imediato quanto agendado.
     const meetingId = randomUUID()
     const now = new Date()
     const startTime = item.start?.dateTime ? new Date(item.start.dateTime) : null
     // Usa bot agendado se a reunião começa daqui mais de 2 minutos
     const useScheduled = startTime !== null && startTime.getTime() - now.getTime() > 2 * 60 * 1000
 
-    let provider: BotProviderName = 'meetingbaas'
+    let provider: BotProviderName
     let externalId: string
     try {
-      if (useScheduled) {
-        externalId = await meetingBaasService.scheduleBotAt(meetingUrl, meetingId, startTime!)
-      } else {
-        const dispatch = await botRouter.dispatchImmediateBot(meetingUrl, meetingId)
-        provider = dispatch.provider
-        externalId = dispatch.externalId
-      }
+      const dispatch = useScheduled
+        ? await botRouter.dispatchScheduledBot(meetingUrl, meetingId, startTime!)
+        : await botRouter.dispatchImmediateBot(meetingUrl, meetingId)
+      provider = dispatch.provider
+      externalId = dispatch.externalId
     } catch (err) {
       logger.error(`[CalendarCron] Falha ao enviar bot para evento ${eventId}:`, err)
       return
@@ -278,17 +275,19 @@ export class CalendarCronService {
   }
 
   private async rescheduleBot(
-    existing: { id: string; baas_bot_id: string | null },
+    existing: { id: string; bot_provider: string | null; baas_bot_id: string | null; attendee_bot_id: string | null },
     meetingUrl: string,
     newStartedAt: string,
   ): Promise<void> {
-    // Cancela bot antigo (best-effort — se falhar, seguimos: pior caso é
-    // bot antigo entrar no horário antigo e timeoutar sozinho).
-    if (existing.baas_bot_id) {
+    // Cancela bot antigo no provider correto (best-effort — se falhar,
+    // seguimos: pior caso é o bot antigo entrar no horário antigo e timeoutar).
+    const oldProvider = (existing.bot_provider ?? 'meetingbaas') as BotProviderName
+    const oldExternalId = oldProvider === 'attendee' ? existing.attendee_bot_id : existing.baas_bot_id
+    if (oldExternalId) {
       try {
-        await meetingBaasService.removeBot(existing.baas_bot_id)
+        await botRouter.removeBot(oldProvider, oldExternalId)
       } catch (err) {
-        logger.warn(`[CalendarCron] Falha ao cancelar bot antigo ${existing.baas_bot_id}:`, err)
+        logger.warn(`[CalendarCron] Falha ao cancelar bot antigo ${oldExternalId} (${oldProvider}):`, err)
       }
     }
 
@@ -298,11 +297,12 @@ export class CalendarCronService {
     // dedup_key novo para não colidir com a request do bot cancelado
     const dedupKey = randomUUID()
 
-    let newBotId: string
+    // Re-roteia do zero (capacity-first pode mandar pro mesmo ou outro provider).
+    let dispatch: DispatchResult
     try {
-      newBotId = useScheduled
-        ? await meetingBaasService.scheduleBotAt(meetingUrl, existing.id, newStart, dedupKey)
-        : await meetingBaasService.sendBot(meetingUrl, existing.id, dedupKey)
+      dispatch = useScheduled
+        ? await botRouter.dispatchScheduledBot(meetingUrl, existing.id, newStart, dedupKey)
+        : await botRouter.dispatchImmediateBot(meetingUrl, existing.id, dedupKey)
     } catch (err) {
       logger.error(`[CalendarCron] Falha ao reagendar bot para meeting ${existing.id}:`, err)
       return
@@ -311,20 +311,22 @@ export class CalendarCronService {
     const { error: updateError } = await supabase
       .from('meetings')
       .update({
-        baas_bot_id: newBotId,
-        started_at: newStart.toISOString(),
+        bot_provider:    dispatch.provider,
+        baas_bot_id:     dispatch.provider === 'meetingbaas' ? dispatch.externalId : null,
+        attendee_bot_id: dispatch.provider === 'attendee' ? dispatch.externalId : null,
+        started_at:      newStart.toISOString(),
       })
       .eq('id', existing.id)
 
     if (updateError) {
       logger.error(`[CalendarCron] Erro ao atualizar meeting ${existing.id} após reagendamento:`, updateError)
-      meetingBaasService.removeBot(newBotId).catch(e =>
-        logger.warn(`[CalendarCron] Falha ao remover bot órfão pós-reagendamento ${newBotId}:`, e)
+      botRouter.removeBot(dispatch.provider, dispatch.externalId).catch(e =>
+        logger.warn(`[CalendarCron] Falha ao remover bot órfão pós-reagendamento ${dispatch.externalId}:`, e)
       )
       return
     }
 
-    logger.info(`[CalendarCron] ✅ Bot reagendado: meeting=${existing.id} bot=${newBotId} novo_horario=${newStart.toISOString()}`)
+    logger.info(`[CalendarCron] ✅ Bot reagendado: meeting=${existing.id} bot=${dispatch.externalId} provider=${dispatch.provider} novo_horario=${newStart.toISOString()}`)
   }
 }
 

@@ -17,6 +17,11 @@ export class MeetingBaasProvider implements IBotProvider {
     return { externalId: botId }
   }
 
+  async scheduleBotAt(meetingUrl: string, meetingId: string, joinAt: Date, dedupKey?: string): Promise<SendBotResult> {
+    const botId = await meetingBaasService.scheduleBotAt(meetingUrl, meetingId, joinAt, dedupKey)
+    return { externalId: botId }
+  }
+
   async removeBot(externalId: string): Promise<void> {
     await meetingBaasService.removeBot(externalId)
   }

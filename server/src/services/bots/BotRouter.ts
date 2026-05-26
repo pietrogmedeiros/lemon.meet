@@ -1,16 +1,18 @@
 // ============================================================
-// BotRouter.ts — Roteamento híbrido MeetingBaas ↔ Attendee
+// BotRouter.ts — Roteamento híbrido MeetingBaas ↔ Attendee (capacity-first)
 //
-// Regras (apenas para joins IMEDIATOS — agendados ficam no MeetingBaas):
+// Política: preenche o Attendee até o teto de slots simultâneos
+// (ATTENDEE_MAX_CONCURRENT); tudo que exceder o teto transborda para o
+// MeetingBaas. Vale para joins IMEDIATOS e AGENDADOS.
 //   1. Attendee desabilitado (ATTENDEE_ENABLED!='true' ou sem creds) → MeetingBaas.
-//   2. Sorteio por percentual fixo (ATTENDEE_TRAFFIC_PERCENT).
-//   3. Teto de capacidade (ATTENDEE_MAX_CONCURRENT): conta bots ativos do
-//      Attendee no banco; se cheio → overflow para MeetingBaas.
-//   4. Se o dispatch no Attendee falhar → fallback automático para MeetingBaas
+//   2. Teto de capacidade na janela do horário-alvo → overflow para MeetingBaas.
+//      • imediato:  conta bots do Attendee ativos em torno de AGORA.
+//      • agendado:  conta bots do Attendee cujo horário se sobrepõe ao join_at.
+//   3. Se o dispatch no Attendee falhar → fallback automático para MeetingBaas
 //      (uma reunião nunca falha por causa do Attendee).
 //
 // Segurança: com ATTENDEE_ENABLED desligado, o comportamento é idêntico
-// ao atual (100% MeetingBaas) e o AttendeeProvider nem é instanciado.
+// ao MeetingBaas puro (100% MeetingBaas) e o AttendeeProvider nem é instanciado.
 // ============================================================
 
 import { supabase } from '../../config/supabase.js'
@@ -18,9 +20,14 @@ import { logger } from '../../utils/logger.js'
 import type { BotProviderName } from './IBotProvider.js'
 import { MeetingBaasProvider } from './MeetingBaasProvider.js'
 import { AttendeeProvider } from './AttendeeProvider.js'
-import { decideImmediateProvider } from './botRouterDecision.js'
+import { decideProvider } from './botRouterDecision.js'
 
 const ACTIVE_STATUSES = ['requesting', 'recording', 'processing']
+
+// Duração assumida por reunião para contar sobreposição de slots do Attendee.
+// Conservador: reuniões cujo started_at cai dentro de ±SLOT_WINDOW_MS do
+// horário-alvo são tratadas como concorrentes (não temos o end real em banco).
+const SLOT_WINDOW_MS = 60 * 60 * 1000
 
 export interface DispatchResult {
   provider: BotProviderName
@@ -30,18 +37,16 @@ export interface DispatchResult {
 export class BotRouter {
   private readonly meetingbaas = new MeetingBaasProvider()
   private readonly attendee: AttendeeProvider | null
-  private readonly trafficPercent: number
   private readonly maxConcurrent: number
 
   constructor() {
     const enabled = process.env.ATTENDEE_ENABLED === 'true'
     const hasCreds = Boolean(process.env.ATTENDEE_API_URL && process.env.ATTENDEE_API_KEY)
     this.attendee = enabled && hasCreds ? new AttendeeProvider() : null
-    this.trafficPercent = clampInt(process.env.ATTENDEE_TRAFFIC_PERCENT, 0, 0, 100)
-    this.maxConcurrent = clampInt(process.env.ATTENDEE_MAX_CONCURRENT, 3, 0, 100)
+    this.maxConcurrent = clampInt(process.env.ATTENDEE_MAX_CONCURRENT, 2, 0, 100)
 
     if (this.attendee) {
-      logger.info(`[BotRouter] Híbrido ATIVO — Attendee ${this.trafficPercent}% (teto ${this.maxConcurrent})`)
+      logger.info(`[BotRouter] Híbrido ATIVO (capacity-first) — Attendee até ${this.maxConcurrent} simultâneos, excedente → MeetingBaas`)
     } else {
       logger.info('[BotRouter] Attendee desabilitado — 100% MeetingBaas')
     }
@@ -51,34 +56,40 @@ export class BotRouter {
     return this.attendee
   }
 
-  /** Conta bots do Attendee atualmente ativos (para respeitar o teto). */
-  private async attendeeActiveCount(): Promise<number> {
+  /**
+   * Conta bots do Attendee ocupando a janela em torno de `targetTime`
+   * (para respeitar o teto). Em caso de erro, assume cheio (conservador:
+   * em dúvida, não manda pro Attendee).
+   */
+  private async attendeeCountNear(targetTime: Date): Promise<number> {
+    const from = new Date(targetTime.getTime() - SLOT_WINDOW_MS).toISOString()
+    const to = new Date(targetTime.getTime() + SLOT_WINDOW_MS).toISOString()
     const { count, error } = await supabase
       .from('meetings')
       .select('id', { count: 'exact', head: true })
       .eq('bot_provider', 'attendee')
       .in('status', ACTIVE_STATUSES)
+      .gte('started_at', from)
+      .lte('started_at', to)
     if (error) {
-      logger.warn('[BotRouter] Falha ao contar bots ativos do Attendee — assumindo cheio:', error)
-      return this.maxConcurrent // conservador: em dúvida, não manda pro Attendee
+      logger.warn('[BotRouter] Falha ao contar bots do Attendee — assumindo cheio:', error)
+      return this.maxConcurrent
     }
     return count ?? 0
   }
 
-  /** Decide o provider para um join imediato (sem efetuar o dispatch). */
-  private async chooseImmediateProvider(): Promise<BotProviderName> {
+  /** Decide o provider para um horário-alvo (now p/ imediato, joinAt p/ agendado). */
+  private async chooseProvider(targetTime: Date): Promise<BotProviderName> {
     if (!this.attendee) return 'meetingbaas'
 
-    const attendeeActiveCount = await this.attendeeActiveCount()
-    const provider = decideImmediateProvider({
+    const attendeeNearbyCount = await this.attendeeCountNear(targetTime)
+    const provider = decideProvider({
       attendeeEnabled: true,
-      trafficPercent: this.trafficPercent,
       maxConcurrent: this.maxConcurrent,
-      attendeeActiveCount,
-      roll: Math.random() * 100,
+      attendeeNearbyCount,
     })
-    if (provider === 'meetingbaas' && attendeeActiveCount >= this.maxConcurrent) {
-      logger.info(`[BotRouter] Attendee no teto (${attendeeActiveCount}/${this.maxConcurrent}) — overflow → MeetingBaas`)
+    if (provider === 'meetingbaas') {
+      logger.info(`[BotRouter] Attendee no teto na janela (${attendeeNearbyCount}/${this.maxConcurrent}) — overflow → MeetingBaas`)
     }
     return provider
   }
@@ -88,21 +99,42 @@ export class BotRouter {
    * usado e o id externo, para o caller persistir na coluna correta.
    */
   async dispatchImmediateBot(meetingUrl: string, meetingId: string, dedupKey?: string): Promise<DispatchResult> {
-    const choice = await this.chooseImmediateProvider()
+    const choice = await this.chooseProvider(new Date())
 
     if (choice === 'attendee' && this.attendee) {
       try {
         const { externalId } = await this.attendee.sendBot(meetingUrl, meetingId, dedupKey)
-        logger.info(`[BotRouter] dispatch via attendee meeting=${meetingId} bot=${externalId}`)
+        logger.info(`[BotRouter] dispatch imediato via attendee meeting=${meetingId} bot=${externalId}`)
         return { provider: 'attendee', externalId }
       } catch (err) {
-        // Fallback de confiabilidade: Attendee fora do ar/erro → MeetingBaas.
         logger.error(`[BotRouter] Attendee falhou (fallback → MeetingBaas) meeting=${meetingId}:`, err)
       }
     }
 
     const { externalId } = await this.meetingbaas.sendBot(meetingUrl, meetingId, dedupKey)
-    logger.info(`[BotRouter] dispatch via meetingbaas meeting=${meetingId} bot=${externalId}`)
+    logger.info(`[BotRouter] dispatch imediato via meetingbaas meeting=${meetingId} bot=${externalId}`)
+    return { provider: 'meetingbaas', externalId }
+  }
+
+  /**
+   * Agenda um bot para um horário futuro com fallback. Conta a ocupação do
+   * Attendee na janela do `joinAt` para respeitar o teto de simultâneos.
+   */
+  async dispatchScheduledBot(meetingUrl: string, meetingId: string, joinAt: Date, dedupKey?: string): Promise<DispatchResult> {
+    const choice = await this.chooseProvider(joinAt)
+
+    if (choice === 'attendee' && this.attendee) {
+      try {
+        const { externalId } = await this.attendee.scheduleBotAt(meetingUrl, meetingId, joinAt, dedupKey)
+        logger.info(`[BotRouter] agendado via attendee meeting=${meetingId} bot=${externalId} join_at=${joinAt.toISOString()}`)
+        return { provider: 'attendee', externalId }
+      } catch (err) {
+        logger.error(`[BotRouter] Attendee falhou ao agendar (fallback → MeetingBaas) meeting=${meetingId}:`, err)
+      }
+    }
+
+    const { externalId } = await this.meetingbaas.scheduleBotAt(meetingUrl, meetingId, joinAt, dedupKey)
+    logger.info(`[BotRouter] agendado via meetingbaas meeting=${meetingId} bot=${externalId} join_at=${joinAt.toISOString()}`)
     return { provider: 'meetingbaas', externalId }
   }
 

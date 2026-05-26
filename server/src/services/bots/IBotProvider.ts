@@ -19,6 +19,9 @@ export interface IBotProvider {
   /** Envia o bot imediatamente para uma reunião em andamento. */
   sendBot(meetingUrl: string, meetingId: string, dedupKey?: string): Promise<SendBotResult>
 
+  /** Agenda o bot para entrar num horário futuro (ISO). */
+  scheduleBotAt(meetingUrl: string, meetingId: string, joinAt: Date, dedupKey?: string): Promise<SendBotResult>
+
   /** Remove o bot de uma reunião. */
   removeBot(externalId: string): Promise<void>
 }

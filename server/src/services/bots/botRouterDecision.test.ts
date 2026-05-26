@@ -1,45 +1,32 @@
-import { decideImmediateProvider, type ImmediateDecisionInput } from './botRouterDecision.js'
+import { decideProvider, type CapacityDecisionInput } from './botRouterDecision.js'
 
-const base: ImmediateDecisionInput = {
+const base: CapacityDecisionInput = {
   attendeeEnabled: true,
-  trafficPercent: 10,
-  maxConcurrent: 3,
-  attendeeActiveCount: 0,
-  roll: 5,
+  maxConcurrent: 2,
+  attendeeNearbyCount: 0,
 }
 
-describe('decideImmediateProvider', () => {
+describe('decideProvider (capacity-first)', () => {
   it('Attendee desabilitado → sempre meetingbaas', () => {
-    expect(decideImmediateProvider({ ...base, attendeeEnabled: false, roll: 0 })).toBe('meetingbaas')
+    expect(decideProvider({ ...base, attendeeEnabled: false, attendeeNearbyCount: 0 })).toBe('meetingbaas')
   })
 
-  it('sorteio dentro do percentual e com capacidade → attendee', () => {
-    expect(decideImmediateProvider({ ...base, roll: 9.9 })).toBe('attendee')
+  it('slot livre → attendee', () => {
+    expect(decideProvider({ ...base, attendeeNearbyCount: 0 })).toBe('attendee')
+    expect(decideProvider({ ...base, attendeeNearbyCount: 1 })).toBe('attendee')
   })
 
-  it('sorteio fora do percentual → meetingbaas', () => {
-    expect(decideImmediateProvider({ ...base, roll: 10 })).toBe('meetingbaas')
-    expect(decideImmediateProvider({ ...base, roll: 80 })).toBe('meetingbaas')
+  it('no teto → overflow para meetingbaas', () => {
+    expect(decideProvider({ ...base, attendeeNearbyCount: 2 })).toBe('meetingbaas')
+    expect(decideProvider({ ...base, attendeeNearbyCount: 5 })).toBe('meetingbaas')
   })
 
-  it('roll == trafficPercent é exclusivo (>=) → meetingbaas', () => {
-    expect(decideImmediateProvider({ ...base, trafficPercent: 10, roll: 10 })).toBe('meetingbaas')
+  it('teto = 3 → enche 3 e transborda o 4º', () => {
+    expect(decideProvider({ ...base, maxConcurrent: 3, attendeeNearbyCount: 2 })).toBe('attendee')
+    expect(decideProvider({ ...base, maxConcurrent: 3, attendeeNearbyCount: 3 })).toBe('meetingbaas')
   })
 
-  it('no teto de capacidade → overflow para meetingbaas', () => {
-    expect(decideImmediateProvider({ ...base, roll: 0, attendeeActiveCount: 3, maxConcurrent: 3 })).toBe('meetingbaas')
-    expect(decideImmediateProvider({ ...base, roll: 0, attendeeActiveCount: 5, maxConcurrent: 3 })).toBe('meetingbaas')
-  })
-
-  it('abaixo do teto e dentro do percentual → attendee', () => {
-    expect(decideImmediateProvider({ ...base, roll: 0, attendeeActiveCount: 2, maxConcurrent: 3 })).toBe('attendee')
-  })
-
-  it('trafficPercent=0 → nunca attendee', () => {
-    expect(decideImmediateProvider({ ...base, trafficPercent: 0, roll: 0 })).toBe('meetingbaas')
-  })
-
-  it('trafficPercent=100 com capacidade → attendee', () => {
-    expect(decideImmediateProvider({ ...base, trafficPercent: 100, roll: 99.99, attendeeActiveCount: 0 })).toBe('attendee')
+  it('teto = 0 → nunca attendee', () => {
+    expect(decideProvider({ ...base, maxConcurrent: 0, attendeeNearbyCount: 0 })).toBe('meetingbaas')
   })
 })

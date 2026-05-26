@@ -51,35 +51,52 @@ export class AttendeeProvider implements IBotProvider {
     }
   }
 
+  /** Join imediato (reunião em andamento). */
   async sendBot(meetingUrl: string, meetingId: string, dedupKey?: string): Promise<SendBotResult> {
+    return this.createBot(meetingUrl, meetingId, dedupKey)
+  }
+
+  /**
+   * Agenda o bot para entrar num horário futuro via `join_at` (ISO 8601).
+   * Suportado nativamente pelo Attendee (POST /api/v1/bots aceita join_at).
+   */
+  async scheduleBotAt(meetingUrl: string, meetingId: string, joinAt: Date, dedupKey?: string): Promise<SendBotResult> {
+    return this.createBot(meetingUrl, meetingId, dedupKey, joinAt)
+  }
+
+  /** Cria o bot no Attendee. Com `joinAt` → agendado; sem → join imediato. */
+  private async createBot(meetingUrl: string, meetingId: string, dedupKey?: string, joinAt?: Date): Promise<SendBotResult> {
+    const body: Record<string, unknown> = {
+      meeting_url: meetingUrl,
+      bot_name: BOT_NAME,
+      deduplication_key: dedupKey ?? meetingId,
+      // Transcrição em tempo real via Deepgram (nova-3 multilíngue).
+      transcription_settings: {
+        deepgram: { language: this.deepgramLanguage, model: 'nova-3' },
+      },
+      // Não retém gravação no Supabase Storage — só precisamos do transcript.
+      recording_settings: { format: 'none' },
+      // Webhook por-bot apontando para o lemon.meet.
+      webhooks: [{ url: this.webhookUrl, triggers: ['bot.state_change'] }],
+      // Liga o meetingId nos metadados pra rastrear de volta no webhook.
+      metadata: { lemon_meeting_id: meetingId },
+    }
+    if (joinAt) body.join_at = joinAt.toISOString()
+
     const response = await fetch(`${this.apiUrl}/api/v1/bots`, {
       method: 'POST',
       headers: this.headers(),
-      body: JSON.stringify({
-        meeting_url: meetingUrl,
-        bot_name: BOT_NAME,
-        deduplication_key: dedupKey ?? meetingId,
-        // Transcrição em tempo real via Deepgram (nova-3 multilíngue).
-        transcription_settings: {
-          deepgram: { language: this.deepgramLanguage, model: 'nova-3' },
-        },
-        // Não retém gravação no Supabase Storage — só precisamos do transcript.
-        recording_settings: { format: 'none' },
-        // Webhook por-bot apontando para o lemon.meet.
-        webhooks: [{ url: this.webhookUrl, triggers: ['bot.state_change'] }],
-        // Liga o meetingId nos metadados pra rastrear de volta no webhook.
-        metadata: { lemon_meeting_id: meetingId },
-      }),
+      body: JSON.stringify(body),
     })
 
     if (!response.ok) {
-      const body = await response.text()
-      throw new Error(`Attendee API error ${response.status}: ${body}`)
+      const errBody = await response.text()
+      throw new Error(`Attendee API error ${response.status}: ${errBody}`)
     }
 
     const data = await response.json() as { id: string }
     const externalId = String(data.id)
-    logger.info(`[Attendee] Bot ${externalId} criado para meeting ${meetingId}`)
+    logger.info(`[Attendee] Bot ${externalId} ${joinAt ? `agendado p/ ${joinAt.toISOString()}` : 'criado'} para meeting ${meetingId}`)
     return { externalId }
   }
 
