@@ -105,13 +105,16 @@ async function handleStateChange(event: any): Promise<void> {
   if (!mapped) return // joining, waiting_room, leaving, etc. — ignora
 
   if (mapped === 'failed') {
+    const subType: string = event?.data?.event_sub_type ?? 'unknown'
     // Não rebaixa uma reunião já concluída por um fatal_error tardio/fora de ordem.
     await supabase.from('meetings').update({
       status: 'failed',
-      failure_reason: `attendee_fatal_error: ${event?.data?.event_sub_type ?? 'unknown'}`,
+      failure_reason: `attendee_fatal_error: ${subType}`,
       ended_at: meeting.ended_at ?? new Date().toISOString(),
     }).eq('id', meeting.id).neq('status', 'completed')
-    await notificationService.notifyMeetingNoTranscription(meeting.user_id, meeting.id, meeting.title ?? undefined)
+    // Notificação acionável por motivo (ex.: bot não admitido, reunião não encontrada)
+    // em vez do genérico "sem transcrição", que confundia o usuário.
+    await notificationService.notifyMeetingBotFailed(meeting.user_id, meeting.id, subType, meeting.title ?? undefined)
     return
   }
 

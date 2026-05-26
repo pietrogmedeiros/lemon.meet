@@ -84,6 +84,9 @@ class NotificationService {
       bot_rejected: 'o bot foi recusado ao tentar entrar na reunião.',
       meeting_error: 'ocorreu um erro na plataforma da reunião e o bot não conseguiu permanecer.',
       invalid_meeting_url: 'o link da reunião era inválido ou a reunião não existia mais.',
+      // Sub-tipos de fatal_error do Attendee (event_sub_type):
+      request_to_join_denied: 'o "Lemon Notetaker" pediu para entrar mas não foi admitido. Peça para um participante admitir o bot assim que ele solicitar entrada na reunião.',
+      meeting_not_found: 'a reunião não foi encontrada — o link era inválido/expirado ou ela ainda não tinha sido aberta quando o bot tentou entrar.',
     }
     const detail = reasonMap[reason] ?? `o bot encerrou com a falha "${reason}".`
 
