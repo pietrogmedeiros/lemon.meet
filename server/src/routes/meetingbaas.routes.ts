@@ -354,7 +354,7 @@ async function handleBotCompleted(data: Record<string, any>) {
     logger.warn(`[MeetingBaas] bot.completed: sem URL de transcrição p/ meeting ${meetingId}; usando fallback Whisper a partir do áudio`)
     await supabase.from('meetings').update({ status: 'processing' }).eq('id', meetingId)
     try {
-      rawTranscription = await transcribeFromAudioUrl(audioUrl, meetingId)
+      rawTranscription = await transcribeFromAudioUrl(audioUrl, meetingId, data.duration_seconds ?? 0)
       logger.info(`[MeetingBaas] fallback Whisper gerou ${rawTranscription.length} segmentos p/ meeting ${meetingId}`)
     } catch (err) {
       logger.error(`[MeetingBaas] fallback Whisper falhou p/ meeting ${meetingId}:`, err)
@@ -417,7 +417,7 @@ async function handleBotCompleted(data: Record<string, any>) {
 
   try {
     const insights = await insightsService.generateInsights(fullTranscript, meetingId)
-    await supabase.from('meetings').update({ insights, status: 'completed' }).eq('id', meetingId)
+    await supabase.from('meetings').update({ insights, status: 'completed', failure_reason: null }).eq('id', meetingId)
     await fireWebhookForMeeting(meeting.user_id, meeting, insights)
     logger.info(`[MeetingBaas] bot.completed: meeting ${meetingId} finalizada com sucesso`)
   } catch (err) {
@@ -435,7 +435,7 @@ async function handleBotCompleted(data: Record<string, any>) {
  * Groq Whisper. Retorna entradas no formato { text, start, end, speaker } —
  * compatível com o mapeamento de segmentos do handleBotCompleted.
  */
-async function transcribeFromAudioUrl(audioUrl: string, meetingId: string): Promise<any[]> {
+async function transcribeFromAudioUrl(audioUrl: string, meetingId: string, durationSeconds = 0): Promise<any[]> {
   const res = await fetch(audioUrl)
   if (!res.ok) throw new Error(`download de áudio HTTP ${res.status}`)
   const buf = Buffer.from(await res.arrayBuffer())
@@ -446,7 +446,26 @@ async function transcribeFromAudioUrl(audioUrl: string, meetingId: string): Prom
     throw new Error(`áudio grande demais p/ fallback (${(buf.length / 1048576).toFixed(1)}MB > 25MB)`)
   }
 
+  // Guard de silêncio: FLAC com bitrate muito baixo = gravação sem fala (foi por isso
+  // que o gladia também não transcreveu). Evita gastar Whisper e, principalmente, evita
+  // que ele alucine frases repetidas ("E aí" xN) sobre silêncio e marque a reunião como
+  // concluída com lixo. Fala real fica bem acima de ~20 kbps; silêncio ~1-2 kbps.
+  if (durationSeconds > 30) {
+    const kbps = (buf.length * 8) / durationSeconds / 1000
+    if (kbps < 8) {
+      throw new Error(`áudio sem fala detectável (${kbps.toFixed(1)} kbps em ${durationSeconds}s)`)
+    }
+  }
+
   const chunks = await transcriptionService.transcribeAudioBuffer(buf, `${meetingId}.flac`)
+
+  // Guard de alucinação: o Whisper costuma repetir a mesma frase em trechos sem fala.
+  // Se quase todos os segmentos são idênticos, trata como transcrição inválida.
+  const distinct = new Set(chunks.map(c => c.text.toLowerCase().trim()))
+  if (chunks.length >= 3 && distinct.size <= 2) {
+    throw new Error(`transcrição degenerada (${chunks.length} segmentos, ${distinct.size} distintos — provável alucinação sobre silêncio)`)
+  }
+
   return chunks.map(c => ({
     text: c.text,
     start: c.startSeconds ?? 0,
