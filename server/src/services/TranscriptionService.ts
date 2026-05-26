@@ -44,50 +44,69 @@ export class TranscriptionService {
 
       logger.info(`Transcription completed: ${response.text.length} characters`);
 
-      // Converte resposta verbose em chunks
-      const chunks: TranscriptChunk[] = [];
-      // Cast para any: verbose_json retorna segments/language mas o tipo SDK não os declara
-      const verboseResponse = response as any;
-
-      // Limiar de probabilidade de não-fala — segmentos acima disso são alucinações do Whisper
-      // 0.85 preserva muito mais conteúdo válido; o filtro agressivo (0.6) descartava fala real
-      const NO_SPEECH_THRESHOLD = 0.85;
-
-      if (verboseResponse.segments && Array.isArray(verboseResponse.segments)) {
-        for (const segment of verboseResponse.segments) {
-          // Filtra segmentos provavelmente sem fala (alucinações do Whisper)
-          const noSpeechProb = segment.no_speech_prob ?? 0;
-          if (noSpeechProb > NO_SPEECH_THRESHOLD) {
-            logger.debug(`Seg descartado (no_speech_prob=${noSpeechProb.toFixed(2)}): "${segment.text.trim()}"`);
-            continue;
-          }
-          const text = segment.text.trim();
-          if (!text) continue;
-          chunks.push({
-            text,
-            timestamp: new Date(Date.now() + (segment.start || 0) * 1000),
-            duration: (segment.end || 0) - (segment.start || 0),
-            language: verboseResponse.language ?? 'pt',
-            startSeconds: segment.start ?? 0,
-            endSeconds: segment.end ?? 0,
-          });
-        }
-      } else if (response.text.trim()) {
-        chunks.push({
-          text: response.text.trim(),
-          timestamp: new Date(),
-          language: verboseResponse.language ?? 'pt',
-          startSeconds: 0,
-          endSeconds: 0,
-        });
-      }
-
-      return chunks;
+      return this.buildChunks(response as any);
 
     } catch (error: any) {
       logger.error('Error transcribing audio:', error);
       throw error;
     }
+  }
+
+  /**
+   * Transcreve um buffer de áudio deixando o Groq inferir o formato pelo nome do
+   * arquivo (ex.: "meeting.flac" do MeetingBaas). Diferente de transcribeBuffer,
+   * não força .webm/audio-webm — essencial para áudio não-webm.
+   */
+  async transcribeAudioBuffer(audioBuffer: Buffer, filename: string): Promise<TranscriptChunk[]> {
+    const audioFile = await toFile(audioBuffer, filename);
+    const response = await groq.audio.transcriptions.create({
+      file: audioFile,
+      model: 'whisper-large-v3-turbo',
+      language: 'pt',
+      response_format: 'verbose_json',
+      timestamp_granularities: ['segment'],
+    });
+    logger.info(`Transcription (buffer ${filename}) completed: ${response.text.length} characters`);
+    return this.buildChunks(response as any);
+  }
+
+  /** Converte a resposta verbose_json do Whisper em chunks, filtrando alucinações. */
+  private buildChunks(verboseResponse: any): TranscriptChunk[] {
+    const chunks: TranscriptChunk[] = [];
+
+    // Limiar de probabilidade de não-fala — segmentos acima disso são alucinações do Whisper.
+    // 0.85 preserva muito mais conteúdo válido; o filtro agressivo (0.6) descartava fala real.
+    const NO_SPEECH_THRESHOLD = 0.85;
+
+    if (verboseResponse.segments && Array.isArray(verboseResponse.segments)) {
+      for (const segment of verboseResponse.segments) {
+        const noSpeechProb = segment.no_speech_prob ?? 0;
+        if (noSpeechProb > NO_SPEECH_THRESHOLD) {
+          logger.debug(`Seg descartado (no_speech_prob=${noSpeechProb.toFixed(2)}): "${(segment.text ?? '').trim()}"`);
+          continue;
+        }
+        const text = (segment.text ?? '').trim();
+        if (!text) continue;
+        chunks.push({
+          text,
+          timestamp: new Date(Date.now() + (segment.start || 0) * 1000),
+          duration: (segment.end || 0) - (segment.start || 0),
+          language: verboseResponse.language ?? 'pt',
+          startSeconds: segment.start ?? 0,
+          endSeconds: segment.end ?? 0,
+        });
+      }
+    } else if ((verboseResponse.text ?? '').trim()) {
+      chunks.push({
+        text: verboseResponse.text.trim(),
+        timestamp: new Date(),
+        language: verboseResponse.language ?? 'pt',
+        startSeconds: 0,
+        endSeconds: 0,
+      });
+    }
+
+    return chunks;
   }
 
   /**

@@ -12,6 +12,7 @@ import { supabase } from '../config/supabase.js'
 import { logger } from '../utils/logger.js'
 import { meetingBaasService, type BaasCompletePayload } from '../services/MeetingBaasService.js'
 import { insightsService } from '../services/InsightsService.js'
+import { transcriptionService } from '../services/TranscriptionService.js'
 import { fireWebhookForMeeting } from './integrations.routes.js'
 import { gdriveService } from '../services/GDriveService.js'
 import { resolveMeetingTeamId } from '../utils/teamAccess.js'
@@ -305,59 +306,75 @@ async function handleBotCompleted(data: Record<string, any>) {
 
   const meetingId = meeting.id
 
-  // Busca a transcrição via URL (formato v2)
+  // Transcrição via URL (formato v2 Gladia). Quando ausente, faz fallback Whisper
+  // a partir do áudio (data.audio): às vezes o MeetingBaas conclui o bot com o áudio
+  // pronto mas SEM transcrição (gladia não rodou → transcription/transcription_ids = null).
   const transcriptionUrl: string | undefined = data.transcription
-  if (!transcriptionUrl) {
-    logger.warn(`[MeetingBaas] bot.completed: sem URL de transcrição para meeting ${meetingId}`)
+  const audioUrl: string | undefined = data.audio
+
+  let rawTranscription: any[]
+
+  if (transcriptionUrl) {
+    try {
+      const res = await fetch(transcriptionUrl)
+      const transcriptionData: any = await res.json()
+      logger.info(`[MeetingBaas] Transcrição baixada para meeting ${meetingId}, tipo: ${typeof transcriptionData}, isArray: ${Array.isArray(transcriptionData)}`)
+
+      if (Array.isArray(transcriptionData)) {
+        rawTranscription = transcriptionData
+      } else if (transcriptionData?.result?.utterances && Array.isArray(transcriptionData.result.utterances)) {
+        // MeetingBaaS Gladia format: { bot_id, provider, result: { utterances: [...] } }
+        rawTranscription = transcriptionData.result.utterances
+      } else if (transcriptionData?.transcription && Array.isArray(transcriptionData.transcription)) {
+        rawTranscription = transcriptionData.transcription
+      } else if (transcriptionData?.utterances && Array.isArray(transcriptionData.utterances)) {
+        rawTranscription = transcriptionData.utterances
+      } else if (transcriptionData?.words && Array.isArray(transcriptionData.words)) {
+        rawTranscription = transcriptionData.words
+      } else if (transcriptionData?.results?.transcription?.utterances) {
+        rawTranscription = transcriptionData.results.transcription.utterances
+      } else {
+        logger.warn(`[MeetingBaas] Formato de transcrição desconhecido para meeting ${meetingId}:`, JSON.stringify(transcriptionData).slice(0, 500))
+        rawTranscription = []
+      }
+
+      logger.info(`[MeetingBaas] ${rawTranscription.length} entradas de transcrição para meeting ${meetingId}`)
+    } catch (err) {
+      logger.error(`[MeetingBaas] Erro ao baixar transcrição para meeting ${meetingId}:`, err)
+      const errMsg = (err instanceof Error ? err.message : String(err)).slice(0, 300)
+      await supabase.from('meetings').update({
+        status: 'failed',
+        failure_reason: `transcription_download_failed: ${errMsg}`,
+        ended_at: data.exited_at ?? new Date().toISOString(),
+      }).eq('id', meetingId)
+      await notificationService.notifyMeetingNoTranscription(meeting.user_id, meetingId, meeting.title)
+      return
+    }
+  } else if (audioUrl) {
+    logger.warn(`[MeetingBaas] bot.completed: sem URL de transcrição p/ meeting ${meetingId}; usando fallback Whisper a partir do áudio`)
+    await supabase.from('meetings').update({ status: 'processing' }).eq('id', meetingId)
+    try {
+      rawTranscription = await transcribeFromAudioUrl(audioUrl, meetingId)
+      logger.info(`[MeetingBaas] fallback Whisper gerou ${rawTranscription.length} segmentos p/ meeting ${meetingId}`)
+    } catch (err) {
+      logger.error(`[MeetingBaas] fallback Whisper falhou p/ meeting ${meetingId}:`, err)
+      const errMsg = (err instanceof Error ? err.message : String(err)).slice(0, 200)
+      await supabase.from('meetings').update({
+        status: 'failed',
+        failure_reason: `transcription_fallback_failed: ${errMsg}`,
+        ended_at: data.exited_at ?? new Date().toISOString(),
+      }).eq('id', meetingId)
+      await notificationService.notifyMeetingNoTranscription(meeting.user_id, meetingId, meeting.title)
+      return
+    }
+  } else {
+    logger.warn(`[MeetingBaas] bot.completed: sem transcrição e sem áudio p/ meeting ${meetingId}`)
     await supabase.from('meetings').update({
       status: 'failed',
       failure_reason: 'no_transcription_url',
       ended_at: data.exited_at ?? new Date().toISOString(),
     }).eq('id', meetingId)
-
-    // Notifica usuário
     await notificationService.notifyMeetingNoTranscription(meeting.user_id, meetingId, meeting.title)
-
-    return
-  }
-
-  let rawTranscription: any[]
-  try {
-    const res = await fetch(transcriptionUrl)
-    const transcriptionData: any = await res.json()
-    logger.info(`[MeetingBaas] Transcrição baixada para meeting ${meetingId}, tipo: ${typeof transcriptionData}, isArray: ${Array.isArray(transcriptionData)}`)
-
-    if (Array.isArray(transcriptionData)) {
-      rawTranscription = transcriptionData
-    } else if (transcriptionData?.result?.utterances && Array.isArray(transcriptionData.result.utterances)) {
-      // MeetingBaaS Gladia format: { bot_id, provider, result: { utterances: [...] } }
-      rawTranscription = transcriptionData.result.utterances
-    } else if (transcriptionData?.transcription && Array.isArray(transcriptionData.transcription)) {
-      rawTranscription = transcriptionData.transcription
-    } else if (transcriptionData?.utterances && Array.isArray(transcriptionData.utterances)) {
-      rawTranscription = transcriptionData.utterances
-    } else if (transcriptionData?.words && Array.isArray(transcriptionData.words)) {
-      rawTranscription = transcriptionData.words
-    } else if (transcriptionData?.results?.transcription?.utterances) {
-      rawTranscription = transcriptionData.results.transcription.utterances
-    } else {
-      logger.warn(`[MeetingBaas] Formato de transcrição desconhecido para meeting ${meetingId}:`, JSON.stringify(transcriptionData).slice(0, 500))
-      rawTranscription = []
-    }
-
-    logger.info(`[MeetingBaas] ${rawTranscription.length} entradas de transcrição para meeting ${meetingId}`)
-  } catch (err) {
-    logger.error(`[MeetingBaas] Erro ao baixar transcrição para meeting ${meetingId}:`, err)
-    const errMsg = (err instanceof Error ? err.message : String(err)).slice(0, 300)
-    await supabase.from('meetings').update({
-      status: 'failed',
-      failure_reason: `transcription_download_failed: ${errMsg}`,
-      ended_at: data.exited_at ?? new Date().toISOString(),
-    }).eq('id', meetingId)
-
-    // Notifica usuário
-    await notificationService.notifyMeetingNoTranscription(meeting.user_id, meetingId, meeting.title)
-
     return
   }
 
@@ -411,6 +428,31 @@ async function handleBotCompleted(data: Record<string, any>) {
       failure_reason: `insights_generation_failed: ${errMsg}`,
     }).eq('id', meetingId)
   }
+}
+
+/**
+ * Fallback de transcrição: baixa o áudio (FLAC) do MeetingBaas e transcreve via
+ * Groq Whisper. Retorna entradas no formato { text, start, end, speaker } —
+ * compatível com o mapeamento de segmentos do handleBotCompleted.
+ */
+async function transcribeFromAudioUrl(audioUrl: string, meetingId: string): Promise<any[]> {
+  const res = await fetch(audioUrl)
+  if (!res.ok) throw new Error(`download de áudio HTTP ${res.status}`)
+  const buf = Buffer.from(await res.arrayBuffer())
+
+  // Limite do Groq Whisper (~25MB). Acima disso não tenta, para evitar rejeição/OOM.
+  const MAX_BYTES = 25 * 1024 * 1024
+  if (buf.length > MAX_BYTES) {
+    throw new Error(`áudio grande demais p/ fallback (${(buf.length / 1048576).toFixed(1)}MB > 25MB)`)
+  }
+
+  const chunks = await transcriptionService.transcribeAudioBuffer(buf, `${meetingId}.flac`)
+  return chunks.map(c => ({
+    text: c.text,
+    start: c.startSeconds ?? 0,
+    end: c.endSeconds ?? 0,
+    speaker: null,
+  }))
 }
 
 async function handleFailed(data: { bot_id: string; error?: string; error_message?: string; error_code?: string; event_uuid?: string }) {
