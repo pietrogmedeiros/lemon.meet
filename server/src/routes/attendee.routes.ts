@@ -105,16 +105,24 @@ async function handleStateChange(event: any): Promise<void> {
   if (!mapped) return // joining, waiting_room, leaving, etc. — ignora
 
   if (mapped === 'failed') {
+    // Não rebaixa uma reunião já concluída por um fatal_error tardio/fora de ordem.
     await supabase.from('meetings').update({
       status: 'failed',
       failure_reason: `attendee_fatal_error: ${event?.data?.event_sub_type ?? 'unknown'}`,
       ended_at: meeting.ended_at ?? new Date().toISOString(),
-    }).eq('id', meeting.id)
+    }).eq('id', meeting.id).neq('status', 'completed')
     await notificationService.notifyMeetingNoTranscription(meeting.user_id, meeting.id, meeting.title ?? undefined)
     return
   }
 
-  await supabase.from('meetings').update({ status: mapped }).eq('id', meeting.id)
+  // Transição para estado não-terminal (recording/processing): nunca sobrescreve
+  // um estado terminal. Os webhooks do Attendee podem chegar/ser processados fora
+  // de ordem (ex.: post_processing depois de fatal_error), o que deixava a reunião
+  // presa em 'processing' com failure_reason fatal e sem nunca concluir.
+  await supabase.from('meetings')
+    .update({ status: mapped })
+    .eq('id', meeting.id)
+    .not('status', 'in', '("failed","completed")')
 }
 
 /** Localiza a reunião por attendee_bot_id ou pelo metadata lemon_meeting_id. */
