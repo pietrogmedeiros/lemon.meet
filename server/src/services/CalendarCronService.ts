@@ -35,6 +35,20 @@ export class CalendarCronService {
 
   start(): void {
     if (this.timer) return
+
+    // GUARDRAIL (incidente 2026-05-27): o cron NÃO pode rodar em instâncias
+    // não-produção que compartilhem o banco de prod — senão elas despacham bots
+    // para os eventos dos usuários e sequestram o fluxo (staging mandou tudo
+    // pro MeetingBaas por dias). Roda só em production por padrão; override
+    // explícito via CALENDAR_CRON_ENABLED ('true'/'false') p/ casos especiais.
+    const flag = process.env.CALENDAR_CRON_ENABLED
+    const envName = process.env.RAILWAY_ENVIRONMENT_NAME
+    const enabled = flag !== undefined ? flag === 'true' : envName === 'production'
+    if (!enabled) {
+      logger.info(`[CalendarCron] DESLIGADO (env=${envName ?? 'local'}, CALENDAR_CRON_ENABLED=${flag ?? 'unset'}) — não dispacha bots de calendário`)
+      return
+    }
+
     logger.info('[CalendarCron] Iniciado — intervalo de 3 minutos')
     // Roda imediatamente ao iniciar, depois a cada INTERVAL_MS
     this.run().catch(err => logger.error('[CalendarCron] Erro na primeira execução:', err))
