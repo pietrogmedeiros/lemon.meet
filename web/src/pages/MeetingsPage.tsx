@@ -5,6 +5,7 @@ import { MainLayout } from '@/components/layout';
 import { Card, Badge } from '@/components/ui';
 import { Video, Clock, Calendar, ChevronRight, Search, X, User, Users, FileText } from 'lucide-react';
 import { formatDate, formatTime } from '@/lib';
+import { describeFailure } from '@/lib/failureReason';
 import { fetchMeetings as fetchMeetingsCache, type Meeting } from '@/lib/meetingsCache';
 import { supabase } from '@/lib/supabase';
 
@@ -159,15 +160,8 @@ export function MeetingsPage() {
     return <Badge variant="secondary">{status ?? 'Desconhecido'}</Badge>;
   };
 
-  const describeFailureShort = (reason: string | null | undefined): string | null => {
-    if (!reason) return null;
-    if (reason.startsWith('no_transcript_in_webhook')) return 'O bot entrou mas não capturou áudio.';
-    if (reason.startsWith('no_transcription_url')) return 'Serviço externo não retornou link de transcrição.';
-    if (reason.startsWith('transcription_download_failed')) return 'Falha ao baixar a transcrição (instabilidade externa).';
-    if (reason.startsWith('insights_generation_failed')) return 'Transcrição existe, mas IA falhou ao analisar.';
-    if (reason.startsWith('extension_no_audio_captured')) return 'Extensão não capturou áudio.';
-    return reason;
-  };
+  const describeFailureShort = (reason: string | null | undefined): string | null =>
+    describeFailure(reason)?.short ?? null;
 
   const formatDuration = (seconds: number | null) => {
     if (!seconds) return null;

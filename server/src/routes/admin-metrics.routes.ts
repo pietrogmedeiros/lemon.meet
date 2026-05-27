@@ -36,6 +36,20 @@ function setCached(key: string, payload: any) {
   cache.set(key, { expiresAt: Date.now() + CACHE_TTL_MS, payload })
 }
 
+// Extrai o código canônico do failure_reason para o breakdown, removendo o
+// wrapper de origem ("bot_failed: ...", "attendee_fatal_error: ...") e o
+// detalhe livre após ':'. Sem isso, todas as falhas de entrada colapsavam em
+// um único balde "bot_failed" e o motivo real (waiting_room_timeout,
+// request_to_join_denied, ...) sumia. Mantém em sincronia com
+// web/src/lib/failureReason.ts (extractCode).
+function failureCode(reason: string | null | undefined): string {
+  if (!reason) return 'unknown'
+  let r = reason.trim()
+  const wrapped = r.match(/^(?:bot_failed|attendee_fatal_error)\s*:\s*(.*)$/)
+  if (wrapped) r = wrapped[1].trim()
+  return r.split(':')[0].trim() || 'unknown'
+}
+
 // ── Tipos ────────────────────────────────────────────────────
 type RangeKey = '7d' | '30d' | '90d' | 'all'
 
@@ -210,7 +224,7 @@ function buildTimeseries(meetings: MeetingRow[], users: UserLite[], days: number
     meetingsBySource[src][day] += 1
     if (m.failure_reason) {
       failuresByDay[day] += 1
-      const reason = m.failure_reason.split(':')[0] || 'unknown'
+      const reason = failureCode(m.failure_reason)
       failuresByReason[reason] ??= empty()
       failuresByReason[reason][day] += 1
     }
@@ -244,7 +258,7 @@ function buildQuality(meetings: MeetingRow[]): any {
   const reasonCounts = new Map<string, number>()
   for (const m of meetings) {
     if (!m.failure_reason) continue
-    const reason = m.failure_reason.split(':')[0]
+    const reason = failureCode(m.failure_reason)
     reasonCounts.set(reason, (reasonCounts.get(reason) ?? 0) + 1)
   }
   const failureBreakdown = [...reasonCounts.entries()]

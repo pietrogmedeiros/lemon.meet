@@ -8,6 +8,7 @@ import { ArrowLeft, Clock, Calendar, Mic, Target, CheckCircle, Mail, BookOpen, S
 import { RapportSection } from '../components/ui/RapportSection';
 import { MeetingChatPanel } from '../components/MeetingChatPanel';
 import { supabase } from '../lib/supabase';
+import { describeFailure } from '../lib/failureReason';
 import { useSubscription, useAuth } from '../contexts';
 
 interface TranscriptSegment {
@@ -104,33 +105,10 @@ interface Meeting {
 }
 
 // Traduz códigos de failure_reason em mensagens amigáveis pro usuário.
+// O mapeamento PT/BR vive em lib/failureReason (compartilhado com a lista).
 function describeFailureReason(reason: string | null | undefined): { title: string; detail: string } | null {
-  if (!reason) return null;
-  if (reason.startsWith('no_transcript_in_webhook')) {
-    return {
-      title: 'Reunião sem transcrição',
-      detail: 'O bot entrou na reunião mas não capturou áudio. Verifique se a sala admitiu o bot e se o microfone dos participantes estava ativo.',
-    };
-  }
-  if (reason.startsWith('no_transcription_url')) {
-    return {
-      title: 'Serviço de transcrição não retornou áudio',
-      detail: 'O serviço externo concluiu o bot mas não disponibilizou link de transcrição. Tente reprocessar a reunião.',
-    };
-  }
-  if (reason.startsWith('transcription_download_failed')) {
-    return {
-      title: 'Falha ao baixar a transcrição',
-      detail: 'Não foi possível obter a transcrição do serviço externo (provavelmente instabilidade temporária). Tente reprocessar.',
-    };
-  }
-  if (reason.startsWith('insights_generation_failed')) {
-    return {
-      title: 'Análise por IA falhou',
-      detail: 'A transcrição está disponível, mas não foi possível gerar os insights. Tente reprocessar para gerar a análise.',
-    };
-  }
-  return { title: 'Reunião com erro', detail: reason };
+  const d = describeFailure(reason);
+  return d ? { title: d.title, detail: d.detail } : null;
 }
 
 interface ActionItem {

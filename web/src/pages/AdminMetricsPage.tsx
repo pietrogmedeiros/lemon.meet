@@ -139,10 +139,20 @@ function formatDuration(s: number | null | undefined): string {
   return `${m}min`
 }
 const REASON_COLORS: Record<string, string> = {
+  // Bot não entrou na reunião (motivo extraído pelo backend, ex.: "bot_failed: waiting_room_timeout")
+  waiting_room_timeout: '#D64545',
+  request_to_join_denied: '#E06C3A',
+  bot_rejected: '#E0913A',
+  meeting_error: '#C7A03A',
+  invalid_meeting_url: '#8A8A3A',
+  meeting_not_found: '#6FA03A',
+  bot_failed: '#B05A5A', // owner sem motivo (fan-out) — falha não identificada
+  // Entrou mas não capturou áudio / falha de transcrição
   no_transcript_in_webhook: '#E07B6F',
   no_transcript: '#E07B6F',
   no_transcription_url: '#D86F8C',
   transcription_download_failed: '#C97AB4',
+  transcription_fallback_failed: '#B57ACC',
   insights_generation_failed: '#B97FCC',
   extension_no_audio_captured: '#9C8EE0',
   transcription_failed: '#7AA8E0',
