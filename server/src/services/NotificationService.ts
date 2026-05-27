@@ -87,6 +87,8 @@ class NotificationService {
       // Sub-tipos de fatal_error do Attendee (event_sub_type):
       request_to_join_denied: 'o "Lemon Notetaker" pediu para entrar mas não foi admitido. Peça para um participante admitir o bot assim que ele solicitar entrada na reunião.',
       meeting_not_found: 'a reunião não foi encontrada — o link era inválido/expirado ou ela ainda não tinha sido aberta quando o bot tentou entrar.',
+      // Falha total de despacho (nenhum provider conseguiu enviar o bot):
+      dispatch_failed: 'não foi possível enviar o bot para a reunião (instabilidade no serviço de bots). Tente iniciar a reunião novamente.',
     }
     const detail = reasonMap[reason] ?? `o bot encerrou com a falha "${reason}".`
 

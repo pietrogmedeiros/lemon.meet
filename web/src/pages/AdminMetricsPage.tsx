@@ -147,6 +147,7 @@ const REASON_COLORS: Record<string, string> = {
   invalid_meeting_url: '#8A8A3A',
   meeting_not_found: '#6FA03A',
   bot_failed: '#B05A5A', // owner sem motivo (fan-out) — falha não identificada
+  dispatch_failed: '#A03A3A', // nenhum provider conseguiu enviar o bot
   // Entrou mas não capturou áudio / falha de transcrição
   no_transcript_in_webhook: '#E07B6F',
   no_transcript: '#E07B6F',

@@ -17,12 +17,20 @@
 
 import { supabase } from '../../config/supabase.js'
 import { logger } from '../../utils/logger.js'
+import { notificationService } from '../NotificationService.js'
 import type { BotProviderName } from './IBotProvider.js'
 import { MeetingBaasProvider } from './MeetingBaasProvider.js'
 import { AttendeeProvider } from './AttendeeProvider.js'
 import { decideProvider } from './botRouterDecision.js'
 
 const ACTIVE_STATUSES = ['requesting', 'recording', 'processing']
+
+// Alerta de fallback: quando o Attendee falha e a reunião transborda pro
+// MeetingBaas, isso era invisível (só log) — uma queda do Attendee passava
+// horas despercebida. Agora cada fallback é contado, marcado no banco
+// (meetings.bot_fallback) e, se ALERT_ADMIN_USER_ID estiver setado, dispara
+// uma notificação admin throttled (no máx. 1 a cada ALERT_THROTTLE_MS).
+const ALERT_THROTTLE_MS = 10 * 60 * 1000
 
 // Duração assumida por reunião para contar sobreposição de slots do Attendee.
 // Conservador: reuniões cujo started_at cai dentro de ±SLOT_WINDOW_MS do
@@ -32,12 +40,17 @@ const SLOT_WINDOW_MS = 60 * 60 * 1000
 export interface DispatchResult {
   provider: BotProviderName
   externalId: string
+  /** true quando caiu no MeetingBaas por falha do Attendee (não por capacidade). */
+  fellBack: boolean
 }
 
 export class BotRouter {
   private readonly meetingbaas = new MeetingBaasProvider()
   private readonly attendee: AttendeeProvider | null
   private readonly maxConcurrent: number
+  private readonly alertAdminUserId = process.env.ALERT_ADMIN_USER_ID
+  private fallbacksSinceAlert = 0
+  private lastAlertAt = 0
 
   constructor() {
     const enabled = process.env.ATTENDEE_ENABLED === 'true'
@@ -81,6 +94,34 @@ export class BotRouter {
     return count ?? 0
   }
 
+  /**
+   * Registra um fallback Attendee→MeetingBaas: log estruturado, marca a reunião
+   * (best-effort, não quebra o dispatch se a coluna não existir) e dispara um
+   * alerta admin throttled.
+   */
+  private async reportFallback(meetingId: string, err: unknown): Promise<void> {
+    this.fallbacksSinceAlert++
+    const detail = err instanceof Error ? err.message : String(err)
+    logger.warn(`[BotRouter][FALLBACK] Attendee→MeetingBaas meeting=${meetingId} motivo="${detail}" (acum=${this.fallbacksSinceAlert})`)
+
+    // Marca a reunião para o admin conseguir medir a taxa de fallback no painel.
+    const { error } = await supabase.from('meetings').update({ bot_fallback: true }).eq('id', meetingId)
+    if (error) logger.warn(`[BotRouter] não marcou bot_fallback (rode migration-bot-fallback.sql?): ${error.message}`)
+
+    if (!this.alertAdminUserId) return
+    const now = Date.now()
+    if (now - this.lastAlertAt < ALERT_THROTTLE_MS) return
+    const count = this.fallbacksSinceAlert
+    this.lastAlertAt = now
+    this.fallbacksSinceAlert = 0
+    await notificationService.notify({
+      user_id: this.alertAdminUserId,
+      type: 'admin_bot_fallback',
+      title: '⚠️ Attendee falhando — fallback p/ MeetingBaas',
+      message: `${count} dispatch(es) caíram pro MeetingBaas nos últimos minutos. Último erro: ${detail}. Verifique o serviço Attendee.`,
+    })
+  }
+
   /** Decide o provider para um horário-alvo (now p/ imediato, joinAt p/ agendado). */
   private async chooseProvider(targetTime: Date): Promise<BotProviderName> {
     if (!this.attendee) return 'meetingbaas'
@@ -104,19 +145,22 @@ export class BotRouter {
   async dispatchImmediateBot(meetingUrl: string, meetingId: string, dedupKey?: string): Promise<DispatchResult> {
     const choice = await this.chooseProvider(new Date())
 
+    let fellBack = false
     if (choice === 'attendee' && this.attendee) {
       try {
         const { externalId } = await this.attendee.sendBot(meetingUrl, meetingId, dedupKey)
         logger.info(`[BotRouter] dispatch imediato via attendee meeting=${meetingId} bot=${externalId}`)
-        return { provider: 'attendee', externalId }
+        return { provider: 'attendee', externalId, fellBack: false }
       } catch (err) {
         logger.error(`[BotRouter] Attendee falhou (fallback → MeetingBaas) meeting=${meetingId}:`, err)
+        fellBack = true
+        await this.reportFallback(meetingId, err)
       }
     }
 
     const { externalId } = await this.meetingbaas.sendBot(meetingUrl, meetingId, dedupKey)
     logger.info(`[BotRouter] dispatch imediato via meetingbaas meeting=${meetingId} bot=${externalId}`)
-    return { provider: 'meetingbaas', externalId }
+    return { provider: 'meetingbaas', externalId, fellBack }
   }
 
   /**
@@ -126,19 +170,22 @@ export class BotRouter {
   async dispatchScheduledBot(meetingUrl: string, meetingId: string, joinAt: Date, dedupKey?: string): Promise<DispatchResult> {
     const choice = await this.chooseProvider(joinAt)
 
+    let fellBack = false
     if (choice === 'attendee' && this.attendee) {
       try {
         const { externalId } = await this.attendee.scheduleBotAt(meetingUrl, meetingId, joinAt, dedupKey)
         logger.info(`[BotRouter] agendado via attendee meeting=${meetingId} bot=${externalId} join_at=${joinAt.toISOString()}`)
-        return { provider: 'attendee', externalId }
+        return { provider: 'attendee', externalId, fellBack: false }
       } catch (err) {
         logger.error(`[BotRouter] Attendee falhou ao agendar (fallback → MeetingBaas) meeting=${meetingId}:`, err)
+        fellBack = true
+        await this.reportFallback(meetingId, err)
       }
     }
 
     const { externalId } = await this.meetingbaas.scheduleBotAt(meetingUrl, meetingId, joinAt, dedupKey)
     logger.info(`[BotRouter] agendado via meetingbaas meeting=${meetingId} bot=${externalId} join_at=${joinAt.toISOString()}`)
-    return { provider: 'meetingbaas', externalId }
+    return { provider: 'meetingbaas', externalId, fellBack }
   }
 
   /** Remove o bot no provider correto. */

@@ -54,6 +54,12 @@ const REASON_MAP: Record<string, FailureDescription> = {
     detail:
       'O link era inválido/expirado ou a reunião ainda não tinha sido aberta quando o bot tentou entrar.',
   },
+  dispatch_failed: {
+    short: 'Não foi possível enviar o bot.',
+    title: 'Falha ao enviar o bot',
+    detail:
+      'Houve instabilidade no serviço de bots e o bot não chegou a ser enviado para a reunião. Tente iniciar a reunião novamente.',
+  },
 
   // ── Entrou mas não capturou áudio / falha de transcrição ───────────────────
   no_transcript_in_webhook: {

@@ -14,6 +14,7 @@ import { authMiddleware, type AuthRequest } from '../middleware/auth.middleware.
 import { supabase } from '../config/supabase.js'
 import { logger } from '../utils/logger.js'
 import { botRouter, type DispatchResult } from '../services/bots/BotRouter.js'
+import { notificationService } from '../services/NotificationService.js'
 import { insightsService } from '../services/InsightsService.js'
 import { rapportService } from '../services/RapportService.js'
 import { meetingChatService } from '../services/MeetingChatService.js'
@@ -57,8 +58,16 @@ router.post('/start', authMiddleware, async (req: AuthRequest, res: Response) =>
     try {
       dispatch = await botRouter.dispatchImmediateBot(meetLink, meetingId)
     } catch (err) {
+      // Ambos os providers falharam ao despachar — antes isto marcava 'failed'
+      // SEM motivo nem notificação (falha silenciosa, indiagnosticável no front).
       logger.error('Error dispatching bot:', err)
-      await supabase.from('meetings').update({ status: 'failed' }).eq('id', meetingId)
+      const detail = err instanceof Error ? err.message : String(err)
+      await supabase.from('meetings').update({
+        status: 'failed',
+        failure_reason: `dispatch_failed: ${detail}`.slice(0, 300),
+        ended_at: new Date().toISOString(),
+      }).eq('id', meetingId)
+      await notificationService.notifyMeetingBotFailed(userId, meetingId, 'dispatch_failed', title ?? undefined)
       return res.status(502).json({ success: false, message: 'Failed to send bot to meeting' })
     }
 

@@ -697,7 +697,10 @@ async function handleCalendarSyncEvents(data: Record<string, any>) {
             transcription_config: { provider: 'gladia' },
             callback_enabled: true,
             callback_config: { url: webhookUrl },
-            timeout_config: { waiting_room_timeout: 600 },
+            // Alinhado ao LEAVE_TIMEOUTS do MeetingBaasService (era 600, defasado):
+            // 20min na sala de espera + 15min sem ninguém na call antes de desistir.
+            timeout_config: { waiting_room_timeout: 1200, noone_joined_timeout: 900 },
+            automatic_leave: { waiting_room_timeout: 1200, noone_joined_timeout: 900 },
           }),
         }
       )

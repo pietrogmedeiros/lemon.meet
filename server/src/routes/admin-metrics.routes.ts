@@ -62,6 +62,7 @@ interface MeetingRow {
   platform: string | null
   failure_reason: string | null
   bot_provider: string | null
+  bot_fallback: boolean | null
   duration_seconds: number | null
   transcript: string | null
   insights: any
@@ -108,7 +109,7 @@ async function fetchAllMeetings(): Promise<MeetingRow[]> {
   for (;;) {
     const { data, error } = await supabase
       .from('meetings')
-      .select('id,user_id,team_id,status,source,platform,failure_reason,bot_provider,duration_seconds,transcript,insights,created_at,ended_at,started_at,updated_at,title')
+      .select('id,user_id,team_id,status,source,platform,failure_reason,bot_provider,bot_fallback,duration_seconds,transcript,insights,created_at,ended_at,started_at,updated_at,title')
       .order('created_at', { ascending: true })
       .range(from, from + PAGE - 1)
     if (error) throw new Error(`meetings fetch: ${error.message}`)
@@ -421,19 +422,21 @@ function buildRetention(meetings: MeetingRow[], users: UserLite[]): any {
 function buildProviders(meetings: MeetingRow[]): any {
   const ACTIVE = new Set(['requesting', 'recording', 'processing'])
   const byProvider = new Map<string, {
-    total: number; completed: number; failed: number; withTranscript: number; active: number; failures: Map<string, number>
+    total: number; completed: number; failed: number; withTranscript: number; active: number; fellBack: number; failures: Map<string, number>
   }>()
 
   for (const m of meetings) {
     const p = m.bot_provider || 'meetingbaas'
-    const e = byProvider.get(p) ?? { total: 0, completed: 0, failed: 0, withTranscript: 0, active: 0, failures: new Map() }
+    const e = byProvider.get(p) ?? { total: 0, completed: 0, failed: 0, withTranscript: 0, active: 0, fellBack: 0, failures: new Map() }
     e.total += 1
     if (m.status === 'completed' && !m.failure_reason) e.completed += 1
     if (m.status === 'failed' || m.failure_reason) {
       e.failed += 1
-      const reason = (m.failure_reason ?? 'unknown').split(':')[0]
+      const reason = failureCode(m.failure_reason)
       e.failures.set(reason, (e.failures.get(reason) ?? 0) + 1)
     }
+    // Reunião que caiu neste provider por FALHA do Attendee (degradação, não capacidade).
+    if (m.bot_fallback) e.fellBack += 1
     if ((m.transcript ?? '').trim().length > 0) e.withTranscript += 1
     if (m.status && ACTIVE.has(m.status)) e.active += 1
     byProvider.set(p, e)
@@ -446,6 +449,7 @@ function buildProviders(meetings: MeetingRow[]): any {
       completed: e.completed,
       failed: e.failed,
       active: e.active,
+      fellBack: e.fellBack,
       successPct: safePct(e.completed, e.total),
       failurePct: safePct(e.failed, e.total),
       transcriptPct: safePct(e.withTranscript, e.total),
