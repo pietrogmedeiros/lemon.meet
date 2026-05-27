@@ -69,6 +69,9 @@ export class BotRouter {
       .select('id', { count: 'exact', head: true })
       .eq('bot_provider', 'attendee')
       .in('status', ACTIVE_STATUSES)
+      // Só conta reuniões "donas" do bot — linkadas compartilham um bot já
+      // contabilizado e não ocupam slot próprio no Attendee.
+      .is('bot_owner_meeting_id', null)
       .gte('started_at', from)
       .lte('started_at', to)
     if (error) {

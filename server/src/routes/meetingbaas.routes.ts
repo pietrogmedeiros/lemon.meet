@@ -132,12 +132,14 @@ async function handleStatusChange(data: { bot_id: string; status: { code: string
 async function handleComplete(data: BaasCompletePayload & { event_uuid?: string }) {
   const { bot_id, transcript, event_uuid } = data
 
-  // Busca a reunião pelo bot_id (bots manuais) ou event_uuid (bots de calendário)
+  // Busca a reunião DONA do bot (bot_owner_meeting_id IS NULL) — linkadas
+  // compartilham o mesmo baas_bot_id e são preenchidas depois via fan-out.
   let meeting: any = null
   const { data: byBotId } = await supabase
     .from('meetings')
     .select('*')
     .eq('baas_bot_id', bot_id)
+    .is('bot_owner_meeting_id', null)
     .maybeSingle()
 
   meeting = byBotId
@@ -147,6 +149,7 @@ async function handleComplete(data: BaasCompletePayload & { event_uuid?: string 
       .from('meetings')
       .select('*')
       .eq('baas_event_uuid', event_uuid)
+      .is('bot_owner_meeting_id', null)
       .maybeSingle()
     meeting = byEvent
     // Garante que baas_bot_id fica preenchido para próximas buscas
@@ -231,6 +234,9 @@ async function handleComplete(data: BaasCompletePayload & { event_uuid?: string 
     // Salva no Google Drive (se conectado)
     await gdriveService.saveInsightsToFolder(meeting.user_id, meeting, insights)
 
+    // Compartilha o resultado com reuniões linkadas (1 bot p/ vários convidados)
+    await fanOutFromOwner(meetingId)
+
     logger.info(`[MeetingBaas] Meeting ${meetingId} finalizada com sucesso`)
   } catch (err) {
     logger.error(`[MeetingBaas] Erro ao gerar insights para meeting ${meetingId}:`, err)
@@ -250,13 +256,14 @@ async function handleBotCompleted(data: Record<string, any>) {
 
   logger.info(`[MeetingBaas] bot.completed bot_id=${bot_id} event_id=${event_id}`)
 
-  // Localiza reunião pelo bot_id ou event_id
+  // Localiza a reunião DONA do bot (bot_owner_meeting_id IS NULL) — linkadas
+  // compartilham o baas_bot_id e são preenchidas via fan-out depois.
   let meeting: any = null
-  const { data: byBotId } = await supabase.from('meetings').select('*').eq('baas_bot_id', bot_id).maybeSingle()
+  const { data: byBotId } = await supabase.from('meetings').select('*').eq('baas_bot_id', bot_id).is('bot_owner_meeting_id', null).maybeSingle()
   meeting = byBotId
 
   if (!meeting && event_id) {
-    const { data: byEvent } = await supabase.from('meetings').select('*').eq('baas_event_uuid', event_id).maybeSingle()
+    const { data: byEvent } = await supabase.from('meetings').select('*').eq('baas_event_uuid', event_id).is('bot_owner_meeting_id', null).maybeSingle()
     meeting = byEvent
     if (meeting) {
       await supabase.from('meetings').update({ baas_bot_id: bot_id }).eq('id', meeting.id)
@@ -348,6 +355,7 @@ async function handleBotCompleted(data: Record<string, any>) {
         ended_at: data.exited_at ?? new Date().toISOString(),
       }).eq('id', meetingId)
       await notificationService.notifyMeetingNoTranscription(meeting.user_id, meetingId, meeting.title)
+      await fanOutFromOwner(meetingId)
       return
     }
   } else if (audioUrl) {
@@ -365,6 +373,7 @@ async function handleBotCompleted(data: Record<string, any>) {
         ended_at: data.exited_at ?? new Date().toISOString(),
       }).eq('id', meetingId)
       await notificationService.notifyMeetingNoTranscription(meeting.user_id, meetingId, meeting.title)
+      await fanOutFromOwner(meetingId)
       return
     }
   } else {
@@ -375,6 +384,7 @@ async function handleBotCompleted(data: Record<string, any>) {
       ended_at: data.exited_at ?? new Date().toISOString(),
     }).eq('id', meetingId)
     await notificationService.notifyMeetingNoTranscription(meeting.user_id, meetingId, meeting.title)
+    await fanOutFromOwner(meetingId)
     return
   }
 
@@ -403,6 +413,7 @@ async function handleBotCompleted(data: Record<string, any>) {
     }).eq('id', meetingId)
 
     await notificationService.notifyMeetingNoTranscription(meeting.user_id, meetingId, meeting.title)
+    await fanOutFromOwner(meetingId)
     return
   }
 
@@ -419,6 +430,7 @@ async function handleBotCompleted(data: Record<string, any>) {
     const insights = await insightsService.generateInsights(fullTranscript, meetingId)
     await supabase.from('meetings').update({ insights, status: 'completed', failure_reason: null }).eq('id', meetingId)
     await fireWebhookForMeeting(meeting.user_id, meeting, insights)
+    await fanOutFromOwner(meetingId)
     logger.info(`[MeetingBaas] bot.completed: meeting ${meetingId} finalizada com sucesso`)
   } catch (err) {
     logger.error(`[MeetingBaas] Erro ao gerar insights para meeting ${meetingId}:`, err)
@@ -427,6 +439,67 @@ async function handleBotCompleted(data: Record<string, any>) {
       status: 'completed',
       failure_reason: `insights_generation_failed: ${errMsg}`,
     }).eq('id', meetingId)
+  }
+}
+
+/**
+ * Fan-out "1 bot por reunião": copia o resultado final da reunião DONA do bot
+ * (ownerId) para todas as reuniões LINKADAS (bot_owner_meeting_id = ownerId),
+ * que compartilham o mesmo bot. Insights são gerados 1× (na dona) e só copiados
+ * aqui — sem custo extra de IA. Se a dona falhou, propaga a falha às linkadas
+ * para nenhuma ficar presa em 'requesting'.
+ */
+export async function fanOutFromOwner(ownerId: string): Promise<void> {
+  const { data: linked } = await supabase
+    .from('meetings')
+    .select('id, user_id, title, meet_link, team_id')
+    .eq('bot_owner_meeting_id', ownerId)
+  if (!linked || linked.length === 0) return
+
+  const { data: owner } = await supabase
+    .from('meetings')
+    .select('id, user_id, title, transcript, insights, status, failure_reason, ended_at')
+    .eq('id', ownerId)
+    .maybeSingle()
+  if (!owner) return
+
+  const finishedOk = owner.status === 'completed' && owner.transcript && owner.transcript.trim().length > 0
+
+  if (finishedOk) {
+    const { data: ownerSegs } = await supabase
+      .from('transcript_segments')
+      .select('text, start_seconds, end_seconds, speaker, sequence, chunk_index')
+      .eq('meeting_id', ownerId)
+      .order('sequence', { ascending: true })
+
+    for (const m of linked) {
+      // idempotência: limpa segmentos antigos da linkada antes de copiar
+      await supabase.from('transcript_segments').delete().eq('meeting_id', m.id)
+      if (ownerSegs && ownerSegs.length > 0) {
+        await supabase.from('transcript_segments').insert(ownerSegs.map(s => ({ ...s, meeting_id: m.id })))
+      }
+      await supabase.from('meetings').update({
+        transcript: owner.transcript,
+        insights: owner.insights,
+        status: 'completed',
+        failure_reason: null,
+        ended_at: owner.ended_at,
+      }).eq('id', m.id)
+      try { await fireWebhookForMeeting(m.user_id, m, owner.insights) } catch (e) { logger.warn('[Fanout] webhook falhou:', e) }
+      try { await gdriveService.saveInsightsToFolder(m.user_id, m, owner.insights) } catch (e) { logger.warn('[Fanout] gdrive falhou:', e) }
+      await notificationService.notifyMeetingCompleted(m.user_id, m.id, m.title ?? undefined)
+    }
+    logger.info(`[Fanout] dona ${ownerId} → ${linked.length} linkada(s) preenchida(s) com sucesso`)
+  } else {
+    for (const m of linked) {
+      await supabase.from('meetings').update({
+        status: owner.status ?? 'failed',
+        failure_reason: owner.failure_reason ?? 'bot_failed',
+        ended_at: owner.ended_at,
+      }).eq('id', m.id)
+      await notificationService.notifyMeetingBotFailed(m.user_id, m.id, owner.failure_reason ?? 'bot_failed', m.title ?? undefined)
+    }
+    logger.info(`[Fanout] dona ${ownerId} (${owner.status}) → falha propagada a ${linked.length} linkada(s)`)
   }
 }
 

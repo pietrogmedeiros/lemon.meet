@@ -22,6 +22,7 @@ import { runTranscriptPipeline } from '../services/TranscriptPipeline.js'
 import type { AttendeeUtterance } from '../services/bots/AttendeeProvider.js'
 import { normalizeAttendeeUtterances } from '../services/bots/attendeeTranscript.js'
 import { notificationService } from '../services/NotificationService.js'
+import { fanOutFromOwner } from './meetingbaas.routes.js'
 
 // Estado do Attendee → status interno da reunião.
 const STATE_MAP: Record<string, string> = {
@@ -115,6 +116,8 @@ async function handleStateChange(event: any): Promise<void> {
     // Notificação acionável por motivo (ex.: bot não admitido, reunião não encontrada)
     // em vez do genérico "sem transcrição", que confundia o usuário.
     await notificationService.notifyMeetingBotFailed(meeting.user_id, meeting.id, subType, meeting.title ?? undefined)
+    // Propaga a falha às reuniões linkadas que compartilham este bot.
+    await fanOutFromOwner(meeting.id)
     return
   }
 
@@ -130,10 +133,13 @@ async function handleStateChange(event: any): Promise<void> {
 
 /** Localiza a reunião por attendee_bot_id ou pelo metadata lemon_meeting_id. */
 async function findMeeting(botId: string, lemonMeetingId?: string): Promise<MeetingRow | null> {
+  // Mira a reunião DONA do bot — linkadas compartilham o attendee_bot_id e são
+  // preenchidas via fan-out depois.
   const { data: byBot } = await supabase
     .from('meetings')
     .select('id, user_id, title, status, ended_at')
     .eq('attendee_bot_id', botId)
+    .is('bot_owner_meeting_id', null)
     .maybeSingle()
   if (byBot) return byBot as MeetingRow
 
@@ -178,9 +184,12 @@ async function finalizeMeeting(meeting: MeetingRow, botId: string): Promise<void
       ended_at: meeting.ended_at ?? new Date().toISOString(),
     }).eq('id', meeting.id)
     await notificationService.notifyMeetingNoTranscription(meeting.user_id, meeting.id, meeting.title ?? undefined)
+    await fanOutFromOwner(meeting.id)
     return
   }
 
   const segments = normalizeAttendeeUtterances(utterances)
   await runTranscriptPipeline(meeting, segments)
+  // Compartilha o resultado com reuniões linkadas (1 bot p/ vários convidados).
+  await fanOutFromOwner(meeting.id)
 }

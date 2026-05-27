@@ -15,6 +15,7 @@ import { logger } from '../utils/logger.js'
 import { botRouter, type DispatchResult } from './bots/BotRouter.js'
 import type { BotProviderName } from './bots/IBotProvider.js'
 import { resolveMeetingTeamId } from '../utils/teamAccess.js'
+import { fanOutFromOwner } from '../routes/meetingbaas.routes.js'
 import {
   getValidAccessToken,
   extractMeetingUrl,
@@ -190,31 +191,55 @@ export class CalendarCronService {
       return
     }
 
-    // Checa também se outro usuário já enviou bot para o mesmo link (mesma reunião)
-    if (meetingUrl) {
-      const windowStart = new Date(Date.now() - 30 * 60 * 1000).toISOString()
-      const { data: sameLink } = await supabase
-        .from('meetings')
-        .select('id, user_id, team_id')
-        .eq('meet_link', meetingUrl)
-        .in('status', ['requesting', 'recording', 'processing'])
-        .gte('created_at', windowStart)
-        .limit(1)
+    // ── Dedup GLOBAL por evento: 1 bot por reunião física ─────────────────
+    // O id do evento do Google (eventId) é o MESMO para todos os convidados.
+    // Se já existe uma reunião "dona" (com bot) para este evento, NÃO dispara
+    // outro bot — era a causa de ~31% de bots desperdiçados.
+    const { data: ownerRows } = await supabase
+      .from('meetings')
+      .select('id, user_id, team_id, status, bot_provider, baas_bot_id, attendee_bot_id')
+      .eq('baas_event_uuid', eventId)
+      .is('bot_owner_meeting_id', null)
+      .order('created_at', { ascending: true })
+      .limit(1)
+    const owner = ownerRows?.[0]
 
-      if (sameLink && sameLink.length > 0) {
-        // Verifica se o outro usuário é do mesmo time
-        const existingMeeting = sameLink[0]
-        const myTeamId = await resolveMeetingTeamId(userId)
-        
-        if (existingMeeting.team_id && myTeamId && existingMeeting.team_id === myTeamId) {
-          // Mesmo time! A reunião já é acessível para este usuário via team_id
-          logger.info(`[CalendarCron] Já existe bot para ${meetingUrl} (meeting ${existingMeeting.id}) do mesmo time — ignorando duplicata`)
-          return
-        }
-        
-        // Usuários de times diferentes na mesma reunião — permite criar reunião separada
-        logger.info(`[CalendarCron] Já existe bot para ${meetingUrl} mas de time diferente — criando reunião separada`)
+    if (owner) {
+      const myTeamId = await resolveMeetingTeamId(userId)
+      // Mesmo time já enxerga a reunião via team_id — não cria duplicata nem bot.
+      if (owner.team_id && myTeamId && owner.team_id === myTeamId) {
+        logger.info(`[CalendarCron] Evento ${eventId} já coberto (mesmo time, dona ${owner.id}) — sem bot extra`)
+        return
       }
+      // Time diferente (ou sem time): cria reunião LINKADA compartilhando o MESMO
+      // bot, sem disparar bot novo. O fan-out preenche transcrição/insights depois.
+      const linkedId = randomUUID()
+      const linkedEmails: string[] = (item.attendees ?? []).map((a: any) => a.email as string).filter((e: string) => Boolean(e))
+      const { error: linkErr } = await supabase.from('meetings').insert({
+        id:                 linkedId,
+        user_id:            userId,
+        team_id:            myTeamId,
+        meet_link:          meetingUrl,
+        title,
+        platform:           detectPlatformFromUrl(meetingUrl),
+        source:             'calendar',
+        status:             owner.status ?? 'requesting',
+        bot_provider:       owner.bot_provider,
+        baas_bot_id:        owner.baas_bot_id,
+        attendee_bot_id:    owner.attendee_bot_id,
+        baas_event_uuid:    eventId,
+        bot_owner_meeting_id: owner.id,
+        participant_emails: linkedEmails.length > 0 ? linkedEmails : null,
+        started_at:         startedAt ?? new Date().toISOString(),
+      })
+      if (linkErr) {
+        logger.error(`[CalendarCron] Erro ao criar reunião linkada (evento ${eventId}):`, linkErr)
+      } else {
+        logger.info(`[CalendarCron] 🔗 Evento ${eventId} linkado à dona ${owner.id} (user ${userId}) — SEM bot extra`)
+        // Se a dona já concluiu, preenche a linkada imediatamente.
+        try { await fanOutFromOwner(owner.id) } catch (e) { logger.warn(`[CalendarCron] fanOut pós-link falhou:`, e) }
+      }
+      return
     }
 
     // Roteador híbrido capacity-first (MeetingBaas/Attendee), tanto para
@@ -228,9 +253,11 @@ export class CalendarCronService {
     let provider: BotProviderName
     let externalId: string
     try {
+      // dedupKey = eventId: backstop atômico no provider — duas execuções
+      // concorrentes do cron para o mesmo evento não geram 2 bots reais.
       const dispatch = useScheduled
-        ? await botRouter.dispatchScheduledBot(meetingUrl, meetingId, startTime!)
-        : await botRouter.dispatchImmediateBot(meetingUrl, meetingId)
+        ? await botRouter.dispatchScheduledBot(meetingUrl, meetingId, startTime!, eventId)
+        : await botRouter.dispatchImmediateBot(meetingUrl, meetingId, eventId)
       provider = dispatch.provider
       externalId = dispatch.externalId
     } catch (err) {
