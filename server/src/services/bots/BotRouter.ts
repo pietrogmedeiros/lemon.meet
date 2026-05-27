@@ -95,18 +95,15 @@ export class BotRouter {
   }
 
   /**
-   * Registra um fallback Attendee→MeetingBaas: log estruturado, marca a reunião
-   * (best-effort, não quebra o dispatch se a coluna não existir) e dispara um
-   * alerta admin throttled.
+   * Registra um fallback Attendee→MeetingBaas: log estruturado + alerta admin
+   * throttled. A marcação no banco (meetings.bot_fallback) é feita pelo CALLER
+   * via DispatchResult.fellBack — aqui não dá, porque alguns callers
+   * (CalendarCronService) só inserem a reunião DEPOIS do dispatch retornar.
    */
   private async reportFallback(meetingId: string, err: unknown): Promise<void> {
     this.fallbacksSinceAlert++
     const detail = err instanceof Error ? err.message : String(err)
     logger.warn(`[BotRouter][FALLBACK] Attendee→MeetingBaas meeting=${meetingId} motivo="${detail}" (acum=${this.fallbacksSinceAlert})`)
-
-    // Marca a reunião para o admin conseguir medir a taxa de fallback no painel.
-    const { error } = await supabase.from('meetings').update({ bot_fallback: true }).eq('id', meetingId)
-    if (error) logger.warn(`[BotRouter] não marcou bot_fallback (rode migration-bot-fallback.sql?): ${error.message}`)
 
     if (!this.alertAdminUserId) return
     const now = Date.now()
@@ -132,9 +129,11 @@ export class BotRouter {
       maxConcurrent: this.maxConcurrent,
       attendeeNearbyCount,
     })
-    if (provider === 'meetingbaas') {
-      logger.info(`[BotRouter] Attendee no teto na janela (${attendeeNearbyCount}/${this.maxConcurrent}) — overflow → MeetingBaas`)
-    }
+    // Log de decisão em TODA dispatch (antes só logava no overflow) — torna
+    // visível por que cada reunião foi pra um provider. Se attendeeCountNear
+    // tiver errado, ele já logou "Falha ao contar — assumindo cheio" antes,
+    // então count==max aqui pode significar erro de contagem, não teto real.
+    logger.info(`[BotRouter] chooseProvider: attendee_ativos=${attendeeNearbyCount}/${this.maxConcurrent} → ${provider}`)
     return provider
   }
 

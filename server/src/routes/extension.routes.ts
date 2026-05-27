@@ -73,8 +73,8 @@ router.post('/start', authMiddleware, async (req: AuthRequest, res: Response) =>
 
     await supabase.from('meetings').update(
       dispatch.provider === 'attendee'
-        ? { bot_provider: 'attendee', attendee_bot_id: dispatch.externalId }
-        : { bot_provider: 'meetingbaas', baas_bot_id: dispatch.externalId }
+        ? { bot_provider: 'attendee', attendee_bot_id: dispatch.externalId, bot_fallback: dispatch.fellBack }
+        : { bot_provider: 'meetingbaas', baas_bot_id: dispatch.externalId, bot_fallback: dispatch.fellBack }
     ).eq('id', meetingId)
 
     logger.info(`Meeting started via ${dispatch.provider}: ${meetingId} bot=${dispatch.externalId} user=${userId}`)

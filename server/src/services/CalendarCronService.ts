@@ -252,6 +252,7 @@ export class CalendarCronService {
 
     let provider: BotProviderName
     let externalId: string
+    let fellBack = false
     try {
       // dedupKey = eventId: backstop atômico no provider — duas execuções
       // concorrentes do cron para o mesmo evento não geram 2 bots reais.
@@ -260,6 +261,7 @@ export class CalendarCronService {
         : await botRouter.dispatchImmediateBot(meetingUrl, meetingId, eventId)
       provider = dispatch.provider
       externalId = dispatch.externalId
+      fellBack = dispatch.fellBack
     } catch (err) {
       logger.error(`[CalendarCron] Falha ao enviar bot para evento ${eventId}:`, err)
       return
@@ -283,6 +285,7 @@ export class CalendarCronService {
       source:            'calendar',
       status:            'requesting',
       bot_provider:      provider,
+      bot_fallback:      fellBack,
       baas_bot_id:       provider === 'meetingbaas' ? externalId : null,
       attendee_bot_id:   provider === 'attendee' ? externalId : null,
       baas_event_uuid:   eventId,
@@ -339,6 +342,7 @@ export class CalendarCronService {
       .from('meetings')
       .update({
         bot_provider:    dispatch.provider,
+        bot_fallback:    dispatch.fellBack,
         baas_bot_id:     dispatch.provider === 'meetingbaas' ? dispatch.externalId : null,
         attendee_bot_id: dispatch.provider === 'attendee' ? dispatch.externalId : null,
         started_at:      newStart.toISOString(),
