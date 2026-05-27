@@ -1189,10 +1189,21 @@ export function TranscricaoDetalhesPage() {
           );
         })()}
 
-        {/* Resumo de decisão — síntese acionável (pró / contra / risco), no topo dos insights */}
-        {meeting.insights?.decisionSummary && (
+        {/* Insights que impulsionam decisões — card; ou aviso de disponibilidade
+            para reuniões anteriores ao lançamento (24/05/2026). */}
+        {meeting.insights?.decisionSummary ? (
           <DecisionSummaryCard summary={meeting.insights.decisionSummary} />
-        )}
+        ) : (meeting.status === 'completed' && meeting.insights && meeting.created_at < '2026-05-24') ? (
+          <Card className="p-4 border-l-4 border-l-[#2D5A27] bg-[#F6FBF6]">
+            <p className="text-sm text-secondary flex items-start gap-2">
+              <Sparkles className="h-4 w-4 text-[#2D5A27] flex-shrink-0 mt-0.5" />
+              <span>
+                <span className="font-semibold text-primary">Insights que impulsionam decisões</span> está
+                disponível para reuniões a partir de 24/05/2026.
+              </span>
+            </p>
+          </Card>
+        ) : null}
 
         {/* Insights */}
         {meeting.insights && (

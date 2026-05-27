@@ -47,7 +47,8 @@ export function DecisionInsightsAnnounceModal({ isOpen, onClose }: Props) {
             </div>
           ))}
           <p className="text-xs text-[#999999] pt-1">
-            Cada ponto vem com a evidência da própria conversa. Gerado automaticamente — é só abrir a análise da reunião.
+            Cada ponto vem com a evidência da própria conversa, gerado automaticamente.
+            Disponível nas reuniões a partir de <span className="font-medium text-[#666666]">24/05/2026</span>.
           </p>
         </div>
 
