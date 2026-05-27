@@ -253,9 +253,6 @@ export function RapportSection({ meetingId, initialRapport, apiUrl, getAuthHeade
               Beta
             </span>
           </h2>
-          <p className="text-xs text-gray-500 italic">
-            Se você está vendo essa funcionalidade, você é especial para nós.
-          </p>
         </div>
 
         {rapport?.rapport_data && !showForm && (
@@ -271,47 +268,8 @@ export function RapportSection({ meetingId, initialRapport, apiUrl, getAuthHeade
 
       {/* Formulário de URLs */}
       {showForm && (
-        <div className="space-y-3">
-          <div className="flex items-start gap-3 rounded-lg bg-[#FFFDF0] border border-[#FFE082] px-3 py-2.5">
-            <span className="text-base leading-none mt-0.5">💡</span>
-            <div>
-              <p className="text-sm text-secondary">
-                Informe ao menos uma URL. <span className="font-semibold text-primary">Quanto mais fontes, maior a assertividade</span> — combinar site da empresa + LinkedIn da pessoa gera os insights mais ricos para a conversa.
-              </p>
-              <div className="mt-2 flex items-center gap-3">
-                {[
-                  { filled: website.trim() || linkedin.trim() || instagram.trim(), label: '1 fonte' },
-                  { filled: [website, linkedin, instagram].filter(s => s.trim()).length >= 2, label: '2 fontes' },
-                  { filled: website.trim() && linkedin.trim() && instagram.trim(), label: '3 fontes' },
-                ].map((step, i) => (
-                  <div key={i} className="flex items-center gap-1.5">
-                    <div className={`w-2 h-2 rounded-full transition-colors ${step.filled ? 'bg-[#2D5A27]' : 'bg-[#D0D0D0]'}`} />
-                    <span className={`text-xs transition-colors ${step.filled ? 'text-[#2D5A27] font-medium' : 'text-[#BDBDBD]'}`}>
-                      {step.label}
-                    </span>
-                    {i < 2 && <span className="text-[#D0D0D0] text-xs">→</span>}
-                  </div>
-                ))}
-                <span className={`ml-1 text-xs font-semibold transition-colors ${
-                  [website, linkedin, instagram].filter(s => s.trim()).length === 3
-                    ? 'text-[#2D5A27]'
-                    : [website, linkedin, instagram].filter(s => s.trim()).length === 2
-                    ? 'text-[#F57C00]'
-                    : 'text-[#BDBDBD]'
-                }`}>
-                  {[website, linkedin, instagram].filter(s => s.trim()).length === 3
-                    ? '🎯 Máxima assertividade'
-                    : [website, linkedin, instagram].filter(s => s.trim()).length === 2
-                    ? '⚡ Alta assertividade'
-                    : [website, linkedin, instagram].filter(s => s.trim()).length === 1
-                    ? '✓ Assertividade básica'
-                    : ''}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-3">
+        <div className="space-y-2">
+          <div className="grid gap-3 items-end sm:grid-cols-[1fr_1fr_1fr_auto]">
             {/* Website */}
             <div className="flex flex-col gap-1">
               <label className="flex items-center gap-1.5 text-xs font-medium text-secondary">
@@ -356,40 +314,39 @@ export function RapportSection({ meetingId, initialRapport, apiUrl, getAuthHeade
                 className="rounded-lg border border-[#E0E0E0] bg-white px-3 py-2 text-sm text-primary placeholder:text-[#BDBDBD] focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30 transition-colors"
               />
             </div>
+
+            {/* Botão na mesma linha dos inputs (faixa compacta) */}
+            <Button
+              onClick={handleEnrich}
+              disabled={!hasAnyUrl || loading}
+              className="flex items-center justify-center gap-2 whitespace-nowrap"
+            >
+              {loading ? (
+                <>
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-r-transparent" />
+                  Buscando…
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4" />
+                  Enriquecer
+                </>
+              )}
+            </Button>
           </div>
 
           {error && (
             <p className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>
           )}
 
-          <div className="flex items-center gap-3 pt-1">
-            <Button
-              onClick={handleEnrich}
-              disabled={!hasAnyUrl || loading}
-              className="flex items-center gap-2"
+          {rapport?.rapport_data && (
+            <button
+              onClick={() => setShowForm(false)}
+              className="text-sm text-secondary hover:text-primary transition-colors"
             >
-              {loading ? (
-                <>
-                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-r-transparent" />
-                  Buscando informações…
-                </>
-              ) : (
-                <>
-                  <Sparkles className="h-4 w-4" />
-                  Enriquecer rapport
-                </>
-              )}
-            </Button>
-
-            {rapport?.rapport_data && (
-              <button
-                onClick={() => setShowForm(false)}
-                className="text-sm text-secondary hover:text-primary transition-colors"
-              >
-                Cancelar
-              </button>
-            )}
-          </div>
+              Cancelar
+            </button>
+          )}
         </div>
       )}
 

@@ -3,6 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { MainLayout } from '../components/layout/MainLayout';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
+import { DecisionSummaryCard, type DecisionSummary } from '../components/ui/DecisionSummaryCard';
+import { DecisionInsightsAnnounceModal } from '../components/DecisionInsightsAnnounceModal';
 import { Badge } from '../components/ui/Badge';
 import { ArrowLeft, Clock, Calendar, Mic, Target, CheckCircle, Mail, BookOpen, Sparkles, X, Copy, Check, Trash2, Lock, Users, RefreshCw, Download, Phone, Edit2, Save, MessageCircle, Heart, AlertTriangle, Smile, ExternalLink } from 'lucide-react';
 import { RapportSection } from '../components/ui/RapportSection';
@@ -52,6 +54,7 @@ interface BaseInsights {
   followUpSuggestions: string[];
   keyTopics: string[];
   actionItems: string[];
+  decisionSummary?: DecisionSummary;
 }
 
 interface BantInsights extends BaseInsights {
@@ -539,6 +542,18 @@ export function TranscricaoDetalhesPage() {
   const [segments, setSegments] = useState<TranscriptSegment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Anúncio one-time da feature "Insights que impulsionam decisões" (pop-up ao abrir a reunião)
+  const { user } = useAuth();
+  const [showFeatureAnnounce, setShowFeatureAnnounce] = useState(false);
+  const announceKey = user?.id ? `lemon_announce_decision_insights_${user.id}` : null;
+  useEffect(() => {
+    if (announceKey && !localStorage.getItem(announceKey)) setShowFeatureAnnounce(true);
+  }, [announceKey]);
+  const dismissFeatureAnnounce = () => {
+    if (announceKey) localStorage.setItem(announceKey, '1');
+    setShowFeatureAnnounce(false);
+  };
+
   // Action items state
   const [actionItems, setActionItems] = useState<ActionItem[]>([]);
   const [actionItemsLoaded, setActionItemsLoaded] = useState(false);
@@ -905,6 +920,7 @@ export function TranscricaoDetalhesPage() {
 
   return (
     <MainLayout>
+      <DecisionInsightsAnnounceModal isOpen={showFeatureAnnounce} onClose={dismissFeatureAnnounce} />
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-start gap-4">
@@ -1172,6 +1188,11 @@ export function TranscricaoDetalhesPage() {
             </Card>
           );
         })()}
+
+        {/* Resumo de decisão — síntese acionável (pró / contra / risco), no topo dos insights */}
+        {meeting.insights?.decisionSummary && (
+          <DecisionSummaryCard summary={meeting.insights.decisionSummary} />
+        )}
 
         {/* Insights */}
         {meeting.insights && (
