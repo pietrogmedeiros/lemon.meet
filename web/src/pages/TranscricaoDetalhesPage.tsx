@@ -3,6 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { MainLayout } from '../components/layout/MainLayout';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
+import { DecisionSummaryCard, type DecisionSummary } from '../components/ui/DecisionSummaryCard';
+import { DecisionInsightsAnnounceModal } from '../components/DecisionInsightsAnnounceModal';
 import { Badge } from '../components/ui/Badge';
 import { ArrowLeft, Clock, Calendar, Mic, Target, CheckCircle, Mail, BookOpen, Sparkles, X, Copy, Check, Trash2, Lock, Users, RefreshCw, Download, Phone, Edit2, Save, MessageCircle, Heart, AlertTriangle, Smile, ExternalLink } from 'lucide-react';
 import { RapportSection } from '../components/ui/RapportSection';
@@ -43,21 +45,6 @@ interface SpinScore {
 interface EscalationFlag {
   description: string;
   severity: 'low' | 'medium' | 'high';
-}
-
-interface DecisionPoint {
-  point: string;
-  evidence: string;
-}
-interface DecisionRisk {
-  description: string;
-  severity: 'low' | 'medium' | 'high';
-  mitigation?: string;
-}
-interface DecisionSummary {
-  pros: DecisionPoint[];
-  cons: DecisionPoint[];
-  risks: DecisionRisk[];
 }
 
 interface BaseInsights {
@@ -555,6 +542,18 @@ export function TranscricaoDetalhesPage() {
   const [segments, setSegments] = useState<TranscriptSegment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Anúncio one-time da feature "Insights que impulsionam decisões" (pop-up ao abrir a reunião)
+  const { user } = useAuth();
+  const [showFeatureAnnounce, setShowFeatureAnnounce] = useState(false);
+  const announceKey = user?.id ? `lemon_announce_decision_insights_${user.id}` : null;
+  useEffect(() => {
+    if (announceKey && !localStorage.getItem(announceKey)) setShowFeatureAnnounce(true);
+  }, [announceKey]);
+  const dismissFeatureAnnounce = () => {
+    if (announceKey) localStorage.setItem(announceKey, '1');
+    setShowFeatureAnnounce(false);
+  };
+
   // Action items state
   const [actionItems, setActionItems] = useState<ActionItem[]>([]);
   const [actionItemsLoaded, setActionItemsLoaded] = useState(false);
@@ -921,6 +920,7 @@ export function TranscricaoDetalhesPage() {
 
   return (
     <MainLayout>
+      <DecisionInsightsAnnounceModal isOpen={showFeatureAnnounce} onClose={dismissFeatureAnnounce} />
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-start gap-4">
@@ -1190,67 +1190,9 @@ export function TranscricaoDetalhesPage() {
         })()}
 
         {/* Resumo de decisão — síntese acionável (pró / contra / risco), no topo dos insights */}
-        {meeting.insights?.decisionSummary && (() => {
-          const ds = meeting.insights!.decisionSummary!;
-          if (!(ds.pros?.length || ds.cons?.length || ds.risks?.length)) return null;
-          return (
-            <Card className="p-5 mb-4">
-              <h2 className="text-headline-2 text-primary mb-4 flex items-center gap-2">
-                <Sparkles className="h-5 w-5" />
-                Resumo de decisão
-              </h2>
-              <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
-                {/* A favor */}
-                <div>
-                  <h3 className="text-sm font-semibold text-primary mb-2">✅ A favor</h3>
-                  {ds.pros?.length ? (
-                    <ul className="space-y-2">
-                      {ds.pros.map((p, i) => (
-                        <li key={i} className="text-sm">
-                          <span className="text-primary">{p.point}</span>
-                          {p.evidence && <span className="block text-xs text-secondary mt-0.5 italic">{p.evidence}</span>}
-                        </li>
-                      ))}
-                    </ul>
-                  ) : <p className="text-xs text-secondary">—</p>}
-                </div>
-                {/* Contra */}
-                <div>
-                  <h3 className="text-sm font-semibold text-primary mb-2">⚠️ Contra</h3>
-                  {ds.cons?.length ? (
-                    <ul className="space-y-2">
-                      {ds.cons.map((c, i) => (
-                        <li key={i} className="text-sm">
-                          <span className="text-primary">{c.point}</span>
-                          {c.evidence && <span className="block text-xs text-secondary mt-0.5 italic">{c.evidence}</span>}
-                        </li>
-                      ))}
-                    </ul>
-                  ) : <p className="text-xs text-secondary">—</p>}
-                </div>
-                {/* Riscos */}
-                <div>
-                  <h3 className="text-sm font-semibold text-primary mb-2">🚩 Riscos</h3>
-                  {ds.risks?.length ? (
-                    <ul className="space-y-2">
-                      {ds.risks.map((r, i) => {
-                        const color = r.severity === 'high' ? '#ef4444' : r.severity === 'medium' ? '#f59e0b' : '#22c55e';
-                        const label = r.severity === 'high' ? 'Alto' : r.severity === 'medium' ? 'Médio' : 'Baixo';
-                        return (
-                          <li key={i} className="text-sm">
-                            <span className="text-primary">{r.description}</span>
-                            <span className="ml-2 text-xs font-semibold" style={{ color }}>({label})</span>
-                            {r.mitigation && <span className="block text-xs text-secondary mt-0.5">Mitigação: {r.mitigation}</span>}
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  ) : <p className="text-xs text-secondary">—</p>}
-                </div>
-              </div>
-            </Card>
-          );
-        })()}
+        {meeting.insights?.decisionSummary && (
+          <DecisionSummaryCard summary={meeting.insights.decisionSummary} />
+        )}
 
         {/* Insights */}
         {meeting.insights && (
