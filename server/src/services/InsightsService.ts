@@ -36,6 +36,24 @@ export interface EscalationFlag {
   severity: 'low' | 'medium' | 'high';
 }
 
+// Resumo de decisão: síntese acionável da reunião (pró/contra/risco), cada
+// item ancorado em evidência da transcrição. Impulsiona a decisão sem repetir
+// os scores. Opcional — reuniões antigas (pré-feature) não têm.
+export interface DecisionPoint {
+  point: string;
+  evidence: string;
+}
+export interface DecisionRisk {
+  description: string;
+  severity: 'low' | 'medium' | 'high';
+  mitigation?: string;
+}
+export interface DecisionSummary {
+  pros: DecisionPoint[];   // 2-4 sinais a favor
+  cons: DecisionPoint[];   // 2-4 sinais contra / fricções
+  risks: DecisionRisk[];   // 0-4 riscos que podem travar/reverter
+}
+
 // Campos comuns a todos os frameworks (Sales e CS)
 interface BaseInsights {
   sentiment: 'positive' | 'neutral' | 'negative';
@@ -44,6 +62,7 @@ interface BaseInsights {
   followUpSuggestions: string[]; // exatamente 4 sugestões prontas
   keyTopics: string[];
   actionItems: string[];
+  decisionSummary?: DecisionSummary;
   participants?: number;
   duration?: number;
 }
@@ -138,6 +157,11 @@ Analise a transcrição fornecida e retorne um JSON estruturado com os seguintes
     "authority": { "score": <0-10>, "evidence": "<evidência encontrada na transcrição>" },
     "need": { "score": <0-10>, "evidence": "<evidência encontrada na transcrição>" },
     "timeline": { "score": <0-10>, "evidence": "<evidência encontrada na transcrição>" }
+  },
+  "decisionSummary": {
+    "pros": [ { "point": "<sinal positivo concreto>", "evidence": "<trecho/fato da transcrição>" } ],
+    "cons": [ { "point": "<sinal negativo / fricção>", "evidence": "<trecho/fato da transcrição>" } ],
+    "risks": [ { "description": "<risco que pode travar/reverter o negócio>", "severity": "low" | "medium" | "high", "mitigation": "<como mitigar — opcional>" } ]
   }
 }
 
@@ -151,6 +175,7 @@ Critérios:
 - keyTopics: Principais temas discutidos
 - actionItems: Itens de ação identificados
 - bantScore: Avalie a qualidade de cada dimensão BANT com base em evidências concretas da transcrição. Score 0 = sem evidência, 10 = confirmação explícita e forte. Se não houver evidência para alguma dimensão, use score 0 e evidence "Não mencionado na reunião".
+- decisionSummary: Sintetize a reunião em pontos que IMPULSIONAM A DECISÃO de avançar/fechar. "pros" = 2 a 4 sinais POSITIVOS concretos; "cons" = 2 a 4 sinais NEGATIVOS ou fricções; "risks" = 0 a 4 riscos que podem travar ou reverter o negócio (com severidade e, quando possível, mitigação). CADA item DEVE citar evidência concreta da transcrição. NÃO repita os scores nem invente — se a transcrição não suportar um ponto, deixe a lista menor ou vazia.
 
 Retorne APENAS o JSON válido, sem texto adicional.`;
 
@@ -171,6 +196,11 @@ Analise a transcrição fornecida e retorne um JSON estruturado com os seguintes
     "problem": { "score": <0-10>, "evidence": "<evidência da transcrição>" },
     "implication": { "score": <0-10>, "evidence": "<evidência da transcrição>" },
     "needPayoff": { "score": <0-10>, "evidence": "<evidência da transcrição>" }
+  },
+  "decisionSummary": {
+    "pros": [ { "point": "<sinal positivo concreto>", "evidence": "<trecho/fato da transcrição>" } ],
+    "cons": [ { "point": "<sinal negativo / fricção>", "evidence": "<trecho/fato da transcrição>" } ],
+    "risks": [ { "description": "<risco que pode travar/reverter o negócio>", "severity": "low" | "medium" | "high", "mitigation": "<como mitigar — opcional>" } ]
   }
 }
 
@@ -189,6 +219,7 @@ Demais critérios:
 - executiveContext: Resumo executivo em 2-3 frases
 - closingProbability: PORCENTAGEM de 0 a 100 representando a probabilidade de fechamento. ATENÇÃO: escala 0-100 (porcentagem), NÃO 0-10. Exemplos: 25 (baixa), 50 (média), 70 (boa), 85 (alta), 95 (muito alta). NUNCA retorne valor menor que 10 se sentiment for positivo ou neutro.
 - followUpSuggestions: EXATAMENTE 4 mensagens prontas para enviar ao cliente (primeira pessoa, português BR, tom profissional, referenciando algo específico da reunião, com CTA claro). Ordene da mais urgente para a menos urgente.
+- decisionSummary: Sintetize a reunião em pontos que IMPULSIONAM A DECISÃO de avançar/fechar. "pros" = 2 a 4 sinais POSITIVOS concretos; "cons" = 2 a 4 sinais NEGATIVOS ou fricções; "risks" = 0 a 4 riscos que podem travar ou reverter o negócio (com severidade e, quando possível, mitigação). CADA item DEVE citar evidência concreta da transcrição. NÃO repita os scores nem invente — se a transcrição não suportar um ponto, deixe a lista menor ou vazia.
 
 Retorne APENAS o JSON válido, sem texto adicional.`;
 
@@ -209,7 +240,12 @@ Analise a transcrição fornecida e retorne um JSON estruturado com os seguintes
   "followUp": ["<ação 1>", "<ação 2>", ...],
   "followUpSuggestions": ["<sugestão 1>", "<sugestão 2>", "<sugestão 3>", "<sugestão 4>"],
   "keyTopics": ["<tópico 1>", "<tópico 2>", ...],
-  "actionItems": ["<item 1>", "<item 2>", ...]
+  "actionItems": ["<item 1>", "<item 2>", ...],
+  "decisionSummary": {
+    "pros": [ { "point": "<ponto forte da conta/relacionamento>", "evidence": "<trecho/fato da transcrição>" } ],
+    "cons": [ { "point": "<fricção / insatisfação>", "evidence": "<trecho/fato da transcrição>" } ],
+    "risks": [ { "description": "<risco à conta>", "severity": "low" | "medium" | "high", "mitigation": "<como mitigar — opcional>" } ]
+  }
 }
 
 Critérios:
@@ -224,6 +260,7 @@ Critérios:
 - followUpSuggestions: EXATAMENTE 4 mensagens prontas para enviar ao cliente (primeira pessoa, português BR, tom empático e profissional, referenciando algo específico da reunião, focando em parceria de longo prazo e não em venda). Ordene da mais urgente para a menos urgente.
 - keyTopics: Principais temas discutidos
 - actionItems: Itens de ação identificados
+- decisionSummary: Sintetize a reunião em pontos que IMPULSIONAM A DECISÃO sobre a conta. "pros" = 2 a 4 pontos fortes do relacionamento/uso; "cons" = 2 a 4 fricções ou insatisfações; "risks" = 0 a 4 riscos à conta (COMPLEMENTANDO churnRisk e escalationFlags, sem repetir o que já está lá), com severidade e mitigação quando possível. CADA item DEVE citar evidência concreta da transcrição. NÃO invente — se a transcrição não suportar, deixe a lista menor ou vazia.
 
 Retorne APENAS o JSON válido, sem texto adicional.`;
 

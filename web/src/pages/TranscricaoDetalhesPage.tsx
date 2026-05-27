@@ -45,6 +45,21 @@ interface EscalationFlag {
   severity: 'low' | 'medium' | 'high';
 }
 
+interface DecisionPoint {
+  point: string;
+  evidence: string;
+}
+interface DecisionRisk {
+  description: string;
+  severity: 'low' | 'medium' | 'high';
+  mitigation?: string;
+}
+interface DecisionSummary {
+  pros: DecisionPoint[];
+  cons: DecisionPoint[];
+  risks: DecisionRisk[];
+}
+
 interface BaseInsights {
   sentiment: 'positive' | 'neutral' | 'negative';
   executiveContext: string;
@@ -52,6 +67,7 @@ interface BaseInsights {
   followUpSuggestions: string[];
   keyTopics: string[];
   actionItems: string[];
+  decisionSummary?: DecisionSummary;
 }
 
 interface BantInsights extends BaseInsights {
@@ -1167,6 +1183,69 @@ export function TranscricaoDetalhesPage() {
                   <p className="text-xs text-secondary/60 mt-2 font-mono">
                     código: {meeting.failure_reason}
                   </p>
+                </div>
+              </div>
+            </Card>
+          );
+        })()}
+
+        {/* Resumo de decisão — síntese acionável (pró / contra / risco), no topo dos insights */}
+        {meeting.insights?.decisionSummary && (() => {
+          const ds = meeting.insights!.decisionSummary!;
+          if (!(ds.pros?.length || ds.cons?.length || ds.risks?.length)) return null;
+          return (
+            <Card className="p-5 mb-4">
+              <h2 className="text-headline-2 text-primary mb-4 flex items-center gap-2">
+                <Sparkles className="h-5 w-5" />
+                Resumo de decisão
+              </h2>
+              <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
+                {/* A favor */}
+                <div>
+                  <h3 className="text-sm font-semibold text-primary mb-2">✅ A favor</h3>
+                  {ds.pros?.length ? (
+                    <ul className="space-y-2">
+                      {ds.pros.map((p, i) => (
+                        <li key={i} className="text-sm">
+                          <span className="text-primary">{p.point}</span>
+                          {p.evidence && <span className="block text-xs text-secondary mt-0.5 italic">{p.evidence}</span>}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : <p className="text-xs text-secondary">—</p>}
+                </div>
+                {/* Contra */}
+                <div>
+                  <h3 className="text-sm font-semibold text-primary mb-2">⚠️ Contra</h3>
+                  {ds.cons?.length ? (
+                    <ul className="space-y-2">
+                      {ds.cons.map((c, i) => (
+                        <li key={i} className="text-sm">
+                          <span className="text-primary">{c.point}</span>
+                          {c.evidence && <span className="block text-xs text-secondary mt-0.5 italic">{c.evidence}</span>}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : <p className="text-xs text-secondary">—</p>}
+                </div>
+                {/* Riscos */}
+                <div>
+                  <h3 className="text-sm font-semibold text-primary mb-2">🚩 Riscos</h3>
+                  {ds.risks?.length ? (
+                    <ul className="space-y-2">
+                      {ds.risks.map((r, i) => {
+                        const color = r.severity === 'high' ? '#ef4444' : r.severity === 'medium' ? '#f59e0b' : '#22c55e';
+                        const label = r.severity === 'high' ? 'Alto' : r.severity === 'medium' ? 'Médio' : 'Baixo';
+                        return (
+                          <li key={i} className="text-sm">
+                            <span className="text-primary">{r.description}</span>
+                            <span className="ml-2 text-xs font-semibold" style={{ color }}>({label})</span>
+                            {r.mitigation && <span className="block text-xs text-secondary mt-0.5">Mitigação: {r.mitigation}</span>}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  ) : <p className="text-xs text-secondary">—</p>}
                 </div>
               </div>
             </Card>
