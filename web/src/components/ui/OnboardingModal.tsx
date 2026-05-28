@@ -103,7 +103,7 @@ export function OnboardingModal({ open, onClose }: OnboardingModalProps) {
               <h2 className="text-[16px] font-bold text-primary leading-tight">
                 {page === 1 ? 'Como usar o Lemon.meet' : 'Permissões necessárias'}
               </h2>
-              <p className="text-[12px] text-[#888] mt-0.5">
+              <p className="text-[12px] text-secondary mt-0.5">
                 {page === 1 ? '4 passos para gravar reuniões automaticamente' : 'Importante: leia antes de conectar'}
               </p>
             </div>
@@ -304,7 +304,7 @@ export function OnboardingModal({ open, onClose }: OnboardingModalProps) {
               }}
               defaultChecked={!!localStorage.getItem(STORAGE_KEY)}
             />
-            <span className="text-[12px] text-[#888]">Não mostrar novamente</span>
+            <span className="text-[12px] text-secondary">Não mostrar novamente</span>
           </label>
           <div className="flex items-center gap-2">
             {page === 2 && (

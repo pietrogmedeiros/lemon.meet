@@ -381,14 +381,14 @@ export function IntegrationsPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-[13px] font-medium text-primary">Google Calendar</p>
-                  <p className="text-[11px] text-[#888]">
+                  <p className="text-[11px] text-secondary">
                     Conectado em {new Date(calendar.connected_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}
                   </p>
                 </div>
                 <button
                   onClick={handleDisconnectCalendar}
                   disabled={calendarDisconnecting}
-                  className="flex items-center gap-1.5 text-[12px] text-[#888] hover:text-[#DC3545] transition-colors"
+                  className="flex items-center gap-1.5 text-[12px] text-secondary hover:text-[#DC3545] transition-colors"
                   title="Desconectar calendário"
                 >
                   {calendarDisconnecting
@@ -398,7 +398,7 @@ export function IntegrationsPage() {
                   Desconectar
                 </button>
               </div>
-              <p className="text-[12px] text-[#888]">
+              <p className="text-[12px] text-secondary">
                 ✓ O bot "Lemon Notetaker" entra automaticamente em todas as reuniões do seu calendário com link do Google Meet, Zoom ou Teams.
               </p>
             </div>
@@ -467,7 +467,7 @@ export function IntegrationsPage() {
                 <div className="flex-1 min-w-0">
                   <p className="text-[13px] font-medium text-primary">HubSpot</p>
                   {hubspotConnectedAt && (
-                    <p className="text-[11px] text-[#888]">
+                    <p className="text-[11px] text-secondary">
                       Conectado em {new Date(hubspotConnectedAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}
                     </p>
                   )}
@@ -475,7 +475,7 @@ export function IntegrationsPage() {
                 <button
                   onClick={handleDisconnectHubspot}
                   disabled={hubspotDisconnecting}
-                  className="flex items-center gap-1.5 text-[12px] text-[#888] hover:text-[#DC3545] transition-colors"
+                  className="flex items-center gap-1.5 text-[12px] text-secondary hover:text-[#DC3545] transition-colors"
                   title="Desconectar HubSpot"
                 >
                   {hubspotDisconnecting
@@ -484,7 +484,7 @@ export function IntegrationsPage() {
                   Desconectar
                 </button>
               </div>
-              <p className="text-[12px] text-[#888]">
+              <p className="text-[12px] text-secondary">
                 ✓ Nas reuniões concluídas, clique em "Enviar para HubSpot" para criar um deal e nota no seu CRM.
               </p>
             </div>
@@ -535,7 +535,7 @@ export function IntegrationsPage() {
               <span className={`ml-auto flex-shrink-0 inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${
                 webhook.active
                   ? 'bg-[#2D5A27]/10 text-brand'
-                  : 'bg-[#E0E0E0] text-[#888]'
+                  : 'bg-[#E0E0E0] text-secondary'
               }`}>
                 <span className={`w-1.5 h-1.5 rounded-full ${webhook.active ? 'bg-[#2D5A27]' : 'bg-[#aaa]'}`} />
                 {webhook.active ? 'Ativo' : 'Inativo'}
@@ -646,7 +646,7 @@ export function IntegrationsPage() {
           <pre className="bg-background border border-neutral-light rounded-lg p-4 text-[12px] text-[#444] leading-relaxed overflow-x-auto font-mono">
             {PAYLOAD_EXAMPLE}
           </pre>
-          <p className="mt-3 text-[12px] text-[#888]">
+          <p className="mt-3 text-[12px] text-secondary">
             O payload é enviado via <code className="bg-neutral-lighter px-1 py-0.5 rounded text-[11px]">POST</code> com{' '}
             <code className="bg-neutral-lighter px-1 py-0.5 rounded text-[11px]">Content-Type: application/json</code>.
             O cabeçalho <code className="bg-neutral-lighter px-1 py-0.5 rounded text-[11px]">X-Lemon-Webhook</code> identifica a origem.

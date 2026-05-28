@@ -152,7 +152,7 @@ export function DashboardPage() {
       <div className="space-y-6">
         <div>
           <h1 className="text-headline-1 text-primary">{t('dashboard.title', 'Dashboard')}</h1>
-          <p className="mt-2 text-body-large text-secondary dark:text-gray-400">
+          <p className="mt-2 text-body-large text-secondary ">
             {t('dashboard.subtitle', 'Visualize e gerencie suas reuniões')}
           </p>
         </div>
@@ -190,7 +190,7 @@ export function DashboardPage() {
         {/* Reuniões de Hoje */}
         {todayMeetings.length > 0 && (
           <Card>
-            <div className="border-b border-neutral-light dark:border-gray-700 p-6">
+            <div className="border-b border-neutral-light  p-6">
               <h2 className="text-headline-2 text-primary">Hoje</h2>
             </div>
             <div className="divide-y divide-neutral-light dark:divide-gray-700">
@@ -230,7 +230,7 @@ export function DashboardPage() {
         )}
 
         <Card>
-          <div className="border-b border-neutral-light dark:border-gray-700 p-6">
+          <div className="border-b border-neutral-light  p-6">
             <h2 className="text-headline-2 text-primary">Reuniões Recentes</h2>
           </div>
 
@@ -250,7 +250,7 @@ export function DashboardPage() {
                 <div
                   key={meeting.id}
                   onClick={() => navigate(`/meetings/${meeting.id}`)}
-                  className="cursor-pointer p-6 transition-colors hover:bg-neutral-light/30 dark:hover:bg-gray-700/30"
+                  className="cursor-pointer p-6 transition-colors hover:bg-neutral-light/30 dark:hover:bg-surface/30"
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex-1">

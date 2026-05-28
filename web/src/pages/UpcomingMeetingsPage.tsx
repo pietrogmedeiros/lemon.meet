@@ -60,7 +60,7 @@ function getPlatformColor(platform: string | null): string {
   if (platform === 'google_meet') return 'bg-blue-50 text-blue-700';
   if (platform === 'zoom') return 'bg-sky-50 text-sky-700';
   if (platform === 'teams') return 'bg-purple-50 text-purple-700';
-  return 'bg-gray-50 text-gray-600';
+  return 'bg-neutral-lighter text-secondary';
 }
 
 function groupByDay(meetings: Meeting[]): { label: string; items: Meeting[] }[] {
@@ -153,7 +153,7 @@ export function UpcomingMeetingsPage() {
                   <span className="text-body-small font-semibold text-primary uppercase tracking-wide">
                     {group.label}
                   </span>
-                  <div className="flex-1 h-px bg-neutral-light dark:bg-gray-700" />
+                  <div className="flex-1 h-px bg-neutral-light " />
                   <span className="text-body-small text-secondary">{group.items.length} reuni{group.items.length > 1 ? 'ões' : 'ão'}</span>
                 </div>
 
@@ -165,10 +165,10 @@ export function UpcomingMeetingsPage() {
                     return (
                       <div
                         key={meeting.id}
-                        className={`rounded-xl border bg-surface dark:bg-gray-800 p-5 transition-shadow hover:shadow-md ${
+                        className={`rounded-xl border bg-surface  p-5 transition-shadow hover:shadow-md ${
                           todayMeeting
                             ? 'border-primary/30 shadow-sm shadow-primary/10'
-                            : 'border-neutral-light dark:border-gray-700'
+                            : 'border-neutral-light '
                         }`}
                       >
                         <div className="flex items-center gap-4">
@@ -180,7 +180,7 @@ export function UpcomingMeetingsPage() {
                           </div>
 
                           {/* Divider vertical */}
-                          <div className="hidden sm:block w-px h-12 bg-neutral-light dark:bg-gray-700 shrink-0" />
+                          <div className="hidden sm:block w-px h-12 bg-neutral-light  shrink-0" />
 
                           {/* Info */}
                           <div className="flex-1 min-w-0">
@@ -206,7 +206,7 @@ export function UpcomingMeetingsPage() {
                             <span className={`hidden sm:inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${
                               urgent
                                 ? 'bg-amber-50 text-amber-700'
-                                : 'bg-neutral-light text-secondary dark:bg-gray-700 dark:text-gray-300'
+                                : 'bg-neutral-light text-secondary  '
                             }`}>
                               <Clock className="h-3.5 w-3.5" />
                               {timeLabel}

@@ -319,7 +319,7 @@ export function WebinarConfigPage() {
           </div>
           {config && (
             <span className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium ${
-              isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
+              isActive ? 'bg-green-100 text-green-700' : 'bg-neutral-lighter text-secondary'
             }`}>
               {isActive ? <><CheckCircle size={16} /> Ativo</> : <><XCircle size={16} /> Inativo</>}
             </span>
@@ -527,7 +527,7 @@ export function WebinarConfigPage() {
                           <Calendar size={16} className="text-brand shrink-0" />
                           <p className="font-medium text-primary">{formatPretty(s.scheduled_at)}</p>
                           {!s.is_active && (
-                            <span className="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-600">Inativa</span>
+                            <span className="text-xs px-2 py-0.5 rounded bg-neutral-lighter text-secondary">Inativa</span>
                           )}
                         </div>
                         <a

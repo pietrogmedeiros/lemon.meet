@@ -73,7 +73,7 @@ function BANTBar({ label, value, insight }: { label: string; value: number; insi
           style={{ width: `${pct}%` }}
         />
       </div>
-      <p className="text-xs text-[#888]">{insight}</p>
+      <p className="text-xs text-secondary">{insight}</p>
     </div>
   );
 }
@@ -90,7 +90,7 @@ function TrendBadge({ trend }: { trend: CoachingReport['trend'] }) {
     </span>
   );
   return (
-    <span className="inline-flex items-center gap-1 text-xs font-semibold bg-neutral-100 text-secondary px-2.5 py-1 rounded-full">
+    <span className="inline-flex items-center gap-1 text-xs font-semibold bg-neutral-lighter text-secondary px-2.5 py-1 rounded-full">
       <Minus size={12} /> Estável
     </span>
   );
@@ -181,7 +181,7 @@ export function CoachingPage() {
             <p className="mt-1 text-sm text-secondary">Análise personalizada do seu desempenho comercial</p>
           </div>
           <Card className="p-12 text-center">
-            <GraduationCap className="h-14 w-14 text-neutral-300 mx-auto mb-4" />
+            <GraduationCap className="h-14 w-14 text-tertiary mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-primary">Dados insuficientes</h3>
             <p className="mt-2 text-sm text-secondary max-w-sm mx-auto">
               Você tem <strong>{meetingsCount}</strong> reunião concluída
@@ -289,7 +289,7 @@ export function CoachingPage() {
         {/* BANT analysis */}
         <Card className="p-6 space-y-5">
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-neutral-100 flex items-center justify-center">
+            <div className="w-7 h-7 rounded-lg bg-neutral-lighter flex items-center justify-center">
               <TrendingUp size={15} className="text-[#555]" />
             </div>
             <h2 className="text-sm font-semibold text-primary">Análise BANT — média das reuniões</h2>

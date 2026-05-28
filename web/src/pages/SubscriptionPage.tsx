@@ -33,7 +33,7 @@ function formatDate(iso: string) {
 function CardBrandIcon({ brand }: { brand: string }) {
   const labels: Record<string, string> = { visa: 'VISA', mastercard: 'MC', amex: 'AMEX', elo: 'ELO' }
   return (
-    <span className="text-xs font-bold bg-neutral-100 text-primary px-2 py-0.5 rounded-md uppercase tracking-wide">
+    <span className="text-xs font-bold bg-neutral-lighter text-primary px-2 py-0.5 rounded-md uppercase tracking-wide">
       {labels[brand] ?? brand}
     </span>
   )

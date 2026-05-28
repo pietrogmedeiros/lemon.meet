@@ -5,7 +5,7 @@ export function TermosAppPage() {
   const navigate = useNavigate()
 
   return (
-    <div className="min-h-screen bg-background dark:bg-gray-900">
+    <div className="min-h-screen bg-background ">
       <div className="max-w-3xl mx-auto px-6 py-12">
         <button
           onClick={() => navigate(-1)}
@@ -23,7 +23,7 @@ export function TermosAppPage() {
         <h1 className="text-3xl font-bold text-primary dark:text-white mb-2">Termos de Uso</h1>
         <p className="text-body-small text-secondary mb-10">Última atualização: abril de 2026</p>
 
-        <div className="prose prose-sm max-w-none text-secondary dark:text-gray-300 space-y-8">
+        <div className="prose prose-sm max-w-none text-secondary  space-y-8">
 
           <section>
             <h2 className="text-lg font-semibold text-primary dark:text-white mb-3">1. Aceitação dos termos</h2>

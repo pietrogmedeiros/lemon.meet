@@ -64,19 +64,19 @@ function ScoreBar({ score, max = 10 }: { score: number; max?: number }) {
   const pct = (score / max) * 100;
   const color = score >= 8 ? 'bg-[#2D5A27]' : score > 5 ? 'bg-[#FFD700]' : 'bg-[#DC3545]';
   return (
-    <div className="flex-1 h-2 rounded-full bg-neutral-100 overflow-hidden">
+    <div className="flex-1 h-2 rounded-full bg-neutral-lighter overflow-hidden">
       <div className={`h-full rounded-full ${color} transition-all duration-500`} style={{ width: `${pct}%` }} />
     </div>
   );
 }
 
 function ScoreTrendIcon({ scores }: { scores: number[] }) {
-  if (scores.length < 2) return <Minus className="h-4 w-4 text-neutral-400" />;
+  if (scores.length < 2) return <Minus className="h-4 w-4 text-tertiary" />;
   const last = scores[scores.length - 1];
   const prev = scores[scores.length - 2];
   if (last > prev) return <TrendingUp className="h-4 w-4 text-brand" />;
   if (last < prev) return <TrendingDown className="h-4 w-4 text-[#DC3545]" />;
-  return <Minus className="h-4 w-4 text-neutral-400" />;
+  return <Minus className="h-4 w-4 text-tertiary" />;
 }
 
 export function InsightsPage() {
@@ -337,7 +337,7 @@ export function InsightsPage() {
 
         {total === 0 ? (
           <Card className="p-12 text-center">
-            <BarChart3 className="h-12 w-12 text-neutral-300 mx-auto mb-4" />
+            <BarChart3 className="h-12 w-12 text-tertiary mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-primary">{t('insights.aggregate.empty.title')}</h3>
             <p className="mt-2 text-sm text-secondary">{t('insights.aggregate.empty.text')}</p>
           </Card>
@@ -353,7 +353,7 @@ export function InsightsPage() {
                       {t('insights.aggregate.stats.total')}
                     </p>
                     <p className="mt-2 text-4xl font-bold text-primary">{total}</p>
-                    <p className="mt-1 text-xs text-[#888]">
+                    <p className="mt-1 text-xs text-secondary">
                       {t('insights.aggregate.stats.completed', { count: completed })}
                     </p>
                   </div>
@@ -372,10 +372,10 @@ export function InsightsPage() {
                       </p>
                       <div className="mt-2 flex items-end gap-1.5">
                         <span className="text-4xl font-bold text-primary">{avgScore}</span>
-                        <span className="text-sm text-[#888] mb-1">/10</span>
+                        <span className="text-sm text-secondary mb-1">/10</span>
                         <span className="mb-1"><ScoreTrendIcon scores={scores} /></span>
                       </div>
-                      <p className="mt-1 text-xs text-[#888]">
+                      <p className="mt-1 text-xs text-secondary">
                         {t('insights.aggregate.stats.basedOn', { count: withScores.length })}
                       </p>
                     </div>
@@ -400,7 +400,7 @@ export function InsightsPage() {
                       {t('insights.aggregate.stats.highQuality')}
                     </p>
                     <p className="mt-2 text-4xl font-bold text-brand">{highQ}</p>
-                    <p className="mt-1 text-xs text-[#888]">{t('insights.aggregate.stats.scoreHigh')}</p>
+                    <p className="mt-1 text-xs text-secondary">{t('insights.aggregate.stats.scoreHigh')}</p>
                   </div>
                   <div className="w-9 h-9 rounded-xl bg-[#2D5A27]/10 flex items-center justify-center">
                     <TrendingUp size={17} className="text-brand" />
@@ -415,7 +415,7 @@ export function InsightsPage() {
                       {t('insights.aggregate.stats.needsAttention')}
                     </p>
                     <p className="mt-2 text-4xl font-bold text-[#DC3545]">{lowQ}</p>
-                    <p className="mt-1 text-xs text-[#888]">{t('insights.aggregate.stats.scoreLow')}</p>
+                    <p className="mt-1 text-xs text-secondary">{t('insights.aggregate.stats.scoreLow')}</p>
                   </div>
                   <div className="w-9 h-9 rounded-xl bg-[#DC3545]/8 flex items-center justify-center">
                     <TrendingDown size={17} className="text-[#DC3545]" />
@@ -448,12 +448,12 @@ export function InsightsPage() {
                         <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold flex-shrink-0 ${
                           i === 0 ? 'bg-[#FFD700] text-primary' :
                           i === 1 ? 'bg-neutral-300 text-white' :
-                          i === 2 ? 'bg-neutral-200 text-secondary' :
-                          'bg-neutral-100 text-[#888]'
+                          i === 2 ? 'bg-neutral-lighter text-secondary' :
+                          'bg-neutral-lighter text-secondary'
                         }`}>{i + 1}</span>
 
                         <div className="flex-1 min-w-0">
-                          <p className="text-[13px] font-medium text-[#222] truncate group-hover:text-brand transition-colors">
+                          <p className="text-[13px] font-medium text-primary truncate group-hover:text-brand transition-colors">
                             {m.title || `${t('insights.aggregate.ranking.meeting')} ${m.id.slice(0, 8)}`}
                           </p>
                           <p className="text-[11px] text-tertiary">{formatDate(m.created_at, lang)}</p>
@@ -498,7 +498,7 @@ export function InsightsPage() {
                               </span>
                             </div>
                           </div>
-                          <div className="h-3 rounded-full bg-neutral-100 overflow-hidden">
+                          <div className="h-3 rounded-full bg-neutral-lighter overflow-hidden">
                             <div
                               className={`h-full rounded-full ${barCls} transition-all duration-700`}
                               style={{ width: `${pct}%` }}
@@ -547,9 +547,9 @@ export function InsightsPage() {
                         <div className="flex-1">
                           <div className="flex justify-between text-[13px] mb-1">
                             <span className="font-medium text-primary">{t(`insights.aggregate.sentiment.${key}`)}</span>
-                            <span className="text-[#888] tabular-nums">{count}</span>
+                            <span className="text-secondary tabular-nums">{count}</span>
                           </div>
-                          <div className="h-2 rounded-full bg-neutral-100 overflow-hidden">
+                          <div className="h-2 rounded-full bg-neutral-lighter overflow-hidden">
                             <div
                               className={`h-full rounded-full ${barCls} transition-all duration-700`}
                               style={{ width: total ? `${(count / total) * 100}%` : '0%' }}
@@ -612,7 +612,7 @@ export function InsightsPage() {
                         >
                           <div className="w-2.5 h-2.5 rounded-full flex-shrink-0 bg-[#DC3545]" />
                           <div className="flex-1 min-w-0">
-                            <p className="text-[13px] font-medium text-[#222] truncate group-hover:text-[#DC3545] transition-colors">
+                            <p className="text-[13px] font-medium text-primary truncate group-hover:text-[#DC3545] transition-colors">
                               {m.title || `${t('insights.aggregate.ranking.meeting')} ${m.id.slice(0, 8)}`}
                             </p>
                             <p className="text-[11px] text-tertiary">{formatDate(m.created_at, lang)}</p>
@@ -647,7 +647,7 @@ export function InsightsPage() {
                       >
                         <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${m.score >= 8 ? 'bg-[#2D5A27]' : m.score > 5 ? 'bg-[#FFD700]' : 'bg-[#DC3545]'}`} />
                         <div className="flex-1 min-w-0">
-                          <p className="text-[13px] font-medium text-[#222] truncate group-hover:text-brand transition-colors">
+                          <p className="text-[13px] font-medium text-primary truncate group-hover:text-brand transition-colors">
                             {m.title || `${t('insights.aggregate.ranking.meeting')} ${m.id.slice(0, 8)}`}
                           </p>
                           <p className="text-[11px] text-tertiary">{formatDate(m.created_at, lang)}</p>

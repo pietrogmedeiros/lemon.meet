@@ -387,7 +387,7 @@ export function SettingsPage() {
             </div>
           )}
           {checkoutMsg === 'cancelled' && (
-            <div className="flex items-center gap-2 text-sm text-secondary bg-gray-50 border border-gray-200 px-4 py-3 rounded-xl mb-4">
+            <div className="flex items-center gap-2 text-sm text-secondary bg-neutral-lighter border border-neutral-light px-4 py-3 rounded-xl mb-4">
               <AlertCircle size={16} />
               Pagamento cancelado. Você pode tentar novamente quando quiser.
             </div>

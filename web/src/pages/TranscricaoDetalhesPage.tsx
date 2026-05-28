@@ -520,7 +520,7 @@ function FollowUpSection({ suggestions, emailLoading, onGenerateEmail, copiedInd
       {!isPro && (
         <div className="absolute inset-0 flex flex-col items-center justify-center rounded-xl bg-white/60 backdrop-blur-[2px]">
           <div className="flex flex-col items-center gap-2 px-6 py-4 rounded-xl bg-surface shadow-lg border border-[#E8E8E8]">
-            <Lock className="h-6 w-6 text-[#888]" />
+            <Lock className="h-6 w-6 text-secondary" />
             <p className="text-sm font-semibold text-[#444]">Disponível no plano Professional</p>
             <a
               href="/subscription"
@@ -974,7 +974,7 @@ export function TranscricaoDetalhesPage() {
                   {meeting.participant_emails.map((email) => (
                     <span
                       key={email}
-                      className="inline-flex items-center gap-1 text-xs bg-neutral-100 text-secondary px-2 py-0.5 rounded-full"
+                      className="inline-flex items-center gap-1 text-xs bg-neutral-lighter text-secondary px-2 py-0.5 rounded-full"
                     >
                       <Mail className="h-3 w-3" />
                       {email}
@@ -997,7 +997,7 @@ export function TranscricaoDetalhesPage() {
                     value={phoneInput}
                     onChange={(e) => setPhoneInput(e.target.value)}
                     placeholder="DDI+DD+TELEFONE (ex: 5511999999999)"
-                    className="text-xs border border-neutral-300 rounded px-2 py-1 w-64"
+                    className="text-xs border border-neutral-light rounded px-2 py-1 w-64"
                     disabled={phoneSaving}
                   />
                   <button
@@ -1020,7 +1020,7 @@ export function TranscricaoDetalhesPage() {
                 </div>
               ) : contactPhone ? (
                 <div className="flex items-center gap-2">
-                  <span className="text-xs bg-neutral-100 text-secondary px-2 py-0.5 rounded-full">
+                  <span className="text-xs bg-neutral-lighter text-secondary px-2 py-0.5 rounded-full">
                     +{contactPhone}
                   </span>
                   <button
@@ -1458,7 +1458,7 @@ export function TranscricaoDetalhesPage() {
                         className={`flex-shrink-0 mt-0.5 w-4 h-4 rounded border transition-colors ${
                           item.status === 'done'
                             ? 'bg-primary border-primary'
-                            : 'border-gray-300 hover:border-primary'
+                            : 'border-neutral-light hover:border-primary'
                         }`}
                         aria-label={item.status === 'done' ? 'Marcar como pendente' : 'Marcar como concluído'}
                       >

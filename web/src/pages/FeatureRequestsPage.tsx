@@ -28,7 +28,7 @@ interface FeatureRequest {
 }
 
 const STATUS_CONFIG = {
-  'pending': { label: 'Pendente', icon: Clock, color: 'text-gray-500', bg: 'bg-gray-50', border: 'border-gray-200' },
+  'pending': { label: 'Pendente', icon: Clock, color: 'text-secondary', bg: 'bg-neutral-lighter', border: 'border-neutral-light' },
   'under-review': { label: 'Em Análise', icon: AlertCircle, color: 'text-blue-500', bg: 'bg-blue-50', border: 'border-blue-200' },
   'planned': { label: 'Planejada', icon: Calendar, color: 'text-purple-500', bg: 'bg-purple-50', border: 'border-purple-200' },
   'in-progress': { label: 'Em Desenvolvimento', icon: TrendingUp, color: 'text-orange-500', bg: 'bg-orange-50', border: 'border-orange-200' },

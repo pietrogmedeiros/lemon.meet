@@ -152,7 +152,7 @@ export function NotificationBell() {
       {/* Botão do sino */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="relative p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
+        className="relative p-2 text-secondary  hover:bg-neutral-lighter dark:hover:bg-surface rounded-full transition-colors"
         aria-label="Notificações"
       >
         <Bell size={20} />
@@ -173,10 +173,10 @@ export function NotificationBell() {
           />
 
           {/* Menu */}
-          <div className="absolute right-0 mt-2 w-80 bg-surface dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50 max-h-96 overflow-hidden flex flex-col">
+          <div className="absolute right-0 mt-2 w-80 bg-surface  rounded-lg shadow-lg border border-neutral-light  z-50 max-h-96 overflow-hidden flex flex-col">
             {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
-              <h3 className="font-semibold text-gray-900 dark:text-white">
+            <div className="flex items-center justify-between p-4 border-b border-neutral-light ">
+              <h3 className="font-semibold text-primary dark:text-white">
                 Notificações
               </h3>
               {unreadCount > 0 && (
@@ -192,7 +192,7 @@ export function NotificationBell() {
             {/* Lista de notificações */}
             <div className="overflow-y-auto flex-1">
               {notifications.length === 0 ? (
-                <div className="p-8 text-center text-gray-500 dark:text-gray-400">
+                <div className="p-8 text-center text-secondary ">
                   <Bell size={48} className="mx-auto mb-2 opacity-50" />
                   <p>Nenhuma notificação</p>
                 </div>
@@ -201,19 +201,19 @@ export function NotificationBell() {
                   <button
                     key={notification.id}
                     onClick={() => handleNotificationClick(notification)}
-                    className={`w-full text-left p-4 border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${
+                    className={`w-full text-left p-4 border-b border-neutral-light  hover:bg-neutral-lighter dark:hover:bg-surface transition-colors ${
                       !notification.read ? 'bg-blue-50 dark:bg-blue-900/20' : ''
                     }`}
                   >
                     <div className="flex items-start gap-3">
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 dark:text-white mb-1">
+                        <p className="text-sm font-medium text-primary dark:text-white mb-1">
                           {notification.title}
                         </p>
-                        <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-2">
+                        <p className="text-xs text-secondary  line-clamp-2">
                           {notification.message}
                         </p>
-                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                        <p className="text-xs text-tertiary  mt-1">
                           {new Date(notification.created_at).toLocaleString('pt-BR', {
                             day: '2-digit',
                             month: '2-digit',

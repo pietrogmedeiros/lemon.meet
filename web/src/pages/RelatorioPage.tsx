@@ -127,7 +127,7 @@ function computeStats(meetings: Meeting[], start: Date, end: Date): WeekStats {
 function DeltaBadge({ curr, prev }: { curr: number | null; prev: number | null }) {
   if (curr === null || prev === null) return <span className="text-[#ccc] text-xs">—</span>;
   const diff = curr - prev;
-  if (Math.abs(diff) < 0.05) return <span className="inline-flex items-center gap-0.5 text-xs text-[#888]"><Minus size={11} /> igual</span>;
+  if (Math.abs(diff) < 0.05) return <span className="inline-flex items-center gap-0.5 text-xs text-secondary"><Minus size={11} /> igual</span>;
   if (diff > 0) return (
     <span className="inline-flex items-center gap-0.5 text-xs font-semibold text-brand">
       <TrendingUp size={11} /> +{diff.toFixed(1)}
@@ -142,7 +142,7 @@ function DeltaBadge({ curr, prev }: { curr: number | null; prev: number | null }
 
 function DeltaCountBadge({ curr, prev }: { curr: number; prev: number }) {
   const diff = curr - prev;
-  if (diff === 0) return <span className="inline-flex items-center gap-0.5 text-xs text-[#888]"><Minus size={11} /> igual</span>;
+  if (diff === 0) return <span className="inline-flex items-center gap-0.5 text-xs text-secondary"><Minus size={11} /> igual</span>;
   if (diff > 0) return (
     <span className="inline-flex items-center gap-0.5 text-xs font-semibold text-brand">
       <TrendingUp size={11} /> +{diff}
@@ -322,7 +322,7 @@ export function RelatorioPage() {
 
   const sentimentColor =
     dominantSentiment === 'positivo' ? 'text-brand' :
-    dominantSentiment === 'negativo' ? 'text-[#DC3545]' : 'text-[#888]';
+    dominantSentiment === 'negativo' ? 'text-[#DC3545]' : 'text-secondary';
 
   /* Temporariamente desabilitado - Exportação de PDF
   const handleExportPDF = async () => {
@@ -677,7 +677,7 @@ export function RelatorioPage() {
             <div className="flex items-center gap-2 bg-surface border border-neutral-light rounded-xl px-3 py-2">
               <button
                 onClick={() => setWeekOffset(w => w - 1)}
-                className="p-1 rounded hover:bg-neutral-100 transition-colors text-[#555]"
+                className="p-1 rounded hover:bg-neutral-lighter transition-colors text-[#555]"
                 aria-label="Semana anterior"
               >
                 <ChevronLeft size={16} />
@@ -688,7 +688,7 @@ export function RelatorioPage() {
               <button
                 onClick={() => setWeekOffset(w => Math.min(w + 1, 0))}
                 disabled={isCurrentWeek}
-                className="p-1 rounded hover:bg-neutral-100 transition-colors text-[#555] disabled:opacity-30 disabled:cursor-default"
+                className="p-1 rounded hover:bg-neutral-lighter transition-colors text-[#555] disabled:opacity-30 disabled:cursor-default"
                 aria-label="Próxima semana"
               >
                 <ChevronRight size={16} />
@@ -768,7 +768,7 @@ export function RelatorioPage() {
         {/* Empty state */}
         {curr.total === 0 && (
           <Card className="p-12 text-center">
-            <Calendar className="h-12 w-12 text-neutral-300 mx-auto mb-4" />
+            <Calendar className="h-12 w-12 text-tertiary mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-primary">Nenhuma reunião nesta semana</h3>
             <p className="mt-2 text-sm text-secondary">Use as setas para navegar para semanas com dados.</p>
           </Card>
@@ -784,7 +784,7 @@ export function RelatorioPage() {
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-widest text-tertiary">Reuniões</p>
                     <p className="mt-2 text-4xl font-bold text-primary">{curr.total}</p>
-                    <p className="mt-1 text-xs text-[#888]">{curr.completed} concluídas</p>
+                    <p className="mt-1 text-xs text-secondary">{curr.completed} concluídas</p>
                   </div>
                   <div className="flex flex-col items-end gap-1">
                     <div className="w-8 h-8 rounded-xl bg-[#2D5A27]/10 flex items-center justify-center">
@@ -802,12 +802,12 @@ export function RelatorioPage() {
                     <p className="mt-2 text-4xl font-bold text-primary">
                       {curr.avgScore !== null ? curr.avgScore : <span className="text-[#ccc]">—</span>}
                     </p>
-                    <p className="mt-1 text-xs text-[#888]">
+                    <p className="mt-1 text-xs text-secondary">
                       {curr.scoreCount > 0 ? `em ${curr.scoreCount} reuniões` : 'sem dados'}
                     </p>
                   </div>
                   <div className="flex flex-col items-end gap-1">
-                    <div className="w-8 h-8 rounded-xl bg-neutral-100 flex items-center justify-center">
+                    <div className="w-8 h-8 rounded-xl bg-neutral-lighter flex items-center justify-center">
                       <BarChart3 size={15} className="text-secondary" />
                     </div>
                     <DeltaBadge curr={curr.avgScore} prev={prev.avgScore} />
@@ -823,12 +823,12 @@ export function RelatorioPage() {
                       {curr.completed > 0 ? dominantSentiment : <span className="text-[#ccc]">—</span>}
                     </p>
                     {curr.completed > 0 && (
-                      <p className="mt-1 text-xs text-[#888]">
+                      <p className="mt-1 text-xs text-secondary">
                         {curr.positive}↑ {curr.neutral}= {curr.negative}↓
                       </p>
                     )}
                   </div>
-                  <div className="w-8 h-8 rounded-xl bg-neutral-100 flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-xl bg-neutral-lighter flex items-center justify-center">
                     <TrendingUp size={15} className="text-secondary" />
                   </div>
                 </div>
@@ -839,7 +839,7 @@ export function RelatorioPage() {
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-widest text-tertiary">Action items</p>
                     <p className="mt-2 text-4xl font-bold text-primary">{curr.pendingActions}</p>
-                    <p className="mt-1 text-xs text-[#888]">identificados nas reuniões</p>
+                    <p className="mt-1 text-xs text-secondary">identificados nas reuniões</p>
                   </div>
                   <div className="flex flex-col items-end gap-1">
                     <div className="w-8 h-8 rounded-xl bg-[#FFD700]/20 flex items-center justify-center">
@@ -868,7 +868,7 @@ export function RelatorioPage() {
                   <ol className="space-y-2">
                     {curr.topMeetings.map((m, i) => (
                       <li key={m.id} className="flex items-center gap-3">
-                        <span className="w-5 h-5 flex-shrink-0 rounded-full bg-neutral-100 text-[10px] font-bold text-[#888] flex items-center justify-center">
+                        <span className="w-5 h-5 flex-shrink-0 rounded-full bg-neutral-lighter text-[10px] font-bold text-secondary flex items-center justify-center">
                           {i + 1}
                         </span>
                         <span className="flex-1 text-sm text-primary truncate">
@@ -884,7 +884,7 @@ export function RelatorioPage() {
               {/* Tópicos da semana */}
               <Card className="p-5 space-y-4">
                 <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-neutral-100 flex items-center justify-center">
+                  <div className="w-7 h-7 rounded-lg bg-neutral-lighter flex items-center justify-center">
                     <Hash size={14} className="text-secondary" />
                   </div>
                   <h2 className="text-sm font-semibold text-primary">Tópicos discutidos</h2>
@@ -894,7 +894,7 @@ export function RelatorioPage() {
                 ) : (
                   <div className="flex flex-wrap gap-2">
                     {curr.topics.map(t => (
-                      <span key={t} className="px-2.5 py-1 rounded-full bg-neutral-100 text-xs text-[#555] font-medium">
+                      <span key={t} className="px-2.5 py-1 rounded-full bg-neutral-lighter text-xs text-[#555] font-medium">
                         {t}
                       </span>
                     ))}

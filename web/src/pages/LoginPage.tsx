@@ -56,7 +56,7 @@ export function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background dark:bg-gray-900">
+    <div className="min-h-screen flex items-center justify-center bg-background ">
       <div className="max-w-md w-full px-6">
         <div className="text-center mb-8">
           <img src="/lemon.meet.png" alt="Lemon.meet" className="h-28 object-contain mx-auto mb-4" />
@@ -66,12 +66,12 @@ export function LoginPage() {
           </p>
         </div>
 
-        <div className="bg-surface dark:bg-gray-800 border border-neutral-light dark:border-gray-700 rounded-2xl p-8 shadow-sm">
+        <div className="bg-surface  border border-neutral-light  rounded-2xl p-8 shadow-sm">
           <h2 className="text-headline-2 text-primary dark:text-white mb-3 text-center">
             {t('auth.login.title', 'Bem-vindo ao Lemon.meet')}
           </h2>
           
-          <p className="text-body-small text-secondary dark:text-gray-400 mb-6 text-center">
+          <p className="text-body-small text-secondary  mb-6 text-center">
             {t('auth.login.subtitle', 'Entre com sua conta para começar')}
           </p>
 

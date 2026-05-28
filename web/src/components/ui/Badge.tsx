@@ -56,7 +56,7 @@ export function Badge({ status, variant, children, className }: BadgeProps) {
   // Caso contrário, use variant genérico - Design System Vibe AI
   const variantStyles = {
     primary: 'bg-primary/10 dark:bg-primary/20 text-primary border-primary/20',
-    secondary: 'bg-neutral-lighter dark:bg-gray-700 text-neutral-mid dark:text-gray-300 border-neutral-light dark:border-gray-600',
+    secondary: 'bg-neutral-lighter  text-neutral-mid  border-neutral-light ',
     success: 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-700',
     danger: 'bg-red-50 text-red-700 border-red-200',
   }
