@@ -493,7 +493,7 @@ export function InsightsPage() {
                             <span className="text-[13px] font-medium text-primary">{label}</span>
                             <div className="flex items-center gap-2">
                               <span className="text-[11px] text-tertiary">{pct}%</span>
-                              <span className="text-[13px] font-semibold text-[#555]">
+                              <span className="text-[13px] font-semibold text-secondary">
                                 {t('insights.aggregate.distribution.count', { count })}
                               </span>
                             </div>

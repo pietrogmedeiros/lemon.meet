@@ -677,7 +677,7 @@ export function RelatorioPage() {
             <div className="flex items-center gap-2 bg-surface border border-neutral-light rounded-xl px-3 py-2">
               <button
                 onClick={() => setWeekOffset(w => w - 1)}
-                className="p-1 rounded hover:bg-neutral-lighter transition-colors text-[#555]"
+                className="p-1 rounded hover:bg-neutral-lighter transition-colors text-secondary"
                 aria-label="Semana anterior"
               >
                 <ChevronLeft size={16} />
@@ -688,7 +688,7 @@ export function RelatorioPage() {
               <button
                 onClick={() => setWeekOffset(w => Math.min(w + 1, 0))}
                 disabled={isCurrentWeek}
-                className="p-1 rounded hover:bg-neutral-lighter transition-colors text-[#555] disabled:opacity-30 disabled:cursor-default"
+                className="p-1 rounded hover:bg-neutral-lighter transition-colors text-secondary disabled:opacity-30 disabled:cursor-default"
                 aria-label="Próxima semana"
               >
                 <ChevronRight size={16} />
@@ -894,7 +894,7 @@ export function RelatorioPage() {
                 ) : (
                   <div className="flex flex-wrap gap-2">
                     {curr.topics.map(t => (
-                      <span key={t} className="px-2.5 py-1 rounded-full bg-neutral-lighter text-xs text-[#555] font-medium">
+                      <span key={t} className="px-2.5 py-1 rounded-full bg-neutral-lighter text-xs text-secondary font-medium">
                         {t}
                       </span>
                     ))}

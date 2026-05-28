@@ -316,7 +316,7 @@ export function SettingsPage() {
                 </div>
 
                 {pwStatus === 'sent' ? (
-                  <div className="flex items-center gap-2 text-sm text-[#4CAF50] font-medium bg-green-50 border border-green-200 px-4 py-3 rounded-xl">
+                  <div className="flex items-center gap-2 text-sm text-[#4CAF50] font-medium bg-green-50 dark:bg-green-950/40 border border-green-200 dark:border-green-900/50 px-4 py-3 rounded-xl">
                     <CheckCircle size={16} />
                     E-mail enviado! Verifique sua caixa de entrada.
                   </div>
@@ -381,7 +381,7 @@ export function SettingsPage() {
 
           {/* Feedback do gateway de pagamento */}
           {checkoutMsg === 'success' && (
-            <div className="flex items-center gap-2 text-sm text-[#4CAF50] font-medium bg-green-50 border border-green-200 px-4 py-3 rounded-xl mb-4">
+            <div className="flex items-center gap-2 text-sm text-[#4CAF50] font-medium bg-green-50 dark:bg-green-950/40 border border-green-200 dark:border-green-900/50 px-4 py-3 rounded-xl mb-4">
               <CheckCircle size={16} />
               Pagamento confirmado! Seu plano foi ativado.
             </div>

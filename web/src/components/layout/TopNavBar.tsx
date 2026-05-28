@@ -4,9 +4,9 @@ import { NotificationBell } from './NotificationBell'
 import { useNavigate } from 'react-router-dom'
 
 const PLAN_CONFIG: Record<string, { label: string; cls: string }> = {
-  trial:        { label: 'Trial', cls: 'bg-blue-50 text-blue-600 border-blue-200' },
+  trial:        { label: 'Trial', cls: 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 border-blue-200 dark:border-blue-900/50' },
   starter:      { label: 'Starter', cls: 'bg-[#2D5A27]/8 text-brand border-[#2D5A27]/20' },
-  professional: { label: 'Professional', cls: 'bg-amber-50 text-amber-600 border-amber-200' },
+  professional: { label: 'Professional', cls: 'bg-amber-50 dark:bg-amber-950/40 text-amber-600 border-amber-200 dark:border-amber-900/50' },
 }
 
 export function TopNavBar() {

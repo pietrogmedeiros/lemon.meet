@@ -76,7 +76,7 @@ function RapportDataDisplay({ data }: { data: RapportData }) {
     <div className="space-y-5 mt-4">
       {/* Empresa */}
       {data.company && (
-        <div className="rounded-lg border border-[#E8F5E9] bg-[#F9FFF9] p-4">
+        <div className="rounded-lg border border-[#E8F5E9] bg-[#F9FFF9] dark:border-[#244A2F] dark:bg-[#13251A] p-4">
           <h3 className="flex items-center gap-2 text-sm font-semibold text-primary mb-1">
             <Building2 className="h-4 w-4 text-brand" />
             {data.company.name}
@@ -107,9 +107,9 @@ function RapportDataDisplay({ data }: { data: RapportData }) {
 
       {/* Pessoa */}
       {data.person && (
-        <div className="rounded-lg border border-[#E8EEF9] bg-[#F6F9FF] p-4">
+        <div className="rounded-lg border border-[#E8EEF9] bg-[#F6F9FF] dark:border-[#283449] dark:bg-[#141A28] p-4">
           <h3 className="flex items-center gap-2 text-sm font-semibold text-primary mb-1">
-            <User className="h-4 w-4 text-[#3B5999]" />
+            <User className="h-4 w-4 text-[#3B5999] dark:text-[#8FA8E0]" />
             {data.person.name}
             {data.person.role && (
               <span className="text-xs font-normal text-secondary">· {data.person.role}</span>
@@ -130,8 +130,8 @@ function RapportDataDisplay({ data }: { data: RapportData }) {
       {/* Grid: Dicas de rapport + Ice-breakers + Tópicos */}
       <div className="grid gap-4 sm:grid-cols-3">
         {data.rapportTips?.length > 0 && (
-          <div className="rounded-lg border border-[#FFF3E0] bg-[#FFFBF5] p-3">
-            <h4 className="flex items-center gap-1.5 text-xs font-semibold text-[#E65100] uppercase tracking-wide mb-2">
+          <div className="rounded-lg border border-[#FFF3E0] bg-[#FFFBF5] dark:border-[#3A301C] dark:bg-[#211B12] p-3">
+            <h4 className="flex items-center gap-1.5 text-xs font-semibold text-[#E65100] dark:text-[#F0A060] uppercase tracking-wide mb-2">
               <Lightbulb className="h-3.5 w-3.5" />
               Dicas de Rapport
             </h4>
@@ -147,8 +147,8 @@ function RapportDataDisplay({ data }: { data: RapportData }) {
         )}
 
         {data.iceBreakers?.length > 0 && (
-          <div className="rounded-lg border border-[#F3E5F5] bg-[#FDF5FF] p-3">
-            <h4 className="flex items-center gap-1.5 text-xs font-semibold text-[#7B1FA2] uppercase tracking-wide mb-2">
+          <div className="rounded-lg border border-[#F3E5F5] bg-[#FDF5FF] dark:border-[#3A2C40] dark:bg-[#1E1726] p-3">
+            <h4 className="flex items-center gap-1.5 text-xs font-semibold text-[#7B1FA2] dark:text-[#C792DB] uppercase tracking-wide mb-2">
               <MessageCircle className="h-3.5 w-3.5" />
               Ice-breakers
             </h4>
@@ -164,14 +164,14 @@ function RapportDataDisplay({ data }: { data: RapportData }) {
         )}
 
         {data.suggestedTopics?.length > 0 && (
-          <div className="rounded-lg border border-[#E3F2FD] bg-[#F3FAFF] p-3">
-            <h4 className="flex items-center gap-1.5 text-xs font-semibold text-[#1565C0] uppercase tracking-wide mb-2">
+          <div className="rounded-lg border border-[#E3F2FD] bg-[#F3FAFF] dark:border-[#243641] dark:bg-[#121E26] p-3">
+            <h4 className="flex items-center gap-1.5 text-xs font-semibold text-[#1565C0] dark:text-[#6BA8E8] uppercase tracking-wide mb-2">
               <Hash className="h-3.5 w-3.5" />
               Tópicos Sugeridos
             </h4>
             <div className="flex flex-wrap gap-1.5">
               {data.suggestedTopics.map((topic, i) => (
-                <span key={i} className="text-xs bg-[#1565C0]/10 text-[#1565C0] px-2 py-0.5 rounded-full">
+                <span key={i} className="text-xs bg-[#1565C0]/10 text-[#1565C0] dark:text-[#6BA8E8] px-2 py-0.5 rounded-full">
                   {topic}
                 </span>
               ))}
@@ -249,7 +249,7 @@ export function RapportSection({ meetingId, initialRapport, apiUrl, getAuthHeade
             <span className="ml-1 text-xs bg-[#2D5A27]/10 text-brand px-2 py-0.5 rounded-full font-medium">
               Pré-reunião
             </span>
-            <span className="ml-1 text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium border border-amber-200">
+            <span className="ml-1 text-xs bg-amber-100 text-amber-700 dark:text-amber-300 px-2 py-0.5 rounded-full font-medium border border-amber-200 dark:border-amber-900/50">
               Beta
             </span>
           </h2>
@@ -336,7 +336,7 @@ export function RapportSection({ meetingId, initialRapport, apiUrl, getAuthHeade
           </div>
 
           {error && (
-            <p className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>
+            <p className="text-xs text-red-600 bg-red-50 dark:bg-red-950/40 rounded-lg px-3 py-2">{error}</p>
           )}
 
           {rapport?.rapport_data && (

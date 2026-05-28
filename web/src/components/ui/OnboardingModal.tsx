@@ -184,9 +184,9 @@ export function OnboardingModal({ open, onClose }: OnboardingModalProps) {
           <div className="overflow-y-auto px-6 py-5 space-y-6">
 
             {/* Aviso app não verificado */}
-            <div className="flex gap-2 items-start p-3 rounded-xl bg-amber-50 border border-amber-200">
+            <div className="flex gap-2 items-start p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/50">
               <AlertTriangle size={15} className="text-amber-500 shrink-0 mt-0.5" />
-              <p className="text-[12px] text-amber-700 leading-relaxed">
+              <p className="text-[12px] text-amber-700 dark:text-amber-300 leading-relaxed">
                 O Lemon.meet está em <strong>processo de homologação pelo Google</strong>. Por isso, ao conectar o Google Calendar aparece um aviso de "app não verificado". Siga os passos abaixo para continuar normalmente.
               </p>
             </div>

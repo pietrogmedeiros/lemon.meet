@@ -202,7 +202,7 @@ export function NotificationBell() {
                     key={notification.id}
                     onClick={() => handleNotificationClick(notification)}
                     className={`w-full text-left p-4 border-b border-neutral-light  hover:bg-neutral-lighter dark:hover:bg-surface transition-colors ${
-                      !notification.read ? 'bg-blue-50 dark:bg-blue-900/20' : ''
+                      !notification.read ? 'bg-blue-50 dark:bg-blue-950/40 dark:bg-blue-900/20' : ''
                     }`}
                   >
                     <div className="flex items-start gap-3">

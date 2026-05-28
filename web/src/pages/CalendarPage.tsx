@@ -24,8 +24,8 @@ interface CalendarEvent {
 }
 
 const PLATFORM_COLORS: Record<string, { bg: string; text: string; border: string; dot: string }> = {
-  meet:  { bg: 'bg-green-50',  text: 'text-green-700',  border: 'border-green-200', dot: 'bg-green-500' },
-  zoom:  { bg: 'bg-blue-50',   text: 'text-blue-700',   border: 'border-blue-200',  dot: 'bg-blue-500' },
+  meet:  { bg: 'bg-green-50 dark:bg-green-950/40',  text: 'text-green-700 dark:text-green-300',  border: 'border-green-200 dark:border-green-900/50', dot: 'bg-green-500' },
+  zoom:  { bg: 'bg-blue-50 dark:bg-blue-950/40',   text: 'text-blue-700 dark:text-blue-300',   border: 'border-blue-200 dark:border-blue-900/50',  dot: 'bg-blue-500' },
   teams: { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200', dot: 'bg-purple-500' },
   other: { bg: 'bg-neutral-lighter', text: 'text-secondary',  border: 'border-neutral-light', dot: 'bg-[#BBBBBB]' },
 }
@@ -385,7 +385,7 @@ export function CalendarPage() {
                           </span>
                         )}
                         {ev.status === 'tentative' && (
-                          <span className="inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-600 border border-amber-200">
+                          <span className="inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/40 text-amber-600 border border-amber-200 dark:border-amber-900/50">
                             Tentativo
                           </span>
                         )}

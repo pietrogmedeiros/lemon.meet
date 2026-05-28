@@ -417,7 +417,7 @@ export function MeetingsPage() {
                   {meeting.failure_reason && (
                     <span
                       title={describeFailureShort(meeting.failure_reason) ?? meeting.failure_reason ?? ''}
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-red-50 text-red-700 border border-red-200 cursor-help"
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-900/50 cursor-help"
                     >
                       {describeFailureShort(meeting.failure_reason)}
                     </span>

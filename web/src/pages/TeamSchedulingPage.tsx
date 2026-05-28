@@ -469,7 +469,7 @@ export function TeamSchedulingPage() {
                 <span
                   className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium ${
                     isActive
-                      ? 'bg-green-100 text-green-700'
+                      ? 'bg-green-100 text-green-700 dark:text-green-300'
                       : 'bg-neutral-lighter text-secondary'
                   }`}
                 >
@@ -659,7 +659,7 @@ export function TeamSchedulingPage() {
             </div>
 
             {publicLink && (
-              <div className="p-4 bg-green-50 border border-green-200 rounded-xl">
+              <div className="p-4 bg-green-50 dark:bg-green-950/40 border border-green-200 dark:border-green-900/50 rounded-xl">
                 <div className="flex items-start gap-3">
                   <LinkIcon className="text-green-600 mt-1" size={20} />
                   <div className="flex-1">
@@ -670,7 +670,7 @@ export function TeamSchedulingPage() {
                       href={publicLink}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-sm text-green-700 hover:underline flex items-center gap-1"
+                      className="text-sm text-green-700 dark:text-green-300 hover:underline flex items-center gap-1"
                     >
                       {publicLink}
                       <ExternalLink size={14} />
@@ -836,9 +836,9 @@ export function TeamSchedulingPage() {
                       <span
                         className={`px-2 py-1 rounded text-xs font-medium ${
                           booking.status === 'confirmed'
-                            ? 'bg-green-100 text-green-700'
+                            ? 'bg-green-100 text-green-700 dark:text-green-300'
                             : booking.status === 'cancelled'
-                            ? 'bg-red-100 text-red-700'
+                            ? 'bg-red-100 text-red-700 dark:text-red-300'
                             : 'bg-neutral-lighter text-secondary'
                         }`}
                       >
@@ -876,12 +876,12 @@ export function TeamSchedulingPage() {
           <div
             className={`flex items-start gap-3 px-4 py-3 rounded-xl shadow-lg border min-w-[300px] max-w-md ${
               notification.type === 'success'
-                ? 'bg-green-50 border-green-200'
+                ? 'bg-green-50 dark:bg-green-950/40 border-green-200 dark:border-green-900/50'
                 : notification.type === 'error'
-                ? 'bg-red-50 border-red-200'
+                ? 'bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-900/50'
                 : notification.type === 'warning'
-                ? 'bg-yellow-50 border-yellow-200'
-                : 'bg-blue-50 border-blue-200'
+                ? 'bg-yellow-50 dark:bg-yellow-950/40 border-yellow-200 dark:border-yellow-900/50'
+                : 'bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-900/50'
             }`}
           >
             <div className="flex-shrink-0 mt-0.5">

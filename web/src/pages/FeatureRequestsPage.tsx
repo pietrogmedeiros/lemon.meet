@@ -29,11 +29,11 @@ interface FeatureRequest {
 
 const STATUS_CONFIG = {
   'pending': { label: 'Pendente', icon: Clock, color: 'text-secondary', bg: 'bg-neutral-lighter', border: 'border-neutral-light' },
-  'under-review': { label: 'Em Análise', icon: AlertCircle, color: 'text-blue-500', bg: 'bg-blue-50', border: 'border-blue-200' },
+  'under-review': { label: 'Em Análise', icon: AlertCircle, color: 'text-blue-500', bg: 'bg-blue-50 dark:bg-blue-950/40', border: 'border-blue-200 dark:border-blue-900/50' },
   'planned': { label: 'Planejada', icon: Calendar, color: 'text-purple-500', bg: 'bg-purple-50', border: 'border-purple-200' },
-  'in-progress': { label: 'Em Desenvolvimento', icon: TrendingUp, color: 'text-orange-500', bg: 'bg-orange-50', border: 'border-orange-200' },
-  'completed': { label: 'Concluída', icon: CheckCircle, color: 'text-green-500', bg: 'bg-green-50', border: 'border-green-200' },
-  'rejected': { label: 'Rejeitada', icon: XCircle, color: 'text-red-500', bg: 'bg-red-50', border: 'border-red-200' },
+  'in-progress': { label: 'Em Desenvolvimento', icon: TrendingUp, color: 'text-orange-500', bg: 'bg-orange-50 dark:bg-orange-950/40', border: 'border-orange-200 dark:border-orange-900/50' },
+  'completed': { label: 'Concluída', icon: CheckCircle, color: 'text-green-500', bg: 'bg-green-50 dark:bg-green-950/40', border: 'border-green-200 dark:border-green-900/50' },
+  'rejected': { label: 'Rejeitada', icon: XCircle, color: 'text-red-500', bg: 'bg-red-50 dark:bg-red-950/40', border: 'border-red-200 dark:border-red-900/50' },
 }
 
 export function FeatureRequestsPage() {

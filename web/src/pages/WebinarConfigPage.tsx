@@ -319,7 +319,7 @@ export function WebinarConfigPage() {
           </div>
           {config && (
             <span className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium ${
-              isActive ? 'bg-green-100 text-green-700' : 'bg-neutral-lighter text-secondary'
+              isActive ? 'bg-green-100 text-green-700 dark:text-green-300' : 'bg-neutral-lighter text-secondary'
             }`}>
               {isActive ? <><CheckCircle size={16} /> Ativo</> : <><XCircle size={16} /> Inativo</>}
             </span>
@@ -451,7 +451,7 @@ export function WebinarConfigPage() {
             </div>
 
             {publicLink && (
-              <div className="p-4 bg-green-50 border border-green-200 rounded-xl">
+              <div className="p-4 bg-green-50 dark:bg-green-950/40 border border-green-200 dark:border-green-900/50 rounded-xl">
                 <div className="flex items-start gap-3">
                   <LinkIcon className="text-green-600 mt-1" size={20} />
                   <div className="flex-1">
@@ -460,7 +460,7 @@ export function WebinarConfigPage() {
                       href={publicLink}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-sm text-green-700 hover:underline flex items-center gap-1"
+                      className="text-sm text-green-700 dark:text-green-300 hover:underline flex items-center gap-1"
                     >
                       {publicLink}
                       <ExternalLink size={14} />
@@ -617,7 +617,7 @@ export function WebinarConfigPage() {
       {notif && (
         <div className="fixed bottom-6 right-6 z-50">
           <div className={`flex items-start gap-3 px-4 py-3 rounded-xl shadow-lg border min-w-[300px] ${
-            notif.type === 'success' ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'
+            notif.type === 'success' ? 'bg-green-50 dark:bg-green-950/40 border-green-200 dark:border-green-900/50' : 'bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-900/50'
           }`}>
             {notif.type === 'success'
               ? <CheckCircle className="w-5 h-5 text-green-600 mt-0.5" />

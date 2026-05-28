@@ -21,20 +21,20 @@ export function MainLayout({ children }: MainLayoutProps) {
     if (loading || !isTrial || isExpired || daysLeft === null) return null
     if (daysLeft <= 1)
       return {
-        bg: 'bg-red-50 border-red-200 text-red-700',
+        bg: 'bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-900/50 text-red-700 dark:text-red-300',
         icon: <AlertTriangle size={14} className="shrink-0" />,
         msg: daysLeft === 0 ? 'Seu período de teste expira hoje!' : 'Seu período de teste expira amanhã!',
         urgent: true,
       }
     if (daysLeft <= 3)
       return {
-        bg: 'bg-amber-50 border-amber-200 text-amber-700',
+        bg: 'bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-900/50 text-amber-700 dark:text-amber-300',
         icon: <Clock size={14} className="shrink-0" />,
         msg: `Seu período de teste expira em ${daysLeft} dia${daysLeft > 1 ? 's' : ''}.`,
         urgent: false,
       }
     return {
-      bg: 'bg-blue-50 border-blue-200 text-blue-700',
+      bg: 'bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-900/50 text-blue-700 dark:text-blue-300',
       icon: <Clock size={14} className="shrink-0" />,
       msg: `Você está no período gratuito de 7 dias. ${daysLeft} dia${daysLeft > 1 ? 's' : ''} restante${daysLeft > 1 ? 's' : ''}.`,
       urgent: false,

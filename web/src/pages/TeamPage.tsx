@@ -500,17 +500,17 @@ export function TeamPage() {
       {
         icon: Heart,
         iconColor: '#DC3545',
-        iconBg: 'bg-red-50',
+        iconBg: 'bg-red-50 dark:bg-red-950/40',
         tag: 'Novo tipo de time',
         title: 'Customer Success agora é suportado',
         description: 'Lemon não é mais só pra Sales. Times de CS podem analisar reuniões com clientes ativos e ver métricas específicas: Health Score (0-100), Risco de Churn (low/medium/high), Satisfação (0-10) e momentos críticos detectados na conversa.',
         preview: (
           <div className="grid grid-cols-2 gap-2 text-left">
-            <div className="bg-red-50 border border-red-100 rounded-xl p-3">
+            <div className="bg-red-50 dark:bg-red-950/40 border border-red-100 dark:border-red-900/50 rounded-xl p-3">
               <div className="text-[10px] font-semibold text-[#DC3545] uppercase tracking-wider mb-1">Health Score</div>
               <div className="text-xl font-bold text-primary">72/100</div>
             </div>
-            <div className="bg-amber-50 border border-amber-100 rounded-xl p-3">
+            <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-100 dark:border-amber-900/50 rounded-xl p-3">
               <div className="text-[10px] font-semibold text-amber-600 uppercase tracking-wider mb-1">Churn Risk</div>
               <div className="text-xl font-bold text-primary">Médio</div>
             </div>
@@ -571,12 +571,12 @@ export function TeamPage() {
       {
         icon: Trash2,
         iconColor: '#DC3545',
-        iconBg: 'bg-red-50',
+        iconBg: 'bg-red-50 dark:bg-red-950/40',
         tag: 'Mais segurança',
         title: 'Excluir time agora exige confirmação',
         description: 'Pra evitar acidentes, a exclusão de um time pede pra você digitar exatamente o nome dele antes de habilitar o botão. Membros são removidos, links de convite invalidados, e reuniões já registradas perdem o vínculo mas permanecem no histórico. Disponível em Configurações → Zona de perigo.',
         preview: (
-          <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-left">
+          <div className="bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 rounded-xl p-3 text-left">
             <div className="text-[10px] text-secondary mb-1">Para confirmar, digite:</div>
             <div className="font-mono text-xs font-bold text-[#DC3545] mb-2">Meu Time Comercial</div>
             <div className="flex gap-2">
@@ -814,7 +814,7 @@ export function TeamPage() {
 
           {/* Erro */}
           {createError && (
-            <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex gap-2">
+            <div className="bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 rounded-xl p-3 flex gap-2">
               <AlertCircle size={16} className="text-[#DC3545] shrink-0 mt-0.5" />
               <p className="text-xs text-[#DC3545] leading-relaxed">{createError}</p>
             </div>
@@ -970,7 +970,7 @@ export function TeamPage() {
                 <p className="text-sm text-secondary mt-0.5 flex items-center gap-2 flex-wrap">
                   {activeCount} membro(s) ativo(s)
                   {pendingCount > 0 && (
-                    <span className="inline-flex items-center gap-1 text-xs bg-amber-50 text-amber-600 border border-amber-200 px-2 py-0.5 rounded-full font-medium">
+                    <span className="inline-flex items-center gap-1 text-xs bg-amber-50 dark:bg-amber-950/40 text-amber-600 border border-amber-200 dark:border-amber-900/50 px-2 py-0.5 rounded-full font-medium">
                       <Clock size={10} /> {pendingCount} pendente(s)
                     </span>
                   )}
@@ -1040,7 +1040,7 @@ export function TeamPage() {
                           {m.name ?? m.invited_email.split('@')[0]}
                         </span>
                         {m.role === 'admin' && (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-amber-50 text-amber-600 border border-amber-200 px-1.5 py-0.5 rounded-full">
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-amber-50 dark:bg-amber-950/40 text-amber-600 border border-amber-200 dark:border-amber-900/50 px-1.5 py-0.5 rounded-full">
                             <Crown size={9} /> Admin
                           </span>
                         )}
@@ -1049,11 +1049,11 @@ export function TeamPage() {
                     </div>
                     <div className="flex items-center gap-3 shrink-0">
                       {m.status === 'active' ? (
-                        <span className="inline-flex items-center gap-1.5 text-xs font-medium text-[#4CAF50] bg-green-50 border border-green-200 px-2.5 py-1 rounded-full">
+                        <span className="inline-flex items-center gap-1.5 text-xs font-medium text-[#4CAF50] bg-green-50 dark:bg-green-950/40 border border-green-200 dark:border-green-900/50 px-2.5 py-1 rounded-full">
                           <CheckCircle size={11} /> Ativo
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-600 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full">
+                        <span className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-600 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/50 px-2.5 py-1 rounded-full">
                           <Clock size={11} /> Pendente
                         </span>
                       )}
@@ -1064,8 +1064,8 @@ export function TeamPage() {
                           title={m.role === 'admin' ? 'Remover Admin' : 'Tornar Admin'}
                           className={`w-8 h-8 rounded-lg flex items-center justify-center transition ${
                             m.role === 'admin'
-                              ? 'text-amber-500 hover:text-amber-700 hover:bg-amber-50'
-                              : 'text-tertiary hover:text-amber-500 hover:bg-amber-50'
+                              ? 'text-amber-500 hover:text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:bg-amber-950/40'
+                              : 'text-tertiary hover:text-amber-500 hover:bg-amber-50 dark:bg-amber-950/40'
                           }`}
                         >
                           {promotingMember === m.id ? (
@@ -1080,7 +1080,7 @@ export function TeamPage() {
                           onClick={() => handleRemove(m.invited_email)}
                           disabled={removingEmail === m.invited_email}
                           title="Remover membro"
-                          className="w-8 h-8 rounded-lg flex items-center justify-center text-tertiary hover:text-[#DC3545] hover:bg-red-50 transition"
+                          className="w-8 h-8 rounded-lg flex items-center justify-center text-tertiary hover:text-[#DC3545] hover:bg-red-50 dark:bg-red-950/40 transition"
                         >
                           {removingEmail === m.invited_email ? (
                             <Loader size={14} className="animate-spin" />
@@ -1171,8 +1171,8 @@ export function TeamPage() {
             </div>
 
             {/* Seção: Zona de perigo — span full width */}
-            <div className="lg:col-span-2 bg-surface border border-red-200 rounded-2xl shadow-sm overflow-hidden">
-              <div className="px-5 py-3.5 border-b border-red-100 flex items-center gap-2 bg-red-50/50">
+            <div className="lg:col-span-2 bg-surface border border-red-200 dark:border-red-900/50 rounded-2xl shadow-sm overflow-hidden">
+              <div className="px-5 py-3.5 border-b border-red-100 dark:border-red-900/50 flex items-center gap-2 bg-red-50/50">
                 <div className="w-7 h-7 rounded-lg bg-red-100 flex items-center justify-center">
                   <AlertCircle size={14} className="text-[#DC3545]" />
                 </div>
@@ -1188,7 +1188,7 @@ export function TeamPage() {
                 </div>
                 <button
                   onClick={handleOpenDeleteModal}
-                  className="shrink-0 flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl border border-[#DC3545] text-[#DC3545] text-sm font-semibold hover:bg-red-50 transition whitespace-nowrap"
+                  className="shrink-0 flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl border border-[#DC3545] text-[#DC3545] text-sm font-semibold hover:bg-red-50 dark:bg-red-950/40 transition whitespace-nowrap"
                 >
                   <Trash2 size={15} />
                   Excluir time
@@ -1238,10 +1238,10 @@ export function TeamPage() {
                     </div>
                     <div className="shrink-0 flex items-center gap-2">
                       {m.status === 'completed' && (
-                        <span className="text-xs font-medium text-[#4CAF50] bg-green-50 border border-green-200 px-2 py-0.5 rounded-full">Concluída</span>
+                        <span className="text-xs font-medium text-[#4CAF50] bg-green-50 dark:bg-green-950/40 border border-green-200 dark:border-green-900/50 px-2 py-0.5 rounded-full">Concluída</span>
                       )}
                       {m.status === 'error' && (
-                        <span className="text-xs font-medium text-[#DC3545] bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">Erro</span>
+                        <span className="text-xs font-medium text-[#DC3545] bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 px-2 py-0.5 rounded-full">Erro</span>
                       )}
                       <ChevronRight size={15} className="text-[#CCCCCC] group-hover:text-brand transition" />
                     </div>
@@ -1355,9 +1355,9 @@ export function TeamPage() {
             </div>
 
             {/* Aviso histórico */}
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex gap-2">
+            <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/50 rounded-xl p-3 flex gap-2">
               <AlertCircle size={16} className="text-amber-600 shrink-0 mt-0.5" />
-              <p className="text-xs text-amber-800 leading-relaxed">
+              <p className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed">
                 Reuniões já processadas permanecem com a análise no framework original.
                 A nova configuração só vale para reuniões processadas a partir de agora.
               </p>
@@ -1365,7 +1365,7 @@ export function TeamPage() {
 
             {/* Erro */}
             {configError && (
-              <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex gap-2">
+              <div className="bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 rounded-xl p-3 flex gap-2">
                 <AlertCircle size={16} className="text-[#DC3545] shrink-0 mt-0.5" />
                 <p className="text-xs text-[#DC3545] leading-relaxed">{configError}</p>
               </div>
@@ -1406,7 +1406,7 @@ export function TeamPage() {
             {/* Header */}
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-full bg-red-50 dark:bg-red-950/40 flex items-center justify-center">
                   <AlertCircle size={20} className="text-[#DC3545]" />
                 </div>
                 <div>
@@ -1424,7 +1424,7 @@ export function TeamPage() {
             </div>
 
             {/* O que será removido */}
-            <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-xs text-[#7a1f2b] leading-relaxed space-y-1.5">
+            <div className="bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 rounded-xl p-3 text-xs text-[#7a1f2b] leading-relaxed space-y-1.5">
               <p className="font-semibold">Ao excluir o time:</p>
               <ul className="space-y-1 pl-4 list-disc">
                 <li>Todos os membros serão removidos</li>
@@ -1438,7 +1438,7 @@ export function TeamPage() {
             <div className="space-y-2">
               <label className="text-xs font-semibold text-secondary leading-relaxed block">
                 Para confirmar, digite o nome do time:{' '}
-                <span className="font-mono font-bold text-[#DC3545] bg-red-50 px-1.5 py-0.5 rounded">
+                <span className="font-mono font-bold text-[#DC3545] bg-red-50 dark:bg-red-950/40 px-1.5 py-0.5 rounded">
                   {team.name}
                 </span>
               </label>
@@ -1455,7 +1455,7 @@ export function TeamPage() {
 
             {/* Erro */}
             {deleteError && (
-              <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex gap-2">
+              <div className="bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 rounded-xl p-3 flex gap-2">
                 <AlertCircle size={16} className="text-[#DC3545] shrink-0 mt-0.5" />
                 <p className="text-xs text-[#DC3545] leading-relaxed">{deleteError}</p>
               </div>
@@ -1553,9 +1553,9 @@ export function TeamPage() {
             </div>
 
             {/* Aviso */}
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex gap-2">
+            <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/50 rounded-xl p-3 flex gap-2">
               <AlertCircle size={16} className="text-amber-600 shrink-0 mt-0.5" />
-              <p className="text-xs text-amber-800 leading-relaxed">
+              <p className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed">
                 Qualquer pessoa com este link poderá entrar no seu time. Compartilhe apenas com pessoas confiáveis.
               </p>
             </div>

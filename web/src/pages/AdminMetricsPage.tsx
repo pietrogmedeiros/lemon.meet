@@ -541,7 +541,7 @@ export function AdminMetricsPage() {
           </div>
         </div>
 
-        {error && <Card className="mb-4 border-red-200 bg-red-50"><p className="text-sm text-red-700">Erro: {error}</p></Card>}
+        {error && <Card className="mb-4 border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/40"><p className="text-sm text-red-700 dark:text-red-300">Erro: {error}</p></Card>}
 
         {!data && loading && <p className="text-sm text-secondary">Carregando…</p>}
 

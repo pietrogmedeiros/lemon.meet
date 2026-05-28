@@ -386,9 +386,9 @@ export function MeetingChatPanel({ meetingId, isOpen, onClose, apiUrl, authToken
           )}
 
           {error && (
-            <div className="mb-3 flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-xl">
+            <div className="mb-3 flex items-start gap-2 p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 rounded-xl">
               <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
-              <p className="text-xs text-red-700">{error}</p>
+              <p className="text-xs text-red-700 dark:text-red-300">{error}</p>
             </div>
           )}
 

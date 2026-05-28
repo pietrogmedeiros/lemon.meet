@@ -1073,7 +1073,7 @@ export function TranscricaoDetalhesPage() {
                 className={`flex items-center gap-2 text-[13px] font-medium px-3 py-2 rounded-lg border transition-all disabled:opacity-60 ${
                   hubspotSynced
                     ? 'border-[#FF7A59] text-[#FF7A59] bg-[#FF7A59]/8'
-                    : 'border-neutral-light text-[#555] hover:border-[#FF7A59] hover:text-[#FF7A59] bg-surface'
+                    : 'border-neutral-light text-secondary hover:border-[#FF7A59] hover:text-[#FF7A59] bg-surface'
                 }`}
                 title="Enviar resumo e deal para o HubSpot"
               >
@@ -1093,7 +1093,7 @@ export function TranscricaoDetalhesPage() {
 
               {/* Sucesso: link do negócio criado/atualizado */}
               {hubspotResult && (
-                <div className="flex flex-col gap-1.5 text-[12px] text-[#555] bg-[#FF7A59]/8 border border-[#FF7A59]/30 rounded-lg px-3 py-2">
+                <div className="flex flex-col gap-1.5 text-[12px] text-secondary bg-[#FF7A59]/8 border border-[#FF7A59]/30 rounded-lg px-3 py-2">
                   <div className="flex flex-wrap items-center gap-2">
                     <CheckCircle className="h-3.5 w-3.5 text-[#FF7A59] shrink-0" />
                     <span>Negócio {hubspotResult.action === 'updated' ? 'atualizado' : 'criado'} no HubSpot.</span>
@@ -1150,11 +1150,11 @@ export function TranscricaoDetalhesPage() {
 
         {/* Briefing pré-reunião */}
         {(briefingLoading || briefing || (!briefingLoading && briefing === null)) && meeting.status === 'completed' && (
-          <Card className="p-5 border-l-4 border-l-[#FFD700] bg-[#FFFDF0]">
+          <Card className="p-5 border-l-4 border-l-[#FFD700] bg-[#FFFDF0] dark:bg-[#221E10]">
             <h2 className="text-headline-2 text-primary mb-3 flex items-center gap-2">
-              <BookOpen className="h-5 w-5 text-[#B8860B]" />
+              <BookOpen className="h-5 w-5 text-[#B8860B] dark:text-[#E8C56A]" />
               Contexto de Reuniões Anteriores
-              <span className="ml-2 text-xs bg-[#FFD700]/30 text-[#7A5C00] px-2 py-0.5 rounded-full font-medium">Exclusivo Lemon</span>
+              <span className="ml-2 text-xs bg-[#FFD700]/30 text-[#7A5C00] dark:text-[#E8C56A] px-2 py-0.5 rounded-full font-medium">Exclusivo Lemon</span>
             </h2>
             {briefingLoading ? (
               <div className="flex items-center gap-2 text-sm text-secondary">
@@ -1183,7 +1183,7 @@ export function TranscricaoDetalhesPage() {
                   <X className="h-4 w-4 text-red-600" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-red-700">{info.title}</p>
+                  <p className="text-sm font-semibold text-red-700 dark:text-red-300">{info.title}</p>
                   <p className="text-sm text-secondary mt-1 leading-relaxed">{info.detail}</p>
                   <p className="text-xs text-secondary/60 mt-2 font-mono">
                     código: {meeting.failure_reason}

@@ -57,7 +57,7 @@ function getPlatformLabel(platform: string | null): string {
 }
 
 function getPlatformColor(platform: string | null): string {
-  if (platform === 'google_meet') return 'bg-blue-50 text-blue-700';
+  if (platform === 'google_meet') return 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300';
   if (platform === 'zoom') return 'bg-sky-50 text-sky-700';
   if (platform === 'teams') return 'bg-purple-50 text-purple-700';
   return 'bg-neutral-lighter text-secondary';
@@ -205,7 +205,7 @@ export function UpcomingMeetingsPage() {
                           <div className="flex items-center gap-3 shrink-0">
                             <span className={`hidden sm:inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${
                               urgent
-                                ? 'bg-amber-50 text-amber-700'
+                                ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300'
                                 : 'bg-neutral-light text-secondary  '
                             }`}>
                               <Clock className="h-3.5 w-3.5" />

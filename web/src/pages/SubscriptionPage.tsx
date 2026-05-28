@@ -104,9 +104,9 @@ export function SubscriptionPage() {
   }
 
   const statusInfo = () => {
-    if (isExpired) return { label: 'Expirado', color: 'text-red-500', bg: 'bg-red-50 border-red-200', icon: <XCircle size={16} className="text-red-500" /> }
-    if (isTrial) return { label: `Trial — ${daysLeft} dia${daysLeft !== 1 ? 's' : ''} restante${daysLeft !== 1 ? 's' : ''}`, color: 'text-yellow-600', bg: 'bg-yellow-50 border-yellow-200', icon: <Clock size={16} className="text-yellow-500" /> }
-    return { label: 'Ativo', color: 'text-green-600', bg: 'bg-green-50 border-green-200', icon: <CheckCircle size={16} className="text-green-500" /> }
+    if (isExpired) return { label: 'Expirado', color: 'text-red-500', bg: 'bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-900/50', icon: <XCircle size={16} className="text-red-500" /> }
+    if (isTrial) return { label: `Trial — ${daysLeft} dia${daysLeft !== 1 ? 's' : ''} restante${daysLeft !== 1 ? 's' : ''}`, color: 'text-yellow-600', bg: 'bg-yellow-50 dark:bg-yellow-950/40 border-yellow-200 dark:border-yellow-900/50', icon: <Clock size={16} className="text-yellow-500" /> }
+    return { label: 'Ativo', color: 'text-green-600', bg: 'bg-green-50 dark:bg-green-950/40 border-green-200 dark:border-green-900/50', icon: <CheckCircle size={16} className="text-green-500" /> }
   }
 
   const si = statusInfo()
@@ -128,7 +128,7 @@ export function SubscriptionPage() {
             <button
               onClick={handleCancel}
               disabled={cancelLoading}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg border border-[#DC3545] text-[#DC3545] text-sm font-semibold hover:bg-red-50 transition disabled:opacity-50"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg border border-[#DC3545] text-[#DC3545] text-sm font-semibold hover:bg-red-50 dark:bg-red-950/40 transition disabled:opacity-50"
             >
               {cancelLoading ? <Loader size={13} className="animate-spin" /> : <XOctagon size={13} />}
               Cancelar assinatura

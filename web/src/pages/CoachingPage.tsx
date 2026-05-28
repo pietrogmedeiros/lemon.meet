@@ -219,7 +219,7 @@ export function CoachingPage() {
           </div>
           <button
             onClick={() => load(true)}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg border border-neutral-light bg-surface text-sm text-[#555] hover:border-[#2D5A27] hover:text-brand transition-colors"
+            className="flex items-center gap-2 px-3 py-2 rounded-lg border border-neutral-light bg-surface text-sm text-secondary hover:border-[#2D5A27] hover:text-brand transition-colors"
           >
             <RefreshCw size={14} /> Atualizar análise
           </button>
@@ -261,7 +261,7 @@ export function CoachingPage() {
               {report.strengths.map((s, i) => (
                 <div key={i} className="rounded-lg bg-[#2D5A27]/5 p-3 space-y-0.5">
                   <p className="text-sm font-semibold text-brand">{s.title}</p>
-                  <p className="text-xs text-[#555] leading-relaxed">{s.description}</p>
+                  <p className="text-xs text-secondary leading-relaxed">{s.description}</p>
                 </div>
               ))}
             </div>
@@ -279,7 +279,7 @@ export function CoachingPage() {
               {report.improvements.map((imp, i) => (
                 <div key={i} className="rounded-lg bg-[#DC3545]/5 p-3 space-y-0.5">
                   <p className="text-sm font-semibold text-[#DC3545]">{imp.title}</p>
-                  <p className="text-xs text-[#555] leading-relaxed">{imp.description}</p>
+                  <p className="text-xs text-secondary leading-relaxed">{imp.description}</p>
                 </div>
               ))}
             </div>
@@ -290,7 +290,7 @@ export function CoachingPage() {
         <Card className="p-6 space-y-5">
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 rounded-lg bg-neutral-lighter flex items-center justify-center">
-              <TrendingUp size={15} className="text-[#555]" />
+              <TrendingUp size={15} className="text-secondary" />
             </div>
             <h2 className="text-sm font-semibold text-primary">Análise BANT — média das reuniões</h2>
           </div>

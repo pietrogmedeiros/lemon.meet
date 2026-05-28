@@ -360,7 +360,7 @@ export function IntegrationsPage() {
               <span className={`ml-auto flex-shrink-0 inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${
                 calendar.status === 'active'
                   ? 'bg-[#2D5A27]/10 text-brand'
-                  : 'bg-amber-50 text-amber-600'
+                  : 'bg-amber-50 dark:bg-amber-950/40 text-amber-600'
               }`}>
                 <span className={`w-1.5 h-1.5 rounded-full ${calendar.status === 'active' ? 'bg-[#2D5A27]' : 'bg-amber-500'}`} />
                 {calendar.status === 'active' ? 'Conectado' : 'Sincronizando'}
@@ -404,7 +404,7 @@ export function IntegrationsPage() {
             </div>
           ) : (
             <div className="space-y-4">
-              <p className="text-[13px] text-[#555]">
+              <p className="text-[13px] text-secondary">
                 Nenhum calendário conectado. Conecte o Google Calendar para gravar reuniões automaticamente, sem precisar da extensão.
               </p>
               <Button
@@ -490,7 +490,7 @@ export function IntegrationsPage() {
             </div>
           ) : (
             <div className="space-y-4">
-              <p className="text-[13px] text-[#555]">
+              <p className="text-[13px] text-secondary">
                 Nenhuma conta HubSpot conectada. Conecte para enviar resumos e follow-ups das reuniões diretamente ao seu CRM.
               </p>
               <Button
