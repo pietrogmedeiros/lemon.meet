@@ -6,6 +6,7 @@ import { useAuth, useSubscription } from '@/contexts'
 import { clsx } from 'clsx'
 import { OnboardingModal, useOnboarding } from '@/components/ui/OnboardingModal'
 import { ThemeToggle } from '@/components/ui/ThemeToggle'
+import { ThemeAnnounceCoachmark } from '@/components/ThemeAnnounceCoachmark'
 
 interface MenuItem {
   id: string
@@ -29,6 +30,18 @@ export function Sidebar() {
   const [expanded, setExpanded] = useState(true)
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({ integrations: true })
   const { open: onboardingOpen, openModal: openOnboarding, closeModal: closeOnboarding } = useOnboarding()
+
+  // Anúncio one-time do tema dark (coachmark apontando pro toggle). Reaparece a
+  // cada reload ATÉ o usuário fechar; depois nunca mais.
+  const themeAnnounceKey = session?.user?.id ? `lemon_announce_dark_theme_${session.user.id}` : null
+  const [showThemeAnnounce, setShowThemeAnnounce] = useState(false)
+  useEffect(() => {
+    if (themeAnnounceKey && !localStorage.getItem(themeAnnounceKey)) setShowThemeAnnounce(true)
+  }, [themeAnnounceKey])
+  const dismissThemeAnnounce = () => {
+    if (themeAnnounceKey) localStorage.setItem(themeAnnounceKey, '1')
+    setShowThemeAnnounce(false)
+  }
 
   const getCachedOwnership = () => {
     try { return localStorage.getItem('isTeamOwner') === 'true' } catch { return false }
@@ -361,6 +374,10 @@ export function Sidebar() {
       </aside>
 
       <OnboardingModal open={onboardingOpen} onClose={closeOnboarding} />
+
+      {showThemeAnnounce && expanded && (
+        <ThemeAnnounceCoachmark onClose={dismissThemeAnnounce} />
+      )}
     </>
   )
 }
