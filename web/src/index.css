@@ -24,15 +24,17 @@
 
 .dark {
   color-scheme: dark;
-  --bg: 14 17 22;             /* #0E1116 */
-  --surface: 22 26 32;        /* #161A20 */
-  --surface-2: 30 35 43;      /* #1E232B */
-  --text: 230 232 235;        /* #E6E8EB */
-  --text-secondary: 154 161 171; /* #9AA1AB */
-  --text-tertiary: 107 114 124;  /* #6B727C */
-  --border: 42 47 55;         /* #2A2F37 */
-  --border-subtle: 35 40 48;  /* #232830 */
-  --brand: 95 174 99;         /* #5FAE63 verde claro p/ texto no dark */
+  /* Charcoal neutro levemente QUENTE (R≈G≥B) — sem o azul frio, combina com
+     o amarelo/verde da marca. Degraus de elevação: bg < surface < surface-2. */
+  --bg: 16 16 15;             /* #10100F  fundo da página */
+  --surface: 26 26 24;        /* #1A1A18  cards / sidebar */
+  --surface-2: 37 37 34;      /* #252522  hover / secundária */
+  --text: 235 234 231;        /* #EBEAE7  texto principal (branco quente) */
+  --text-secondary: 167 165 159; /* #A7A59F */
+  --text-tertiary: 115 113 107;  /* #73716B */
+  --border: 48 47 43;         /* #302F2B */
+  --border-subtle: 38 37 34;  /* #262522 */
+  --brand: 95 174 99;         /* #5FAE63  verde claro p/ texto no dark */
 }
 
 @layer base {
