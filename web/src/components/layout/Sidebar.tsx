@@ -31,18 +31,16 @@ export function Sidebar() {
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({ integrations: true })
   const { open: onboardingOpen, openModal: openOnboarding, closeModal: closeOnboarding } = useOnboarding()
 
-  // Anúncio one-time do tema dark (coachmark apontando pro toggle). Reaparece a
-  // cada reload ATÉ o usuário fechar; depois nunca mais.
-  const themeAnnounceKey = session?.user?.id ? `lemon_announce_dark_theme_${session.user.id}` : null
-  const [showThemeAnnounce, setShowThemeAnnounce] = useState(false)
+  // Anúncio one-time do tema dark (coachmark). Chave GLOBAL + leitura SÍNCRONA
+  // no init (igual ao tema, que persiste) — não depende da sessão carregar.
+  // Marca como visto no mount → não reaparece.
+  const DARK_ANNOUNCE_KEY = 'lemon_seen_dark_announce_v1'
+  const [showThemeAnnounce, setShowThemeAnnounce] = useState(() => {
+    try { return !localStorage.getItem(DARK_ANNOUNCE_KEY) } catch { return false }
+  })
   useEffect(() => {
-    if (themeAnnounceKey && !localStorage.getItem(themeAnnounceKey)) {
-      setShowThemeAnnounce(true)
-      // Marca como visto JÁ na 1ª exibição — garante que não reaparece (mesmo
-      // que o usuário recarregue sem clicar em fechar).
-      localStorage.setItem(themeAnnounceKey, '1')
-    }
-  }, [themeAnnounceKey])
+    try { localStorage.setItem(DARK_ANNOUNCE_KEY, '1') } catch { /* noop */ }
+  }, [])
   const dismissThemeAnnounce = () => setShowThemeAnnounce(false)
 
   const getCachedOwnership = () => {

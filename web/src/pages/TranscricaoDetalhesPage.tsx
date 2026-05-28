@@ -542,22 +542,17 @@ export function TranscricaoDetalhesPage() {
   const [segments, setSegments] = useState<TranscriptSegment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Anúncio one-time da feature "Insights que impulsionam decisões" (pop-up ao abrir a reunião)
-  const { user } = useAuth();
-  const [showFeatureAnnounce, setShowFeatureAnnounce] = useState(false);
-  const announceKey = user?.id ? `lemon_announce_decision_insights_${user.id}` : null;
+  // Anúncio one-time "Insights que impulsionam decisões". Chave GLOBAL + leitura
+  // SÍNCRONA no init (igual ao tema, que persiste) — não depende de user.id nem
+  // de a sessão carregar num effect. Marca como visto no mount → não reaparece.
+  const DECISION_ANNOUNCE_KEY = 'lemon_seen_decision_insights_v1';
+  const [showFeatureAnnounce, setShowFeatureAnnounce] = useState(() => {
+    try { return !localStorage.getItem(DECISION_ANNOUNCE_KEY); } catch { return false; }
+  });
   useEffect(() => {
-    if (announceKey && !localStorage.getItem(announceKey)) {
-      setShowFeatureAnnounce(true);
-      // Marca como visto JÁ na 1ª exibição — garante 1x por usuário mesmo que
-      // ele feche/saia da página sem clicar em "Entendi".
-      localStorage.setItem(announceKey, '1');
-    }
-  }, [announceKey]);
-  const dismissFeatureAnnounce = () => {
-    if (announceKey) localStorage.setItem(announceKey, '1');
-    setShowFeatureAnnounce(false);
-  };
+    try { localStorage.setItem(DECISION_ANNOUNCE_KEY, '1'); } catch { /* noop */ }
+  }, []);
+  const dismissFeatureAnnounce = () => setShowFeatureAnnounce(false);
 
   // Action items state
   const [actionItems, setActionItems] = useState<ActionItem[]>([]);
