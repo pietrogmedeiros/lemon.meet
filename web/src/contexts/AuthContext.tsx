@@ -21,8 +21,13 @@ function clearAllCaches(keepPendingInvite = false) {
     keysToPreserve.push('pending_team_join')
   }
   
-  // Preserva preferência de onboarding
+  // Preserva preferências de UI do navegador (não são cache de dados de usuário):
+  // onboarding, tema light/dark e os pop-ups one-time. Antes só onboarding
+  // sobrevivia — por isso os announces reapareciam a cada SIGNED_IN (= reload).
   keysToPreserve.push('lemon_onboarding_seen')
+  keysToPreserve.push('lemon-theme')
+  keysToPreserve.push('lemon_seen_decision_insights_v1')
+  keysToPreserve.push('lemon_seen_dark_announce_v1')
   
   // Preserva chaves do Supabase (auth tokens)
   for (let i = 0; i < localStorage.length; i++) {
