@@ -36,12 +36,14 @@ export function Sidebar() {
   const themeAnnounceKey = session?.user?.id ? `lemon_announce_dark_theme_${session.user.id}` : null
   const [showThemeAnnounce, setShowThemeAnnounce] = useState(false)
   useEffect(() => {
-    if (themeAnnounceKey && !localStorage.getItem(themeAnnounceKey)) setShowThemeAnnounce(true)
+    if (themeAnnounceKey && !localStorage.getItem(themeAnnounceKey)) {
+      setShowThemeAnnounce(true)
+      // Marca como visto JÁ na 1ª exibição — garante que não reaparece (mesmo
+      // que o usuário recarregue sem clicar em fechar).
+      localStorage.setItem(themeAnnounceKey, '1')
+    }
   }, [themeAnnounceKey])
-  const dismissThemeAnnounce = () => {
-    if (themeAnnounceKey) localStorage.setItem(themeAnnounceKey, '1')
-    setShowThemeAnnounce(false)
-  }
+  const dismissThemeAnnounce = () => setShowThemeAnnounce(false)
 
   const getCachedOwnership = () => {
     try { return localStorage.getItem('isTeamOwner') === 'true' } catch { return false }
