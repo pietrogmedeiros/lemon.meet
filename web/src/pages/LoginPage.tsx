@@ -140,7 +140,7 @@ export function LoginPage() {
               <div className="w-full border-t border-neutral-light"></div>
             </div>
             <div className="relative flex justify-center text-body-small">
-              <span className="px-2 bg-white text-secondary">ou</span>
+              <span className="px-2 bg-surface text-secondary">ou</span>
             </div>
           </div>
 

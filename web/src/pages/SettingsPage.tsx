@@ -149,41 +149,41 @@ export function SettingsPage() {
 
         {/* Page header */}
         <div>
-          <h1 className="text-2xl font-bold text-[#333333]">Configurações</h1>
-          <p className="mt-1 text-sm text-[#666666]">Gerencie sua conta e preferências.</p>
+          <h1 className="text-2xl font-bold text-primary">Configurações</h1>
+          <p className="mt-1 text-sm text-secondary">Gerencie sua conta e preferências.</p>
         </div>
 
         {/* Card de nova senha — aparece somente quando vem do link do e-mail */}
         {isRecovery && (
-          <section className="bg-white border-2 border-[#2D5A27] rounded-2xl p-6 shadow-sm space-y-5">
+          <section className="bg-surface border-2 border-[#2D5A27] rounded-2xl p-6 shadow-sm space-y-5">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-[#2D5A27]/10 flex items-center justify-center">
-                <KeyRound size={20} className="text-[#2D5A27]" />
+                <KeyRound size={20} className="text-brand" />
               </div>
               <div>
-                <h2 className="text-base font-semibold text-[#333333]">Definir nova senha</h2>
-                <p className="text-xs text-[#666666]">Você veio do link de redefinição. Escolha uma nova senha.</p>
+                <h2 className="text-base font-semibold text-primary">Definir nova senha</h2>
+                <p className="text-xs text-secondary">Você veio do link de redefinição. Escolha uma nova senha.</p>
               </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-[#666666] uppercase tracking-wider">Nova senha</label>
+                <label className="text-xs font-semibold text-secondary uppercase tracking-wider">Nova senha</label>
                 <input
                   type="password"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   placeholder="Mínimo 6 caracteres"
-                  className="w-full px-4 py-2.5 rounded-xl border border-[#E0E0E0] text-[#333333] text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#2D5A27]/25 focus:border-[#2D5A27] transition placeholder:text-[#999]"
+                  className="w-full px-4 py-2.5 rounded-xl border border-neutral-light text-primary text-sm bg-surface focus:outline-none focus:ring-2 focus:ring-[#2D5A27]/25 focus:border-[#2D5A27] transition placeholder:text-tertiary"
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-[#666666] uppercase tracking-wider">Confirmar senha</label>
+                <label className="text-xs font-semibold text-secondary uppercase tracking-wider">Confirmar senha</label>
                 <input
                   type="password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="Repita a senha"
-                  className="w-full px-4 py-2.5 rounded-xl border border-[#E0E0E0] text-[#333333] text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#2D5A27]/25 focus:border-[#2D5A27] transition placeholder:text-[#999]"
+                  className="w-full px-4 py-2.5 rounded-xl border border-neutral-light text-primary text-sm bg-surface focus:outline-none focus:ring-2 focus:ring-[#2D5A27]/25 focus:border-[#2D5A27] transition placeholder:text-tertiary"
                 />
               </div>
             </div>
@@ -212,19 +212,19 @@ export function SettingsPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
 
           {/* ── Coluna esquerda: Perfil ── */}
-          <section className="bg-white border border-[#E0E0E0] rounded-2xl shadow-sm overflow-hidden">
+          <section className="bg-surface border border-neutral-light rounded-2xl shadow-sm overflow-hidden">
             {/* Banner com avatar */}
-            <div className="bg-gradient-to-br from-[#2D5A27]/8 to-[#2D5A27]/3 px-6 pt-7 pb-6 border-b border-[#F0F0F0]">
+            <div className="bg-gradient-to-br from-[#2D5A27]/8 to-[#2D5A27]/3 px-6 pt-7 pb-6 border-b border-neutral-light">
               <div className="flex items-center gap-5">
-                <div className="w-20 h-20 rounded-2xl bg-[#2D5A27]/20 flex items-center justify-center text-2xl font-bold text-[#2D5A27] shrink-0 select-none shadow-sm">
+                <div className="w-20 h-20 rounded-2xl bg-[#2D5A27]/20 flex items-center justify-center text-2xl font-bold text-brand shrink-0 select-none shadow-sm">
                   {initials}
                 </div>
                 <div>
-                  <p className="text-lg font-bold text-[#333333]">{displayName || 'Sem nome'}</p>
-                  <p className="text-sm text-[#666666] flex items-center gap-1.5 mt-1">
+                  <p className="text-lg font-bold text-primary">{displayName || 'Sem nome'}</p>
+                  <p className="text-sm text-secondary flex items-center gap-1.5 mt-1">
                     <Mail size={13} /> {user?.email}
                   </p>
-                  <p className="text-xs text-[#999999] mt-1">
+                  <p className="text-xs text-tertiary mt-1">
                     Membro desde {new Date(user?.created_at ?? '').toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
                   </p>
                 </div>
@@ -235,31 +235,31 @@ export function SettingsPage() {
             <div className="p-6 space-y-5">
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-7 h-7 rounded-lg bg-[#2D5A27]/10 flex items-center justify-center">
-                  <User size={14} className="text-[#2D5A27]" />
+                  <User size={14} className="text-brand" />
                 </div>
-                <span className="text-sm font-semibold text-[#333333]">Informações da conta</span>
+                <span className="text-sm font-semibold text-primary">Informações da conta</span>
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-[#666666] uppercase tracking-wider">E-mail</label>
+                <label className="text-xs font-semibold text-secondary uppercase tracking-wider">E-mail</label>
                 <input
                   type="email"
                   value={user?.email ?? ''}
                   disabled
-                  className="w-full px-4 py-2.5 rounded-xl border border-[#E0E0E0] bg-[#F5F5F5] text-[#999999] text-sm cursor-not-allowed"
+                  className="w-full px-4 py-2.5 rounded-xl border border-neutral-light bg-neutral-lighter text-tertiary text-sm cursor-not-allowed"
                 />
                 <p className="text-xs text-[#BBBBBB]">O e-mail não pode ser alterado.</p>
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-[#666666] uppercase tracking-wider">Nome de exibição</label>
+                <label className="text-xs font-semibold text-secondary uppercase tracking-wider">Nome de exibição</label>
                 <input
                   type="text"
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSaveName()}
                   placeholder="Seu nome"
-                  className="w-full px-4 py-2.5 rounded-xl border border-[#E0E0E0] text-[#333333] text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#2D5A27]/25 focus:border-[#2D5A27] transition placeholder:text-[#999]"
+                  className="w-full px-4 py-2.5 rounded-xl border border-neutral-light text-primary text-sm bg-surface focus:outline-none focus:ring-2 focus:ring-[#2D5A27]/25 focus:border-[#2D5A27] transition placeholder:text-tertiary"
                 />
                 {nameError && (
                   <p className="text-xs text-[#DC3545] flex items-center gap-1.5">
@@ -293,24 +293,24 @@ export function SettingsPage() {
           <div className="space-y-6">
 
             {/* Segurança */}
-            <section className="bg-white border border-[#E0E0E0] rounded-2xl shadow-sm overflow-hidden">
-              <div className="bg-gradient-to-br from-slate-50 to-white px-6 pt-6 pb-5 border-b border-[#F0F0F0]">
+            <section className="bg-surface border border-neutral-light rounded-2xl shadow-sm overflow-hidden">
+              <div className="bg-gradient-to-br from-slate-50 to-white px-6 pt-6 pb-5 border-b border-neutral-light">
                 <div className="flex items-center gap-2">
                   <div className="w-7 h-7 rounded-lg bg-[#2D5A27]/10 flex items-center justify-center">
-                    <Shield size={14} className="text-[#2D5A27]" />
+                    <Shield size={14} className="text-brand" />
                   </div>
-                  <span className="text-sm font-semibold text-[#333333]">Segurança</span>
+                  <span className="text-sm font-semibold text-primary">Segurança</span>
                 </div>
               </div>
 
               <div className="p-6 space-y-4">
-                <div className="flex items-start gap-3 bg-[#F8F9FA] rounded-xl p-4 border border-[#F0F0F0]">
-                  <Lock size={16} className="text-[#666666] mt-0.5 shrink-0" />
+                <div className="flex items-start gap-3 bg-background rounded-xl p-4 border border-neutral-light">
+                  <Lock size={16} className="text-secondary mt-0.5 shrink-0" />
                   <div>
-                    <p className="text-sm text-[#333333] font-medium">Redefinir senha</p>
-                    <p className="text-xs text-[#666666] mt-0.5 leading-relaxed">
+                    <p className="text-sm text-primary font-medium">Redefinir senha</p>
+                    <p className="text-xs text-secondary mt-0.5 leading-relaxed">
                       Enviaremos um e-mail de redefinição para{' '}
-                      <span className="font-semibold text-[#333333]">{user?.email}</span>.
+                      <span className="font-semibold text-primary">{user?.email}</span>.
                     </p>
                   </div>
                 </div>
@@ -330,7 +330,7 @@ export function SettingsPage() {
                     <button
                       onClick={handleResetPassword}
                       disabled={pwStatus === 'loading'}
-                      className="flex items-center gap-2 px-5 py-2.5 rounded-xl border border-[#2D5A27] text-[#2D5A27] text-sm font-semibold hover:bg-[#2D5A27]/5 transition disabled:opacity-50"
+                      className="flex items-center gap-2 px-5 py-2.5 rounded-xl border border-[#2D5A27] text-brand text-sm font-semibold hover:bg-[#2D5A27]/5 transition disabled:opacity-50"
                     >
                       {pwStatus === 'loading' && <Loader size={15} className="animate-spin" />}
                       Enviar link de redefinição
@@ -341,28 +341,28 @@ export function SettingsPage() {
             </section>
 
             {/* Sessão / informações extras */}
-            <section className="bg-white border border-[#E0E0E0] rounded-2xl shadow-sm p-6 space-y-4">
+            <section className="bg-surface border border-neutral-light rounded-2xl shadow-sm p-6 space-y-4">
               <div className="flex items-center gap-2">
                 <div className="w-7 h-7 rounded-lg bg-[#2D5A27]/10 flex items-center justify-center">
-                  <User size={14} className="text-[#2D5A27]" />
+                  <User size={14} className="text-brand" />
                 </div>
-                <span className="text-sm font-semibold text-[#333333]">Informações da sessão</span>
+                <span className="text-sm font-semibold text-primary">Informações da sessão</span>
               </div>
 
               <div className="space-y-3">
                 <div className="flex justify-between items-center py-2 border-b border-[#F5F5F5]">
-                  <span className="text-xs text-[#666666]">ID do usuário</span>
-                  <span className="text-xs font-mono text-[#999999] truncate max-w-[180px]">{user?.id?.slice(0, 18)}…</span>
+                  <span className="text-xs text-secondary">ID do usuário</span>
+                  <span className="text-xs font-mono text-tertiary truncate max-w-[180px]">{user?.id?.slice(0, 18)}…</span>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-[#F5F5F5]">
-                  <span className="text-xs text-[#666666]">Provedor</span>
-                  <span className="text-xs font-medium text-[#333333] capitalize">
+                  <span className="text-xs text-secondary">Provedor</span>
+                  <span className="text-xs font-medium text-primary capitalize">
                     {user?.app_metadata?.provider ?? 'email'}
                   </span>
                 </div>
                 <div className="flex justify-between items-center py-2">
-                  <span className="text-xs text-[#666666]">Último acesso</span>
-                  <span className="text-xs text-[#333333]">
+                  <span className="text-xs text-secondary">Último acesso</span>
+                  <span className="text-xs text-primary">
                     {user?.last_sign_in_at
                       ? new Date(user.last_sign_in_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })
                       : '—'}
@@ -376,8 +376,8 @@ export function SettingsPage() {
 
         {/* ── Seção de Planos ── */}
         <div>
-          <h2 className="text-lg font-bold text-[#333333] mb-1">Plano & Assinatura</h2>
-          <p className="text-sm text-[#666666] mb-4">Gerencie seu plano de acesso ao Lemon.meet.</p>
+          <h2 className="text-lg font-bold text-primary mb-1">Plano & Assinatura</h2>
+          <p className="text-sm text-secondary mb-4">Gerencie seu plano de acesso ao Lemon.meet.</p>
 
           {/* Feedback do gateway de pagamento */}
           {checkoutMsg === 'success' && (
@@ -387,7 +387,7 @@ export function SettingsPage() {
             </div>
           )}
           {checkoutMsg === 'cancelled' && (
-            <div className="flex items-center gap-2 text-sm text-[#666666] bg-gray-50 border border-gray-200 px-4 py-3 rounded-xl mb-4">
+            <div className="flex items-center gap-2 text-sm text-secondary bg-gray-50 border border-gray-200 px-4 py-3 rounded-xl mb-4">
               <AlertCircle size={16} />
               Pagamento cancelado. Você pode tentar novamente quando quiser.
             </div>
@@ -395,16 +395,16 @@ export function SettingsPage() {
 
           {/* Status atual */}
           {subscription && (
-            <div className="bg-white border border-[#E0E0E0] rounded-2xl p-5 mb-4 flex items-center justify-between flex-wrap gap-3">
+            <div className="bg-surface border border-neutral-light rounded-2xl p-5 mb-4 flex items-center justify-between flex-wrap gap-3">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-[#2D5A27]/10 flex items-center justify-center">
-                  <CreditCard size={18} className="text-[#2D5A27]" />
+                  <CreditCard size={18} className="text-brand" />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-[#333333] capitalize">
+                  <p className="text-sm font-semibold text-primary capitalize">
                     Plano {subscription.plan === 'trial' ? 'Trial' : subscription.plan === 'starter' ? 'Starter' : 'Professional'}
                   </p>
-                  <p className="text-xs text-[#666666]">
+                  <p className="text-xs text-secondary">
                     {isTrial && !isExpired && daysLeft !== null
                       ? `${daysLeft} dia${daysLeft !== 1 ? 's' : ''} restante${daysLeft !== 1 ? 's' : ''} de teste`
                       : isExpired
@@ -418,7 +418,7 @@ export function SettingsPage() {
               {isPaid && (
                 <button
                   onClick={() => navigate('/subscription')}
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl border border-[#2D5A27] text-[#2D5A27] text-sm font-semibold hover:bg-[#2D5A27]/5 transition"
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl border border-[#2D5A27] text-brand text-sm font-semibold hover:bg-[#2D5A27]/5 transition"
                 >
                   <CreditCard size={14} />
                   Gerenciar assinatura
@@ -432,25 +432,25 @@ export function SettingsPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
               {/* Starter */}
-              <div className="bg-white border border-[#E0E0E0] rounded-2xl overflow-hidden shadow-sm">
-                <div className="px-6 pt-6 pb-4 border-b border-[#F0F0F0]">
+              <div className="bg-surface border border-neutral-light rounded-2xl overflow-hidden shadow-sm">
+                <div className="px-6 pt-6 pb-4 border-b border-neutral-light">
                   <div className="flex items-center gap-2 mb-1">
-                    <Zap size={18} className="text-[#2D5A27]" />
-                    <h3 className="text-base font-bold text-[#333333]">Starter</h3>
+                    <Zap size={18} className="text-brand" />
+                    <h3 className="text-base font-bold text-primary">Starter</h3>
                   </div>
-                  <p className="text-xs text-[#666666]">Para vendedores individuais</p>
+                  <p className="text-xs text-secondary">Para vendedores individuais</p>
                 </div>
                 <div className="p-6 space-y-3">
                   {['Gravação e transcrição ilimitada', 'Score comercial por reunião', 'Follow-up inteligente com IA', '7 dias de teste grátis'].map(f => (
-                    <div key={f} className="flex items-center gap-2 text-sm text-[#333333]">
-                      <CheckCircle size={14} className="text-[#2D5A27] shrink-0" />
+                    <div key={f} className="flex items-center gap-2 text-sm text-primary">
+                      <CheckCircle size={14} className="text-brand shrink-0" />
                       {f}
                     </div>
                   ))}
                   <button
                     onClick={() => handleCheckout('starter')}
                     disabled={checkoutLoading === 'starter'}
-                    className="w-full mt-2 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-[#2D5A27] text-[#2D5A27] text-sm font-semibold hover:bg-[#2D5A27]/5 transition disabled:opacity-50"
+                    className="w-full mt-2 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-[#2D5A27] text-brand text-sm font-semibold hover:bg-[#2D5A27]/5 transition disabled:opacity-50"
                   >
                     {checkoutLoading === 'starter' ? <Loader size={14} className="animate-spin" /> : null}
                     Assinar Starter
@@ -460,7 +460,7 @@ export function SettingsPage() {
 
               {/* Professional */}
               <div className="bg-[#2D5A27] rounded-2xl overflow-hidden shadow-md relative">
-                <div className="absolute top-3 right-3 bg-[#FFD700] text-[#1a1a1a] text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">
+                <div className="absolute top-3 right-3 bg-[#FFD700] text-primary text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">
                   Popular
                 </div>
                 <div className="px-6 pt-6 pb-4 border-b border-white/10">
@@ -480,7 +480,7 @@ export function SettingsPage() {
                   <button
                     onClick={() => handleCheckout('professional')}
                     disabled={checkoutLoading === 'professional'}
-                    className="w-full mt-2 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#FFD700] text-[#1a1a1a] text-sm font-bold hover:bg-yellow-400 transition disabled:opacity-50"
+                    className="w-full mt-2 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#FFD700] text-primary text-sm font-bold hover:bg-yellow-400 transition disabled:opacity-50"
                   >
                     {checkoutLoading === 'professional' ? <Loader size={14} className="animate-spin" /> : null}
                     Assinar Professional

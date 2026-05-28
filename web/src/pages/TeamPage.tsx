@@ -508,11 +508,11 @@ export function TeamPage() {
           <div className="grid grid-cols-2 gap-2 text-left">
             <div className="bg-red-50 border border-red-100 rounded-xl p-3">
               <div className="text-[10px] font-semibold text-[#DC3545] uppercase tracking-wider mb-1">Health Score</div>
-              <div className="text-xl font-bold text-[#333333]">72/100</div>
+              <div className="text-xl font-bold text-primary">72/100</div>
             </div>
             <div className="bg-amber-50 border border-amber-100 rounded-xl p-3">
               <div className="text-[10px] font-semibold text-amber-600 uppercase tracking-wider mb-1">Churn Risk</div>
-              <div className="text-xl font-bold text-[#333333]">Médio</div>
+              <div className="text-xl font-bold text-primary">Médio</div>
             </div>
           </div>
         ),
@@ -527,12 +527,12 @@ export function TeamPage() {
         preview: (
           <div className="flex gap-2 text-left">
             <div className="flex-1 bg-[#2D5A27]/5 border border-[#2D5A27]/20 rounded-xl p-3">
-              <div className="text-[10px] font-semibold text-[#2D5A27] uppercase tracking-wider mb-1">BANT</div>
-              <div className="text-xs text-[#666666] leading-snug">Budget · Authority · Need · Timeline</div>
+              <div className="text-[10px] font-semibold text-brand uppercase tracking-wider mb-1">BANT</div>
+              <div className="text-xs text-secondary leading-snug">Budget · Authority · Need · Timeline</div>
             </div>
             <div className="flex-1 bg-[#2D5A27]/5 border border-[#2D5A27]/20 rounded-xl p-3">
-              <div className="text-[10px] font-semibold text-[#2D5A27] uppercase tracking-wider mb-1">SPIN</div>
-              <div className="text-xs text-[#666666] leading-snug">Situation · Problem · Implication · Need-payoff</div>
+              <div className="text-[10px] font-semibold text-brand uppercase tracking-wider mb-1">SPIN</div>
+              <div className="text-xs text-secondary leading-snug">Situation · Problem · Implication · Need-payoff</div>
             </div>
           </div>
         ),
@@ -545,9 +545,9 @@ export function TeamPage() {
         title: 'Instruções customizadas pro seu contexto',
         description: 'Adicione até 4000 caracteres de instruções específicas que serão aplicadas a TODAS as análises do time. Use pra contextualizar seu ICP, tom desejado, sinais específicos a observar — sem precisar prompt engineering. Não substitui o framework: complementa.',
         preview: (
-          <div className="bg-[#F8F9FA] border border-[#E0E0E0] rounded-xl p-3 text-left">
-            <div className="text-[10px] font-semibold text-[#666666] uppercase tracking-wider mb-1.5">Exemplo</div>
-            <p className="text-xs text-[#666666] leading-relaxed font-mono">
+          <div className="bg-background border border-neutral-light rounded-xl p-3 text-left">
+            <div className="text-[10px] font-semibold text-secondary uppercase tracking-wider mb-1.5">Exemplo</div>
+            <p className="text-xs text-secondary leading-relaxed font-mono">
               "Nosso ICP é diretor de RH de empresa de 100-500 funcionários. Foque em sinais de adoção do módulo de pesquisa de clima e mencione integração com SAP se for citada."
             </p>
           </div>
@@ -561,10 +561,10 @@ export function TeamPage() {
         title: 'Nova aba "Configurações" pra owners',
         description: 'Tudo de administração ficou numa aba dedicada: configurar a avaliação por IA, gerar link de convite e a zona de perigo (excluir time). A aba "Membros" ganhou largura total e o botão "+ Novo time" agora fica sempre visível no topo, mesmo quando você tem só um time.',
         preview: (
-          <div className="flex gap-1 bg-[#F5F5F5] rounded-xl p-1 text-left w-fit mx-auto">
-            <div className="px-3 py-1.5 text-xs text-[#666666] flex items-center gap-1.5"><Users size={11} /> Membros</div>
-            <div className="px-3 py-1.5 text-xs text-[#666666] flex items-center gap-1.5"><Video size={11} /> Reuniões</div>
-            <div className="px-3 py-1.5 rounded-lg bg-white text-xs font-semibold text-[#2D5A27] shadow-sm flex items-center gap-1.5"><Settings size={11} /> Configurações</div>
+          <div className="flex gap-1 bg-neutral-lighter rounded-xl p-1 text-left w-fit mx-auto">
+            <div className="px-3 py-1.5 text-xs text-secondary flex items-center gap-1.5"><Users size={11} /> Membros</div>
+            <div className="px-3 py-1.5 text-xs text-secondary flex items-center gap-1.5"><Video size={11} /> Reuniões</div>
+            <div className="px-3 py-1.5 rounded-lg bg-surface text-xs font-semibold text-brand shadow-sm flex items-center gap-1.5"><Settings size={11} /> Configurações</div>
           </div>
         ),
       },
@@ -577,10 +577,10 @@ export function TeamPage() {
         description: 'Pra evitar acidentes, a exclusão de um time pede pra você digitar exatamente o nome dele antes de habilitar o botão. Membros são removidos, links de convite invalidados, e reuniões já registradas perdem o vínculo mas permanecem no histórico. Disponível em Configurações → Zona de perigo.',
         preview: (
           <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-left">
-            <div className="text-[10px] text-[#666666] mb-1">Para confirmar, digite:</div>
+            <div className="text-[10px] text-secondary mb-1">Para confirmar, digite:</div>
             <div className="font-mono text-xs font-bold text-[#DC3545] mb-2">Meu Time Comercial</div>
             <div className="flex gap-2">
-              <div className="flex-1 bg-white border border-[#DC3545]/40 rounded-lg px-2 py-1 text-xs text-[#999999]">Meu Time Comercial</div>
+              <div className="flex-1 bg-surface border border-[#DC3545]/40 rounded-lg px-2 py-1 text-xs text-tertiary">Meu Time Comercial</div>
               <div className="bg-[#DC3545] text-white text-xs font-semibold px-3 py-1 rounded-lg">Excluir</div>
             </div>
           </div>
@@ -599,21 +599,21 @@ export function TeamPage() {
         onClick={dismissWhatsNew}
       >
         <div
-          className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 space-y-5 max-h-[90vh] overflow-y-auto"
+          className="bg-surface rounded-2xl shadow-2xl max-w-lg w-full p-6 space-y-5 max-h-[90vh] overflow-y-auto"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
           <div className="flex items-start justify-between">
             <div>
-              <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[#2D5A27]/10 text-[#2D5A27] text-[10px] font-semibold uppercase tracking-wider mb-2">
+              <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[#2D5A27]/10 text-brand text-[10px] font-semibold uppercase tracking-wider mb-2">
                 <Sparkles size={10} />
                 Novidades
               </div>
-              <p className="text-xs text-[#999999]">{whatsNewStep + 1} de {STEPS.length}</p>
+              <p className="text-xs text-tertiary">{whatsNewStep + 1} de {STEPS.length}</p>
             </div>
             <button
               onClick={dismissWhatsNew}
-              className="text-[#999999] hover:text-[#333333] transition"
+              className="text-tertiary hover:text-primary transition"
               aria-label="Fechar"
             >
               <X size={20} />
@@ -629,9 +629,9 @@ export function TeamPage() {
               <div className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: step.iconColor }}>
                 {step.tag}
               </div>
-              <h3 className="text-xl font-bold text-[#333333] leading-tight">{step.title}</h3>
+              <h3 className="text-xl font-bold text-primary leading-tight">{step.title}</h3>
             </div>
-            <p className="text-sm text-[#666666] leading-relaxed text-left">{step.description}</p>
+            <p className="text-sm text-secondary leading-relaxed text-left">{step.description}</p>
             {step.preview && <div className="pt-1">{step.preview}</div>}
           </div>
 
@@ -656,14 +656,14 @@ export function TeamPage() {
             <button
               onClick={() => setWhatsNewStep(s => Math.max(0, s - 1))}
               disabled={isFirst}
-              className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl border border-[#E0E0E0] text-sm font-semibold text-[#666666] hover:bg-[#F8F9FA] transition disabled:opacity-30 disabled:cursor-not-allowed"
+              className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl border border-neutral-light text-sm font-semibold text-secondary hover:bg-background transition disabled:opacity-30 disabled:cursor-not-allowed"
             >
               <ChevronLeft size={15} />
               Anterior
             </button>
             <button
               onClick={dismissWhatsNew}
-              className="px-4 py-2.5 rounded-xl text-sm font-semibold text-[#666666] hover:bg-[#F8F9FA] transition"
+              className="px-4 py-2.5 rounded-xl text-sm font-semibold text-secondary hover:bg-background transition"
             >
               Pular
             </button>
@@ -700,20 +700,20 @@ export function TeamPage() {
         onClick={() => !isLoading && setShowCreateTeamModal(false)}
       >
         <div
-          className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 space-y-5 max-h-[90vh] overflow-y-auto"
+          className="bg-surface rounded-2xl shadow-2xl max-w-lg w-full p-6 space-y-5 max-h-[90vh] overflow-y-auto"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
           <div className="flex items-start justify-between">
             <div>
-              <h3 className="text-xl font-bold text-[#333333]">Criar novo time</h3>
-              <p className="text-sm text-[#666666] mt-1">
+              <h3 className="text-xl font-bold text-primary">Criar novo time</h3>
+              <p className="text-sm text-secondary mt-1">
                 Defina o tipo do time e como a IA deve avaliar as reuniões
               </p>
             </div>
             <button
               onClick={() => !isLoading && setShowCreateTeamModal(false)}
-              className="text-[#999999] hover:text-[#333333] transition"
+              className="text-tertiary hover:text-primary transition"
               disabled={isLoading}
             >
               <X size={20} />
@@ -722,7 +722,7 @@ export function TeamPage() {
 
           {/* Nome do time */}
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-[#666666] uppercase tracking-wider">
+            <label className="text-xs font-semibold text-secondary uppercase tracking-wider">
               Nome do time
             </label>
             <input
@@ -731,13 +731,13 @@ export function TeamPage() {
               onChange={(e) => setTeamName(e.target.value)}
               placeholder="Ex: Time Comercial"
               autoFocus
-              className="w-full px-4 py-2.5 rounded-xl border border-[#E0E0E0] text-[#333333] text-sm focus:outline-none focus:ring-2 focus:ring-[#2D5A27]/25 focus:border-[#2D5A27] transition bg-white placeholder:text-[#999]"
+              className="w-full px-4 py-2.5 rounded-xl border border-neutral-light text-primary text-sm focus:outline-none focus:ring-2 focus:ring-[#2D5A27]/25 focus:border-[#2D5A27] transition bg-surface placeholder:text-tertiary"
             />
           </div>
 
           {/* Tipo do time */}
           <div className="space-y-2">
-            <label className="text-xs font-semibold text-[#666666] uppercase tracking-wider">
+            <label className="text-xs font-semibold text-secondary uppercase tracking-wider">
               Tipo do time
             </label>
             <div className="grid grid-cols-2 gap-2">
@@ -752,11 +752,11 @@ export function TeamPage() {
                   className={`text-left p-3 rounded-xl border-2 transition ${
                     createTeamType === opt.value
                       ? 'border-[#2D5A27] bg-[#2D5A27]/5'
-                      : 'border-[#E0E0E0] hover:border-[#CCCCCC]'
+                      : 'border-neutral-light hover:border-[#CCCCCC]'
                   }`}
                 >
-                  <div className="text-sm font-semibold text-[#333333]">{opt.label}</div>
-                  <div className="text-xs text-[#666666] mt-1 leading-relaxed">{opt.desc}</div>
+                  <div className="text-sm font-semibold text-primary">{opt.label}</div>
+                  <div className="text-xs text-secondary mt-1 leading-relaxed">{opt.desc}</div>
                 </button>
               ))}
             </div>
@@ -765,7 +765,7 @@ export function TeamPage() {
           {/* Framework (só Sales) */}
           {createTeamType === 'sales' && (
             <div className="space-y-2">
-              <label className="text-xs font-semibold text-[#666666] uppercase tracking-wider">
+              <label className="text-xs font-semibold text-secondary uppercase tracking-wider">
                 Framework de avaliação
               </label>
               <div className="grid grid-cols-2 gap-2">
@@ -780,11 +780,11 @@ export function TeamPage() {
                     className={`text-left p-3 rounded-xl border-2 transition ${
                       createTeamFramework === opt.value
                         ? 'border-[#2D5A27] bg-[#2D5A27]/5'
-                        : 'border-[#E0E0E0] hover:border-[#CCCCCC]'
+                        : 'border-neutral-light hover:border-[#CCCCCC]'
                     }`}
                   >
-                    <div className="text-sm font-semibold text-[#333333]">{opt.label}</div>
-                    <div className="text-xs text-[#666666] mt-1 leading-relaxed">{opt.desc}</div>
+                    <div className="text-sm font-semibold text-primary">{opt.label}</div>
+                    <div className="text-xs text-secondary mt-1 leading-relaxed">{opt.desc}</div>
                   </button>
                 ))}
               </div>
@@ -793,10 +793,10 @@ export function TeamPage() {
 
           {/* Instruções customizadas */}
           <div className="space-y-2">
-            <label className="text-xs font-semibold text-[#666666] uppercase tracking-wider">
+            <label className="text-xs font-semibold text-secondary uppercase tracking-wider">
               Instruções customizadas (opcional)
             </label>
-            <p className="text-xs text-[#666666] leading-relaxed">
+            <p className="text-xs text-secondary leading-relaxed">
               Instruções adicionais para a IA. Contextualize seu ICP, tom desejado, sinais específicos a observar, etc.
             </p>
             <textarea
@@ -805,9 +805,9 @@ export function TeamPage() {
               placeholder="Você pode preencher depois, se preferir."
               maxLength={4000}
               rows={4}
-              className="w-full text-sm text-[#333333] bg-[#F8F9FA] border border-[#E0E0E0] rounded-xl p-3 focus:outline-none focus:border-[#2D5A27] resize-y"
+              className="w-full text-sm text-primary bg-background border border-neutral-light rounded-xl p-3 focus:outline-none focus:border-[#2D5A27] resize-y"
             />
-            <div className="text-xs text-[#999999] text-right">
+            <div className="text-xs text-tertiary text-right">
               {createTeamInstructions.length} / 4000
             </div>
           </div>
@@ -825,7 +825,7 @@ export function TeamPage() {
             <button
               onClick={() => setShowCreateTeamModal(false)}
               disabled={isLoading}
-              className="flex-1 py-2.5 rounded-xl border border-[#E0E0E0] text-sm font-semibold text-[#666666] hover:bg-[#F8F9FA] transition disabled:opacity-50"
+              className="flex-1 py-2.5 rounded-xl border border-neutral-light text-sm font-semibold text-secondary hover:bg-background transition disabled:opacity-50"
             >
               Cancelar
             </button>
@@ -847,7 +847,7 @@ export function TeamPage() {
     return (
       <MainLayout>
         <div className="flex items-center justify-center py-32">
-          <Loader size={28} className="animate-spin text-[#2D5A27]" />
+          <Loader size={28} className="animate-spin text-brand" />
         </div>
       </MainLayout>
     )
@@ -861,10 +861,10 @@ export function TeamPage() {
           {/* Hero */}
           <div className="text-center mb-10">
             <div className="w-20 h-20 rounded-3xl bg-[#2D5A27]/10 flex items-center justify-center mx-auto mb-5 shadow-sm">
-              <Users size={36} className="text-[#2D5A27]" />
+              <Users size={36} className="text-brand" />
             </div>
-            <h1 className="text-2xl font-bold text-[#333333]">Criar meu time</h1>
-            <p className="mt-2 text-[#666666] text-sm max-w-xs mx-auto leading-relaxed">
+            <h1 className="text-2xl font-bold text-primary">Criar meu time</h1>
+            <p className="mt-2 text-secondary text-sm max-w-xs mx-auto leading-relaxed">
               Reúna sua equipe e acesse as reuniões de todos em um só lugar.
             </p>
           </div>
@@ -876,17 +876,17 @@ export function TeamPage() {
               { icon: Video, label: 'Reuniões do time' },
               { icon: Shield, label: 'Controle de acesso' },
             ].map(({ icon: Icon, label }) => (
-              <div key={label} className="bg-white rounded-2xl border border-[#E0E0E0] p-4 flex flex-col items-center gap-2 text-center">
+              <div key={label} className="bg-surface rounded-2xl border border-neutral-light p-4 flex flex-col items-center gap-2 text-center">
                 <div className="w-8 h-8 rounded-xl bg-[#2D5A27]/10 flex items-center justify-center">
-                  <Icon size={15} className="text-[#2D5A27]" />
+                  <Icon size={15} className="text-brand" />
                 </div>
-                <span className="text-xs text-[#666666] font-medium">{label}</span>
+                <span className="text-xs text-secondary font-medium">{label}</span>
               </div>
             ))}
           </div>
 
           {/* Card de criação */}
-          <div className="bg-white border border-[#E0E0E0] rounded-2xl p-6 shadow-sm">
+          <div className="bg-surface border border-neutral-light rounded-2xl p-6 shadow-sm">
             <button
               onClick={openCreateTeamModal}
               className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-[#2D5A27] text-white text-sm font-semibold hover:bg-[#1E3D1A] transition shadow-sm"
@@ -906,7 +906,7 @@ export function TeamPage() {
     return (
       <MainLayout>
         <div className="flex items-center justify-center py-32">
-          <Loader size={28} className="animate-spin text-[#2D5A27]" />
+          <Loader size={28} className="animate-spin text-brand" />
         </div>
       </MainLayout>
     )
@@ -928,13 +928,13 @@ export function TeamPage() {
           <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-end">
             {teams.length > 1 && (
               <div className="flex-1 min-w-0">
-                <label className="text-xs font-semibold text-[#666666] uppercase tracking-wider mb-2 block">
+                <label className="text-xs font-semibold text-secondary uppercase tracking-wider mb-2 block">
                   Selecione um time ({teams.length}/5)
                 </label>
                 <select
                   value={selectedTeamId ?? ''}
                   onChange={(e) => setSelectedTeamId(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-[#E0E0E0] text-[#333333] text-sm focus:outline-none focus:ring-2 focus:ring-[#2D5A27]/25 focus:border-[#2D5A27] transition bg-white shadow-sm"
+                  className="w-full px-4 py-2.5 rounded-xl border border-neutral-light text-primary text-sm focus:outline-none focus:ring-2 focus:ring-[#2D5A27]/25 focus:border-[#2D5A27] transition bg-surface shadow-sm"
                 >
                   {teams.map(t => (
                     <option key={t.id} value={t.id}>
@@ -958,16 +958,16 @@ export function TeamPage() {
         )}
 
         {/* Header full-width */}
-        <div className="bg-white border border-[#E0E0E0] rounded-2xl p-6 shadow-sm">
+        <div className="bg-surface border border-neutral-light rounded-2xl p-6 shadow-sm">
           <div className="flex flex-col sm:flex-row sm:items-center gap-5">
             {/* Info do time */}
             <div className="flex items-center gap-4 flex-1 min-w-0">
               <div className="w-14 h-14 rounded-2xl bg-[#2D5A27]/10 flex items-center justify-center shrink-0">
-                <Users size={26} className="text-[#2D5A27]" />
+                <Users size={26} className="text-brand" />
               </div>
               <div className="min-w-0">
-                <h1 className="text-xl font-bold text-[#333333] truncate">{team.name}</h1>
-                <p className="text-sm text-[#666666] mt-0.5 flex items-center gap-2 flex-wrap">
+                <h1 className="text-xl font-bold text-primary truncate">{team.name}</h1>
+                <p className="text-sm text-secondary mt-0.5 flex items-center gap-2 flex-wrap">
                   {activeCount} membro(s) ativo(s)
                   {pendingCount > 0 && (
                     <span className="inline-flex items-center gap-1 text-xs bg-amber-50 text-amber-600 border border-amber-200 px-2 py-0.5 rounded-full font-medium">
@@ -980,13 +980,13 @@ export function TeamPage() {
             {/* Stats */}
             <div className="flex gap-4 shrink-0">
               {[
-                { label: 'Total', value: members.length, color: 'text-[#2D5A27]' },
+                { label: 'Total', value: members.length, color: 'text-brand' },
                 { label: 'Ativos', value: activeCount, color: 'text-[#4CAF50]' },
                 { label: 'Pendentes', value: pendingCount, color: 'text-amber-500' },
               ].map(({ label, value, color }) => (
-                <div key={label} className="text-center px-4 py-2.5 bg-[#F8F9FA] rounded-xl min-w-[72px]">
+                <div key={label} className="text-center px-4 py-2.5 bg-background rounded-xl min-w-[72px]">
                   <div className={`text-2xl font-bold ${color}`}>{value}</div>
-                  <div className="text-xs text-[#666666] mt-0.5">{label}</div>
+                  <div className="text-xs text-secondary mt-0.5">{label}</div>
                 </div>
               ))}
             </div>
@@ -994,15 +994,15 @@ export function TeamPage() {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1 bg-[#F5F5F5] rounded-xl p-1 w-fit">
+        <div className="flex gap-1 bg-neutral-lighter rounded-xl p-1 w-fit">
           {(isOwner ? (['members', 'meetings', 'settings'] as const) : (['members', 'meetings'] as const)).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
               className={`px-5 py-2 rounded-lg text-sm font-medium transition-all ${
                 tab === t
-                  ? 'bg-white text-[#2D5A27] shadow-sm font-semibold'
-                  : 'text-[#666666] hover:text-[#333333]'
+                  ? 'bg-surface text-brand shadow-sm font-semibold'
+                  : 'text-secondary hover:text-primary'
               }`}
             >
               {t === 'members' && <span className="flex items-center gap-2"><Users size={14} /> Membros</span>}
@@ -1015,9 +1015,9 @@ export function TeamPage() {
         {/* ── ABA MEMBROS ── */}
         {tab === 'members' && (
           <div>
-            <div className="bg-white border border-[#E0E0E0] rounded-2xl shadow-sm overflow-hidden">
-              <div className="px-5 py-3.5 border-b border-[#F0F0F0] flex items-center justify-between">
-                <span className="text-xs font-semibold text-[#666666] uppercase tracking-wider">
+            <div className="bg-surface border border-neutral-light rounded-2xl shadow-sm overflow-hidden">
+              <div className="px-5 py-3.5 border-b border-neutral-light flex items-center justify-between">
+                <span className="text-xs font-semibold text-secondary uppercase tracking-wider">
                   Membros ({members.length})
                 </span>
               </div>
@@ -1025,18 +1025,18 @@ export function TeamPage() {
                 {members.length === 0 ? (
                   <div className="flex flex-col items-center py-16 gap-3">
                     <Users size={32} className="text-[#CCCCCC]" />
-                    <p className="text-sm text-[#999999]">Nenhum membro ainda.</p>
+                    <p className="text-sm text-tertiary">Nenhum membro ainda.</p>
                   </div>
                 ) : members.map((m) => (
-                  <div key={m.id} className="flex items-center gap-4 px-5 py-4 hover:bg-[#F8F9FA] transition-colors">
+                  <div key={m.id} className="flex items-center gap-4 px-5 py-4 hover:bg-background transition-colors">
                     <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${
-                      m.status === 'active' ? 'bg-[#2D5A27]/15 text-[#2D5A27]' : 'bg-[#F5F5F5] text-[#999999]'
+                      m.status === 'active' ? 'bg-[#2D5A27]/15 text-brand' : 'bg-neutral-lighter text-tertiary'
                     }`}>
                       {(m.name ?? m.invited_email)[0].toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-sm font-semibold text-[#333333] truncate">
+                        <span className="text-sm font-semibold text-primary truncate">
                           {m.name ?? m.invited_email.split('@')[0]}
                         </span>
                         {m.role === 'admin' && (
@@ -1045,7 +1045,7 @@ export function TeamPage() {
                           </span>
                         )}
                       </div>
-                      <span className="text-xs text-[#999999]">{m.invited_email}</span>
+                      <span className="text-xs text-tertiary">{m.invited_email}</span>
                     </div>
                     <div className="flex items-center gap-3 shrink-0">
                       {m.status === 'active' ? (
@@ -1065,7 +1065,7 @@ export function TeamPage() {
                           className={`w-8 h-8 rounded-lg flex items-center justify-center transition ${
                             m.role === 'admin'
                               ? 'text-amber-500 hover:text-amber-700 hover:bg-amber-50'
-                              : 'text-[#999999] hover:text-amber-500 hover:bg-amber-50'
+                              : 'text-tertiary hover:text-amber-500 hover:bg-amber-50'
                           }`}
                         >
                           {promotingMember === m.id ? (
@@ -1080,7 +1080,7 @@ export function TeamPage() {
                           onClick={() => handleRemove(m.invited_email)}
                           disabled={removingEmail === m.invited_email}
                           title="Remover membro"
-                          className="w-8 h-8 rounded-lg flex items-center justify-center text-[#999999] hover:text-[#DC3545] hover:bg-red-50 transition"
+                          className="w-8 h-8 rounded-lg flex items-center justify-center text-tertiary hover:text-[#DC3545] hover:bg-red-50 transition"
                         >
                           {removingEmail === m.invited_email ? (
                             <Loader size={14} className="animate-spin" />
@@ -1102,43 +1102,43 @@ export function TeamPage() {
         {tab === 'settings' && isOwner && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* Seção: Avaliação por IA */}
-            <div className="bg-white border border-[#E0E0E0] rounded-2xl shadow-sm overflow-hidden">
-              <div className="px-5 py-3.5 border-b border-[#F0F0F0] flex items-center gap-2">
+            <div className="bg-surface border border-neutral-light rounded-2xl shadow-sm overflow-hidden">
+              <div className="px-5 py-3.5 border-b border-neutral-light flex items-center gap-2">
                 <div className="w-7 h-7 rounded-lg bg-[#2D5A27]/10 flex items-center justify-center">
-                  <Sparkles size={14} className="text-[#2D5A27]" />
+                  <Sparkles size={14} className="text-brand" />
                 </div>
-                <span className="text-sm font-semibold text-[#333333]">Avaliação por IA</span>
+                <span className="text-sm font-semibold text-primary">Avaliação por IA</span>
               </div>
               <div className="p-5 space-y-4">
-                <p className="text-xs text-[#666666] leading-relaxed">
+                <p className="text-xs text-secondary leading-relaxed">
                   Define como a IA analisa as reuniões deste time: tipo (Sales/CS), framework
                   (BANT/SPIN) e instruções customizadas pro seu contexto.
                 </p>
-                <div className="bg-[#F8F9FA] rounded-xl p-3 space-y-1.5">
+                <div className="bg-background rounded-xl p-3 space-y-1.5">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs text-[#666666]">Tipo do time</span>
-                    <span className="text-xs font-semibold text-[#333333]">
+                    <span className="text-xs text-secondary">Tipo do time</span>
+                    <span className="text-xs font-semibold text-primary">
                       {team.team_type === 'customer_success' ? 'Customer Success' : 'Sales'}
                     </span>
                   </div>
                   {team.team_type !== 'customer_success' && (
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs text-[#666666]">Framework</span>
-                      <span className="text-xs font-semibold text-[#333333]">
+                      <span className="text-xs text-secondary">Framework</span>
+                      <span className="text-xs font-semibold text-primary">
                         {(team.evaluation_framework ?? 'bant').toUpperCase()}
                       </span>
                     </div>
                   )}
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs text-[#666666]">Instruções customizadas</span>
-                    <span className="text-xs font-semibold text-[#333333]">
+                    <span className="text-xs text-secondary">Instruções customizadas</span>
+                    <span className="text-xs font-semibold text-primary">
                       {team.custom_prompt_instructions ? 'Sim' : 'Não'}
                     </span>
                   </div>
                 </div>
                 <button
                   onClick={handleOpenConfigModal}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-[#2D5A27] text-[#2D5A27] text-sm font-semibold hover:bg-[#2D5A27]/5 transition"
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-[#2D5A27] text-brand text-sm font-semibold hover:bg-[#2D5A27]/5 transition"
                 >
                   <Sparkles size={15} />
                   Configurar avaliação
@@ -1147,15 +1147,15 @@ export function TeamPage() {
             </div>
 
             {/* Seção: Convite de membros */}
-            <div className="bg-white border border-[#E0E0E0] rounded-2xl shadow-sm overflow-hidden">
-              <div className="px-5 py-3.5 border-b border-[#F0F0F0] flex items-center gap-2">
+            <div className="bg-surface border border-neutral-light rounded-2xl shadow-sm overflow-hidden">
+              <div className="px-5 py-3.5 border-b border-neutral-light flex items-center gap-2">
                 <div className="w-7 h-7 rounded-lg bg-[#2D5A27]/10 flex items-center justify-center">
-                  <Link2 size={14} className="text-[#2D5A27]" />
+                  <Link2 size={14} className="text-brand" />
                 </div>
-                <span className="text-sm font-semibold text-[#333333]">Convite de membros</span>
+                <span className="text-sm font-semibold text-primary">Convite de membros</span>
               </div>
               <div className="p-5 space-y-4">
-                <p className="text-xs text-[#666666] leading-relaxed">
+                <p className="text-xs text-secondary leading-relaxed">
                   Gere um link compartilhável (válido por 7 dias) que qualquer pessoa pode
                   usar pra entrar no time. Após login, ela é automaticamente adicionada.
                 </p>
@@ -1171,7 +1171,7 @@ export function TeamPage() {
             </div>
 
             {/* Seção: Zona de perigo — span full width */}
-            <div className="lg:col-span-2 bg-white border border-red-200 rounded-2xl shadow-sm overflow-hidden">
+            <div className="lg:col-span-2 bg-surface border border-red-200 rounded-2xl shadow-sm overflow-hidden">
               <div className="px-5 py-3.5 border-b border-red-100 flex items-center gap-2 bg-red-50/50">
                 <div className="w-7 h-7 rounded-lg bg-red-100 flex items-center justify-center">
                   <AlertCircle size={14} className="text-[#DC3545]" />
@@ -1180,8 +1180,8 @@ export function TeamPage() {
               </div>
               <div className="p-5 flex flex-col sm:flex-row sm:items-center gap-4">
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-[#333333]">Excluir este time</p>
-                  <p className="text-xs text-[#666666] leading-relaxed mt-1">
+                  <p className="text-sm font-semibold text-primary">Excluir este time</p>
+                  <p className="text-xs text-secondary leading-relaxed mt-1">
                     Remove o time e todos os membros. Reuniões já registradas permanecem mas
                     perdem o vínculo com o time. <strong>Ação irreversível.</strong>
                   </p>
@@ -1203,14 +1203,14 @@ export function TeamPage() {
           <div className="space-y-3">
             {meetingsLoading ? (
               <div className="flex justify-center py-16">
-                <Loader size={24} className="animate-spin text-[#2D5A27]" />
+                <Loader size={24} className="animate-spin text-brand" />
               </div>
             ) : meetings.length === 0 ? (
-              <div className="bg-white border border-[#E0E0E0] rounded-2xl p-16 flex flex-col items-center gap-3 shadow-sm">
-                <div className="w-14 h-14 rounded-2xl bg-[#F5F5F5] flex items-center justify-center">
+              <div className="bg-surface border border-neutral-light rounded-2xl p-16 flex flex-col items-center gap-3 shadow-sm">
+                <div className="w-14 h-14 rounded-2xl bg-neutral-lighter flex items-center justify-center">
                   <Video size={24} className="text-[#CCCCCC]" />
                 </div>
-                <p className="text-sm text-[#999999] font-medium">Nenhuma reunião encontrada no time.</p>
+                <p className="text-sm text-tertiary font-medium">Nenhuma reunião encontrada no time.</p>
                 <p className="text-xs text-[#BBBBBB]">As reuniões dos membros aparecerão aqui.</p>
               </div>
             ) : (
@@ -1219,17 +1219,17 @@ export function TeamPage() {
                   <button
                     key={m.id}
                     onClick={() => navigate(`/meetings/${m.id}`)}
-                    className="bg-white border border-[#E0E0E0] rounded-2xl px-5 py-4 flex items-center gap-4 hover:border-[#2D5A27]/30 hover:shadow-md transition text-left group shadow-sm"
+                    className="bg-surface border border-neutral-light rounded-2xl px-5 py-4 flex items-center gap-4 hover:border-[#2D5A27]/30 hover:shadow-md transition text-left group shadow-sm"
                   >
                     <div className="w-10 h-10 rounded-xl bg-[#2D5A27]/10 flex items-center justify-center shrink-0 group-hover:bg-[#2D5A27]/15 transition">
-                      <Video size={16} className="text-[#2D5A27]" />
+                      <Video size={16} className="text-brand" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-semibold text-[#333333] truncate">
+                      <div className="text-sm font-semibold text-primary truncate">
                         {m.title ?? `Reunião ${m.id.split('-')[0]}`}
                       </div>
-                      <div className="text-xs text-[#999999] mt-0.5 flex items-center gap-1.5 flex-wrap">
-                        <span className="font-medium text-[#666666]">{m.member_name}</span>
+                      <div className="text-xs text-tertiary mt-0.5 flex items-center gap-1.5 flex-wrap">
+                        <span className="font-medium text-secondary">{m.member_name}</span>
                         <span>·</span>
                         <span>{formatDate(m.started_at ?? '')}</span>
                         <span>·</span>
@@ -1243,7 +1243,7 @@ export function TeamPage() {
                       {m.status === 'error' && (
                         <span className="text-xs font-medium text-[#DC3545] bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">Erro</span>
                       )}
-                      <ChevronRight size={15} className="text-[#CCCCCC] group-hover:text-[#2D5A27] transition" />
+                      <ChevronRight size={15} className="text-[#CCCCCC] group-hover:text-brand transition" />
                     </div>
                   </button>
                 ))}
@@ -1260,16 +1260,16 @@ export function TeamPage() {
       {/* Modal de Config de Avaliação */}
       {showConfigModal && team && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => !configSaving && setShowConfigModal(false)}>
-          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 space-y-5 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-surface rounded-2xl shadow-2xl max-w-lg w-full p-6 space-y-5 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             {/* Header */}
             <div className="flex items-start justify-between">
               <div>
-                <h3 className="text-xl font-bold text-[#333333]">Configurar avaliação por IA</h3>
-                <p className="text-sm text-[#666666] mt-1">Como a IA deve analisar as reuniões deste time</p>
+                <h3 className="text-xl font-bold text-primary">Configurar avaliação por IA</h3>
+                <p className="text-sm text-secondary mt-1">Como a IA deve analisar as reuniões deste time</p>
               </div>
               <button
                 onClick={() => !configSaving && setShowConfigModal(false)}
-                className="text-[#999999] hover:text-[#333333] transition"
+                className="text-tertiary hover:text-primary transition"
                 disabled={configSaving}
               >
                 <X size={20} />
@@ -1278,7 +1278,7 @@ export function TeamPage() {
 
             {/* Tipo do time */}
             <div className="space-y-2">
-              <label className="text-xs font-semibold text-[#666666] uppercase tracking-wider">
+              <label className="text-xs font-semibold text-secondary uppercase tracking-wider">
                 Tipo do time
               </label>
               <div className="grid grid-cols-2 gap-2">
@@ -1293,11 +1293,11 @@ export function TeamPage() {
                     className={`text-left p-3 rounded-xl border-2 transition ${
                       configForm.team_type === opt.value
                         ? 'border-[#2D5A27] bg-[#2D5A27]/5'
-                        : 'border-[#E0E0E0] hover:border-[#CCCCCC]'
+                        : 'border-neutral-light hover:border-[#CCCCCC]'
                     }`}
                   >
-                    <div className="text-sm font-semibold text-[#333333]">{opt.label}</div>
-                    <div className="text-xs text-[#666666] mt-1 leading-relaxed">{opt.desc}</div>
+                    <div className="text-sm font-semibold text-primary">{opt.label}</div>
+                    <div className="text-xs text-secondary mt-1 leading-relaxed">{opt.desc}</div>
                   </button>
                 ))}
               </div>
@@ -1306,7 +1306,7 @@ export function TeamPage() {
             {/* Framework (só Sales) */}
             {configForm.team_type === 'sales' && (
               <div className="space-y-2">
-                <label className="text-xs font-semibold text-[#666666] uppercase tracking-wider">
+                <label className="text-xs font-semibold text-secondary uppercase tracking-wider">
                   Framework de avaliação
                 </label>
                 <div className="grid grid-cols-2 gap-2">
@@ -1321,11 +1321,11 @@ export function TeamPage() {
                       className={`text-left p-3 rounded-xl border-2 transition ${
                         configForm.evaluation_framework === opt.value
                           ? 'border-[#2D5A27] bg-[#2D5A27]/5'
-                          : 'border-[#E0E0E0] hover:border-[#CCCCCC]'
+                          : 'border-neutral-light hover:border-[#CCCCCC]'
                       }`}
                     >
-                      <div className="text-sm font-semibold text-[#333333]">{opt.label}</div>
-                      <div className="text-xs text-[#666666] mt-1 leading-relaxed">{opt.desc}</div>
+                      <div className="text-sm font-semibold text-primary">{opt.label}</div>
+                      <div className="text-xs text-secondary mt-1 leading-relaxed">{opt.desc}</div>
                     </button>
                   ))}
                 </div>
@@ -1334,10 +1334,10 @@ export function TeamPage() {
 
             {/* Instruções customizadas */}
             <div className="space-y-2">
-              <label className="text-xs font-semibold text-[#666666] uppercase tracking-wider">
+              <label className="text-xs font-semibold text-secondary uppercase tracking-wider">
                 Instruções customizadas (opcional)
               </label>
-              <p className="text-xs text-[#666666] leading-relaxed">
+              <p className="text-xs text-secondary leading-relaxed">
                 Instruções adicionais que serão incluídas no prompt da IA. Use para contextualizar seu ICP,
                 tom desejado, sinais específicos a observar, etc. Não substitui o framework — complementa.
               </p>
@@ -1347,9 +1347,9 @@ export function TeamPage() {
                 placeholder="Ex: Nosso ICP é diretor de RH de empresa de 100-500 funcionários. Foque em sinais de adoção do módulo de pesquisa de clima e mencione integração com SAP se for citada."
                 maxLength={4000}
                 rows={6}
-                className="w-full text-sm text-[#333333] bg-[#F8F9FA] border border-[#E0E0E0] rounded-xl p-3 focus:outline-none focus:border-[#2D5A27] resize-y"
+                className="w-full text-sm text-primary bg-background border border-neutral-light rounded-xl p-3 focus:outline-none focus:border-[#2D5A27] resize-y"
               />
-              <div className="text-xs text-[#999999] text-right">
+              <div className="text-xs text-tertiary text-right">
                 {configForm.custom_prompt_instructions.length} / 4000
               </div>
             </div>
@@ -1376,7 +1376,7 @@ export function TeamPage() {
               <button
                 onClick={() => setShowConfigModal(false)}
                 disabled={configSaving}
-                className="flex-1 py-2.5 rounded-xl border border-[#E0E0E0] text-sm font-semibold text-[#666666] hover:bg-[#F8F9FA] transition disabled:opacity-50"
+                className="flex-1 py-2.5 rounded-xl border border-neutral-light text-sm font-semibold text-secondary hover:bg-background transition disabled:opacity-50"
               >
                 Cancelar
               </button>
@@ -1400,7 +1400,7 @@ export function TeamPage() {
           onClick={() => !deleteLoading && setShowDeleteModal(false)}
         >
           <div
-            className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-5"
+            className="bg-surface rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-5"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
@@ -1410,13 +1410,13 @@ export function TeamPage() {
                   <AlertCircle size={20} className="text-[#DC3545]" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-[#333333]">Excluir time</h3>
-                  <p className="text-xs text-[#666666] mt-0.5">Esta ação não pode ser desfeita</p>
+                  <h3 className="text-lg font-bold text-primary">Excluir time</h3>
+                  <p className="text-xs text-secondary mt-0.5">Esta ação não pode ser desfeita</p>
                 </div>
               </div>
               <button
                 onClick={() => !deleteLoading && setShowDeleteModal(false)}
-                className="text-[#999999] hover:text-[#333333] transition"
+                className="text-tertiary hover:text-primary transition"
                 disabled={deleteLoading}
               >
                 <X size={20} />
@@ -1436,7 +1436,7 @@ export function TeamPage() {
 
             {/* Confirmação por nome */}
             <div className="space-y-2">
-              <label className="text-xs font-semibold text-[#666666] leading-relaxed block">
+              <label className="text-xs font-semibold text-secondary leading-relaxed block">
                 Para confirmar, digite o nome do time:{' '}
                 <span className="font-mono font-bold text-[#DC3545] bg-red-50 px-1.5 py-0.5 rounded">
                   {team.name}
@@ -1449,7 +1449,7 @@ export function TeamPage() {
                 placeholder={team.name}
                 autoFocus
                 disabled={deleteLoading}
-                className="w-full px-4 py-2.5 rounded-xl border border-[#E0E0E0] text-[#333333] text-sm focus:outline-none focus:ring-2 focus:ring-[#DC3545]/25 focus:border-[#DC3545] transition bg-white placeholder:text-[#999]"
+                className="w-full px-4 py-2.5 rounded-xl border border-neutral-light text-primary text-sm focus:outline-none focus:ring-2 focus:ring-[#DC3545]/25 focus:border-[#DC3545] transition bg-surface placeholder:text-tertiary"
               />
             </div>
 
@@ -1466,7 +1466,7 @@ export function TeamPage() {
               <button
                 onClick={() => setShowDeleteModal(false)}
                 disabled={deleteLoading}
-                className="flex-1 py-2.5 rounded-xl border border-[#E0E0E0] text-sm font-semibold text-[#666666] hover:bg-[#F8F9FA] transition disabled:opacity-50"
+                className="flex-1 py-2.5 rounded-xl border border-neutral-light text-sm font-semibold text-secondary hover:bg-background transition disabled:opacity-50"
               >
                 Cancelar
               </button>
@@ -1486,35 +1486,35 @@ export function TeamPage() {
       {/* Modal de Link de Convite */}
       {showInviteLinkModal && inviteLink && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowInviteLinkModal(false)}>
-          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 space-y-5" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-surface rounded-2xl shadow-2xl max-w-lg w-full p-6 space-y-5" onClick={(e) => e.stopPropagation()}>
             {/* Header */}
             <div className="flex items-start justify-between">
               <div>
-                <h3 className="text-xl font-bold text-[#333333]">Link de Convite Gerado</h3>
-                <p className="text-sm text-[#666666] mt-1">Compartilhe este link com quem você deseja convidar</p>
+                <h3 className="text-xl font-bold text-primary">Link de Convite Gerado</h3>
+                <p className="text-sm text-secondary mt-1">Compartilhe este link com quem você deseja convidar</p>
               </div>
               <button 
                 onClick={() => setShowInviteLinkModal(false)}
-                className="text-[#999999] hover:text-[#333333] transition"
+                className="text-tertiary hover:text-primary transition"
               >
                 <AlertCircle size={20} />
               </button>
             </div>
 
             {/* Link */}
-            <div className="bg-[#F8F9FA] border border-[#E0E0E0] rounded-xl p-4 space-y-3">
+            <div className="bg-background border border-neutral-light rounded-xl p-4 space-y-3">
               <div className="flex items-center justify-between gap-2">
-                <code className="text-xs text-[#2D5A27] font-mono break-all flex-1">
+                <code className="text-xs text-brand font-mono break-all flex-1">
                   {inviteLink.url}
                 </code>
                 <button
                   onClick={handleCopyLink}
-                  className="shrink-0 p-2 rounded-lg bg-white border border-[#E0E0E0] hover:bg-[#F8F9FA] transition"
+                  className="shrink-0 p-2 rounded-lg bg-surface border border-neutral-light hover:bg-background transition"
                 >
                   {linkCopied ? (
                     <Check size={16} className="text-[#4CAF50]" />
                   ) : (
-                    <Copy size={16} className="text-[#666666]" />
+                    <Copy size={16} className="text-secondary" />
                   )}
                 </button>
               </div>
@@ -1538,15 +1538,15 @@ export function TeamPage() {
 
             {/* Info */}
             <div className="grid grid-cols-2 gap-3">
-              <div className="bg-[#F8F9FA] rounded-xl p-3">
-                <p className="text-xs text-[#666666] mb-1">Expira em</p>
-                <p className="text-sm font-semibold text-[#333333]">
+              <div className="bg-background rounded-xl p-3">
+                <p className="text-xs text-secondary mb-1">Expira em</p>
+                <p className="text-sm font-semibold text-primary">
                   {new Date(inviteLink.expiresAt).toLocaleDateString('pt-BR')}
                 </p>
               </div>
-              <div className="bg-[#F8F9FA] rounded-xl p-3">
-                <p className="text-xs text-[#666666] mb-1">Usos</p>
-                <p className="text-sm font-semibold text-[#333333]">
+              <div className="bg-background rounded-xl p-3">
+                <p className="text-xs text-secondary mb-1">Usos</p>
+                <p className="text-sm font-semibold text-primary">
                   {inviteLink.currentUses} {inviteLink.maxUses ? `/ ${inviteLink.maxUses}` : '/ ilimitado'}
                 </p>
               </div>
@@ -1563,7 +1563,7 @@ export function TeamPage() {
             {/* Botão fechar */}
             <button
               onClick={() => setShowInviteLinkModal(false)}
-              className="w-full py-2.5 rounded-xl border border-[#E0E0E0] text-sm font-semibold text-[#666666] hover:bg-[#F8F9FA] transition"
+              className="w-full py-2.5 rounded-xl border border-neutral-light text-sm font-semibold text-secondary hover:bg-background transition"
             >
               Fechar
             </button>

@@ -10,9 +10,9 @@ export interface CardProps {
 
 export function Card({ children, variant = 'default', className, onClick }: CardProps) {
   const variantStyles = {
-    default: 'bg-white dark:bg-gray-800 border border-neutral-light dark:border-gray-700 shadow-sm',
-    primary: 'bg-white dark:bg-gray-800 border border-primary/30 hover:border-primary/50 shadow-sm',
-    bordered: 'bg-white dark:bg-gray-800 border-2 border-neutral-light dark:border-gray-700',
+    default: 'bg-surface dark:bg-gray-800 border border-neutral-light dark:border-gray-700 shadow-sm',
+    primary: 'bg-surface dark:bg-gray-800 border border-primary/30 hover:border-primary/50 shadow-sm',
+    bordered: 'bg-surface dark:bg-gray-800 border-2 border-neutral-light dark:border-gray-700',
   }
 
   return (

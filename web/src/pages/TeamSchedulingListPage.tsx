@@ -55,7 +55,7 @@ export function TeamSchedulingListPage() {
     return (
       <MainLayout>
         <div className="flex items-center justify-center h-96">
-          <Loader className="animate-spin text-[#2D5A27]" size={48} />
+          <Loader className="animate-spin text-brand" size={48} />
         </div>
       </MainLayout>
     )
@@ -65,14 +65,14 @@ export function TeamSchedulingListPage() {
     return (
       <MainLayout>
         <div className="max-w-2xl mx-auto mt-12 px-6">
-          <div className="bg-white rounded-2xl shadow-lg p-12 text-center">
+          <div className="bg-surface rounded-2xl shadow-lg p-12 text-center">
             <div className="w-20 h-20 rounded-full bg-[#FFF3CD] flex items-center justify-center mx-auto mb-6">
               <Calendar className="text-[#856404]" size={40} />
             </div>
-            <h1 className="text-2xl font-bold text-[#333333] mb-3">
+            <h1 className="text-2xl font-bold text-primary mb-3">
               Nenhum time encontrado
             </h1>
-            <p className="text-[#666666] mb-8">
+            <p className="text-secondary mb-8">
               Você precisa ser owner de um time para configurar agendamento Round Robin.
             </p>
             <button
@@ -92,10 +92,10 @@ export function TeamSchedulingListPage() {
       <div className="max-w-4xl mx-auto px-6 py-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-[#333333] mb-2">
+          <h1 className="text-3xl font-bold text-primary mb-2">
             Round Robin - Agendamento Automático
           </h1>
-          <p className="text-[#666666]">
+          <p className="text-secondary">
             Selecione um time para configurar o agendamento Round Robin
           </p>
         </div>
@@ -107,28 +107,28 @@ export function TeamSchedulingListPage() {
               <Calendar className="text-white" size={20} />
             </div>
             <div className="flex-1">
-              <h3 className="text-lg font-bold text-[#333333] mb-2">
+              <h3 className="text-lg font-bold text-primary mb-2">
                 Como funciona o Round Robin?
               </h3>
-              <p className="text-sm text-[#666666] leading-relaxed mb-3">
+              <p className="text-sm text-secondary leading-relaxed mb-3">
                 O Round Robin distribui automaticamente os agendamentos entre os membros do time de forma equilibrada e justa. 
                 Cada novo agendamento é atribuído ao próximo membro disponível na fila, seguindo a ordem de rotação configurada.
               </p>
-              <ul className="text-sm text-[#666666] space-y-2">
+              <ul className="text-sm text-secondary space-y-2">
                 <li className="flex items-start gap-2">
-                  <span className="text-[#2D5A27] font-bold">1.</span>
+                  <span className="text-brand font-bold">1.</span>
                   <span>Configure os membros e a ordem de rotação do seu time</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-[#2D5A27] font-bold">2.</span>
+                  <span className="text-brand font-bold">2.</span>
                   <span>Defina os horários de atendimento e duração das reuniões</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-[#2D5A27] font-bold">3.</span>
+                  <span className="text-brand font-bold">3.</span>
                   <span>Compartilhe o link público de agendamento com seus leads</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-[#2D5A27] font-bold">4.</span>
+                  <span className="text-brand font-bold">4.</span>
                   <span>O sistema distribui automaticamente verificando disponibilidade real no Google Calendar</span>
                 </li>
               </ul>
@@ -142,21 +142,21 @@ export function TeamSchedulingListPage() {
             <button
               key={team.id}
               onClick={() => navigate(`/teams/${team.id}/scheduling`)}
-              className="bg-white border border-[#E0E0E0] rounded-2xl p-6 hover:border-[#2D5A27] hover:shadow-md transition-all group text-left"
+              className="bg-surface border border-neutral-light rounded-2xl p-6 hover:border-[#2D5A27] hover:shadow-md transition-all group text-left"
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4 flex-1">
                   <div className="w-14 h-14 rounded-2xl bg-[#2D5A27]/10 flex items-center justify-center shrink-0">
-                    <Users size={26} className="text-[#2D5A27]" />
+                    <Users size={26} className="text-brand" />
                   </div>
                   <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-[#333333] mb-1">
+                    <h3 className="text-lg font-semibold text-primary mb-1">
                       {team.name}
                     </h3>
-                    <div className="flex items-center gap-2 text-sm text-[#666666]">
+                    <div className="flex items-center gap-2 text-sm text-secondary">
                       <Users size={14} />
                       <span>{team.member_count || 0} membros</span>
-                      <span className="px-2 py-0.5 rounded-full bg-[#2D5A27]/10 text-[#2D5A27] text-xs font-semibold">
+                      <span className="px-2 py-0.5 rounded-full bg-[#2D5A27]/10 text-brand text-xs font-semibold">
                         Owner
                       </span>
                     </div>
@@ -164,7 +164,7 @@ export function TeamSchedulingListPage() {
                 </div>
                 <ArrowRight 
                   size={20} 
-                  className="text-[#999999] group-hover:text-[#2D5A27] group-hover:translate-x-1 transition-all" 
+                  className="text-tertiary group-hover:text-brand group-hover:translate-x-1 transition-all" 
                 />
               </div>
             </button>

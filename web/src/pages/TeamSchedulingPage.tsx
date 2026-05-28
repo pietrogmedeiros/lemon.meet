@@ -425,7 +425,7 @@ export function TeamSchedulingPage() {
     return (
       <MainLayout>
         <div className="flex items-center justify-center h-64">
-          <Loader className="animate-spin text-[#2D5A27]" size={32} />
+          <Loader className="animate-spin text-brand" size={32} />
         </div>
       </MainLayout>
     )
@@ -435,7 +435,7 @@ export function TeamSchedulingPage() {
     return (
       <MainLayout>
         <div className="text-center py-12">
-          <p className="text-[#666666]">Time não encontrado</p>
+          <p className="text-secondary">Time não encontrado</p>
         </div>
       </MainLayout>
     )
@@ -450,7 +450,7 @@ export function TeamSchedulingPage() {
         <div className="mb-6">
           <button
             onClick={() => navigate(`/teams/${teamId}`)}
-            className="flex items-center gap-2 text-[#666666] hover:text-[#2D5A27] mb-4"
+            className="flex items-center gap-2 text-secondary hover:text-brand mb-4"
           >
             <ChevronLeft size={20} />
             Voltar para o time
@@ -458,10 +458,10 @@ export function TeamSchedulingPage() {
 
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-[#2D5A27] mb-1">
+              <h1 className="text-2xl font-bold text-brand mb-1">
                 Agendamento do Time
               </h1>
-              <p className="text-[#666666]">{team.name}</p>
+              <p className="text-secondary">{team.name}</p>
             </div>
 
             {config && (
@@ -489,7 +489,7 @@ export function TeamSchedulingPage() {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-2 mb-6 border-b border-[#E0E0E0]">
+        <div className="flex gap-2 mb-6 border-b border-neutral-light">
           {[
             { key: 'config', label: 'Configuração', icon: Settings },
             { key: 'members', label: 'Membros', icon: Users },
@@ -500,8 +500,8 @@ export function TeamSchedulingPage() {
               onClick={() => setTab(key as any)}
               className={`flex items-center gap-2 px-4 py-2 border-b-2 transition-colors ${
                 tab === key
-                  ? 'border-[#2D5A27] text-[#2D5A27] font-medium'
-                  : 'border-transparent text-[#666666] hover:text-[#2D5A27]'
+                  ? 'border-[#2D5A27] text-brand font-medium'
+                  : 'border-transparent text-secondary hover:text-brand'
               }`}
             >
               <Icon size={18} />
@@ -512,15 +512,15 @@ export function TeamSchedulingPage() {
 
         {/* Tab: Configuração */}
         {tab === 'config' && (
-          <div className="bg-white rounded-2xl border border-[#E0E0E0] p-6 space-y-6">
+          <div className="bg-surface rounded-2xl border border-neutral-light p-6 space-y-6">
             {/* Logo */}
             <div>
-              <label className="block text-sm font-medium text-[#333333] mb-3">
+              <label className="block text-sm font-medium text-primary mb-3">
                 Logo da empresa (opcional)
               </label>
               <div className="flex items-center gap-6">
                 {/* Preview */}
-                <div className="w-24 h-24 rounded-xl border-2 border-dashed border-[#E0E0E0] flex items-center justify-center bg-[#F8F9FA] overflow-hidden">
+                <div className="w-24 h-24 rounded-xl border-2 border-dashed border-neutral-light flex items-center justify-center bg-background overflow-hidden">
                   {(logoPreview || config?.logo_url) ? (
                     <img 
                       src={logoPreview || config?.logo_url || ''} 
@@ -529,14 +529,14 @@ export function TeamSchedulingPage() {
                     />
                   ) : (
                     <div className="text-center p-2">
-                      <p className="text-xs text-[#999999]">Logo</p>
+                      <p className="text-xs text-tertiary">Logo</p>
                     </div>
                   )}
                 </div>
 
                 {/* Upload button */}
                 <div>
-                  <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 border border-[#2D5A27] text-[#2D5A27] rounded-xl hover:bg-[#2D5A27]/5 transition-colors">
+                  <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 border border-[#2D5A27] text-brand rounded-xl hover:bg-[#2D5A27]/5 transition-colors">
                     {uploadingLogo ? (
                       <>
                         <Loader size={16} className="animate-spin" />
@@ -560,13 +560,13 @@ export function TeamSchedulingPage() {
                       className="hidden"
                     />
                   </label>
-                  <p className="text-xs text-[#666666] mt-2">PNG ou JPEG, até 5MB</p>
+                  <p className="text-xs text-secondary mt-2">PNG ou JPEG, até 5MB</p>
                 </div>
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-[#333333] mb-2">
+              <label className="block text-sm font-medium text-primary mb-2">
                 Slug (URL pública) *
               </label>
               <div className="flex gap-2">
@@ -575,16 +575,16 @@ export function TeamSchedulingPage() {
                   value={slug}
                   onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
                   placeholder="meu-time"
-                  className="flex-1 px-4 py-2 border border-[#E0E0E0] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2D5A27]"
+                  className="flex-1 px-4 py-2 border border-neutral-light rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2D5A27]"
                 />
               </div>
-              <p className="text-xs text-[#666666] mt-1">
+              <p className="text-xs text-secondary mt-1">
                 Exemplo: {window.location.origin}/agenda/<strong>{slug || 'meu-time'}</strong>
               </p>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-[#333333] mb-2">
+              <label className="block text-sm font-medium text-primary mb-2">
                 Título da página
               </label>
               <input
@@ -592,12 +592,12 @@ export function TeamSchedulingPage() {
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="Agendar reunião"
-                className="w-full px-4 py-2 border border-[#E0E0E0] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2D5A27]"
+                className="w-full px-4 py-2 border border-neutral-light rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2D5A27]"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-[#333333] mb-2">
+              <label className="block text-sm font-medium text-primary mb-2">
                 Descrição (opcional)
               </label>
               <textarea
@@ -605,18 +605,18 @@ export function TeamSchedulingPage() {
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Descreva o tipo de reunião..."
                 rows={3}
-                className="w-full px-4 py-2 border border-[#E0E0E0] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2D5A27]"
+                className="w-full px-4 py-2 border border-neutral-light rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2D5A27]"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-[#333333] mb-2">
+              <label className="block text-sm font-medium text-primary mb-2">
                 Duração da reunião (minutos)
               </label>
               <select
                 value={duration}
                 onChange={(e) => setDuration(Number(e.target.value))}
-                className="w-full px-4 py-2 border border-[#E0E0E0] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2D5A27]"
+                className="w-full px-4 py-2 border border-neutral-light rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2D5A27]"
               >
                 <option value={15}>15 minutos</option>
                 <option value={30}>30 minutos</option>
@@ -625,15 +625,15 @@ export function TeamSchedulingPage() {
               </select>
             </div>
 
-            <div className="flex items-center gap-3 p-4 bg-[#F5F5F5] rounded-xl">
+            <div className="flex items-center gap-3 p-4 bg-neutral-lighter rounded-xl">
               <input
                 type="checkbox"
                 id="is-active"
                 checked={isActive}
                 onChange={(e) => setIsActive(e.target.checked)}
-                className="w-5 h-5 text-[#2D5A27] rounded focus:ring-[#2D5A27]"
+                className="w-5 h-5 text-brand rounded focus:ring-[#2D5A27]"
               />
-              <label htmlFor="is-active" className="text-sm text-[#333333] font-medium">
+              <label htmlFor="is-active" className="text-sm text-primary font-medium">
                 Ativar agendamento público
               </label>
             </div>
@@ -650,7 +650,7 @@ export function TeamSchedulingPage() {
               {publicLink && (
                 <button
                   onClick={copyLink}
-                  className="flex items-center gap-2 px-6 py-3 border border-[#2D5A27] text-[#2D5A27] rounded-xl hover:bg-[#2D5A27] hover:text-white transition-colors"
+                  className="flex items-center gap-2 px-6 py-3 border border-[#2D5A27] text-brand rounded-xl hover:bg-[#2D5A27] hover:text-white transition-colors"
                 >
                   {linkCopied ? <Check size={20} /> : <Copy size={20} />}
                   {linkCopied ? 'Copiado!' : 'Copiar Link'}
@@ -686,18 +686,18 @@ export function TeamSchedulingPage() {
         {tab === 'members' && (
           <div className="space-y-4">
             {/* Lista de membros */}
-            <div className="bg-white rounded-2xl border border-[#E0E0E0] overflow-hidden">
-              <div className="p-4 border-b border-[#E0E0E0]">
-                <h3 className="font-semibold text-[#333333]">
+            <div className="bg-surface rounded-2xl border border-neutral-light overflow-hidden">
+              <div className="p-4 border-b border-neutral-light">
+                <h3 className="font-semibold text-primary">
                   Membros na Rotação ({members.length})
                 </h3>
-                <p className="text-sm text-[#666666] mt-1">
+                <p className="text-sm text-secondary mt-1">
                   Apenas membros ativos receberão agendamentos
                 </p>
               </div>
 
               {members.length === 0 ? (
-                <div className="p-8 text-center text-[#666666]">
+                <div className="p-8 text-center text-secondary">
                   <Users size={48} className="mx-auto mb-3 opacity-30" />
                   <p>Nenhum membro adicionado ainda</p>
                 </div>
@@ -716,9 +716,9 @@ export function TeamSchedulingPage() {
                           {member.name?.charAt(0)?.toUpperCase() || '?'}
                         </div>
                         <div>
-                          <p className="font-medium text-[#333333]">{member.name}</p>
-                          <p className="text-sm text-[#666666]">{member.email}</p>
-                          <p className="text-xs text-[#999999] mt-1">
+                          <p className="font-medium text-primary">{member.name}</p>
+                          <p className="text-sm text-secondary">{member.email}</p>
+                          <p className="text-xs text-tertiary mt-1">
                             {member.total_bookings} agendamentos
                           </p>
                         </div>
@@ -729,8 +729,8 @@ export function TeamSchedulingPage() {
                           onClick={() => handleToggleMember(member.id, member.is_active)}
                           className={`p-2 rounded-lg border transition-colors ${
                             member.is_active
-                              ? 'border-[#E0E0E0] text-[#666666] hover:bg-[#F5F5F5]'
-                              : 'border-[#E0E0E0] text-[#999999] hover:bg-[#F5F5F5]'
+                              ? 'border-neutral-light text-secondary hover:bg-neutral-lighter'
+                              : 'border-neutral-light text-tertiary hover:bg-neutral-lighter'
                           }`}
                           title={member.is_active ? 'Desativar' : 'Ativar'}
                         >
@@ -739,7 +739,7 @@ export function TeamSchedulingPage() {
 
                         <button
                           onClick={() => handleRemoveMember(member.id)}
-                          className="p-2 rounded-lg border border-[#E0E0E0] text-[#999999] hover:bg-[#F5F5F5] hover:text-[#666666] transition-colors"
+                          className="p-2 rounded-lg border border-neutral-light text-tertiary hover:bg-neutral-lighter hover:text-secondary transition-colors"
                           title="Remover"
                         >
                           <Trash2 size={16} />
@@ -752,15 +752,15 @@ export function TeamSchedulingPage() {
             </div>
 
             {/* Adicionar membro */}
-            <div className="bg-white rounded-2xl border border-[#E0E0E0] p-4">
-              <h3 className="font-semibold text-[#333333] mb-3">Adicionar Membro</h3>
+            <div className="bg-surface rounded-2xl border border-neutral-light p-4">
+              <h3 className="font-semibold text-primary mb-3">Adicionar Membro</h3>
               <div className="space-y-2">
                 {availableMembers
                   .filter((m) => !members.some((sm) => sm.user_id === m.user_id))
                   .map((member) => (
                     <div
                       key={member.user_id}
-                      className="flex items-center justify-between p-3 bg-[#F5F5F5] rounded-xl"
+                      className="flex items-center justify-between p-3 bg-neutral-lighter rounded-xl"
                     >
                       <div className="flex items-center gap-2 flex-1">
                         {/* Indicador de calendário */}
@@ -779,7 +779,7 @@ export function TeamSchedulingPage() {
                             <Calendar size={12} className="text-red-600" />
                           </div>
                         )}
-                        <span className="text-sm text-[#333333]">{member.name}</span>
+                        <span className="text-sm text-primary">{member.name}</span>
                       </div>
                       
                       {member.has_calendar ? (
@@ -801,7 +801,7 @@ export function TeamSchedulingPage() {
 
                 {availableMembers.filter((m) => !members.some((sm) => sm.user_id === m.user_id))
                   .length === 0 && (
-                  <p className="text-sm text-[#666666] text-center py-4">
+                  <p className="text-sm text-secondary text-center py-4">
                     Todos os membros do time já estão na rotação
                   </p>
                 )}
@@ -812,15 +812,15 @@ export function TeamSchedulingPage() {
 
         {/* Tab: Agendamentos */}
         {tab === 'bookings' && (
-          <div className="bg-white rounded-2xl border border-[#E0E0E0] overflow-hidden">
-            <div className="p-4 border-b border-[#E0E0E0]">
-              <h3 className="font-semibold text-[#333333]">
+          <div className="bg-surface rounded-2xl border border-neutral-light overflow-hidden">
+            <div className="p-4 border-b border-neutral-light">
+              <h3 className="font-semibold text-primary">
                 Agendamentos ({bookings.length})
               </h3>
             </div>
 
             {bookings.length === 0 ? (
-              <div className="p-8 text-center text-[#666666]">
+              <div className="p-8 text-center text-secondary">
                 <Calendar size={48} className="mx-auto mb-3 opacity-30" />
                 <p>Nenhum agendamento ainda</p>
               </div>
@@ -830,8 +830,8 @@ export function TeamSchedulingPage() {
                   <div key={booking.id} className="p-4">
                     <div className="flex items-start justify-between mb-2">
                       <div>
-                        <p className="font-medium text-[#333333]">{booking.guest_name}</p>
-                        <p className="text-sm text-[#666666]">{booking.guest_email}</p>
+                        <p className="font-medium text-primary">{booking.guest_name}</p>
+                        <p className="text-sm text-secondary">{booking.guest_email}</p>
                       </div>
                       <span
                         className={`px-2 py-1 rounded text-xs font-medium ${
@@ -845,7 +845,7 @@ export function TeamSchedulingPage() {
                         {booking.status}
                       </span>
                     </div>
-                    <div className="flex items-center gap-4 text-sm text-[#666666]">
+                    <div className="flex items-center gap-4 text-sm text-secondary">
                       <span className="flex items-center gap-1">
                         <Calendar size={14} />
                         {new Date(booking.scheduled_start).toLocaleDateString('pt-BR')}
@@ -923,7 +923,7 @@ export function TeamSchedulingPage() {
       {/* Modal de Confirmação */}
       {confirmModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 animate-in fade-in zoom-in-95">
+          <div className="bg-surface rounded-2xl shadow-xl max-w-md w-full p-6 animate-in fade-in zoom-in-95">
             <h3 className="text-lg font-semibold text-gray-900 mb-3">
               Confirmação
             </h3>

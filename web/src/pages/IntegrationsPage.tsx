@@ -300,20 +300,20 @@ export function IntegrationsPage() {
 
         {/* Header */}
         <div>
-          <h1 className="text-2xl font-bold text-[#1a1a1a]">Integrações</h1>
-          <p className="mt-1 text-sm text-[#666]">
+          <h1 className="text-2xl font-bold text-primary">Integrações</h1>
+          <p className="mt-1 text-sm text-secondary">
             Configure integrações externas para automatizar seu fluxo de vendas.
           </p>
         </div>
 
         {/* Tab switcher */}
-        <div className="flex gap-1 bg-[#F5F5F5] rounded-xl p-1 w-fit">
+        <div className="flex gap-1 bg-neutral-lighter rounded-xl p-1 w-fit">
           <button
             onClick={() => navigate('/integrations/permissions')}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
               activeTab === 'permissions'
-                ? 'bg-white text-[#2D5A27] shadow-sm'
-                : 'text-[#666] hover:text-[#333]'
+                ? 'bg-surface text-brand shadow-sm'
+                : 'text-secondary hover:text-primary'
             }`}
           >
             <Shield className="h-4 w-4" />
@@ -323,8 +323,8 @@ export function IntegrationsPage() {
             onClick={() => navigate('/integrations/apps')}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
               activeTab === 'apps'
-                ? 'bg-white text-[#2D5A27] shadow-sm'
-                : 'text-[#666] hover:text-[#333]'
+                ? 'bg-surface text-brand shadow-sm'
+                : 'text-secondary hover:text-primary'
             }`}
           >
             <LayoutGrid className="h-4 w-4" />
@@ -334,8 +334,8 @@ export function IntegrationsPage() {
             onClick={() => navigate('/integrations/webhooks')}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
               activeTab === 'webhooks'
-                ? 'bg-white text-[#2D5A27] shadow-sm'
-                : 'text-[#666] hover:text-[#333]'
+                ? 'bg-surface text-brand shadow-sm'
+                : 'text-secondary hover:text-primary'
             }`}
           >
             <Webhook className="h-4 w-4" />
@@ -351,15 +351,15 @@ export function IntegrationsPage() {
               <img src="/calendar.png" alt="Google Calendar" className="w-6 h-6 object-contain" />
             </div>
             <div>
-              <h2 className="text-[16px] font-semibold text-[#1a1a1a]">Google Calendar</h2>
-              <p className="text-[13px] text-[#666]">
+              <h2 className="text-[16px] font-semibold text-primary">Google Calendar</h2>
+              <p className="text-[13px] text-secondary">
                 Conecte seu calendário e o bot entra automaticamente nas suas reuniões.
               </p>
             </div>
             {calendar && (
               <span className={`ml-auto flex-shrink-0 inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${
                 calendar.status === 'active'
-                  ? 'bg-[#2D5A27]/10 text-[#2D5A27]'
+                  ? 'bg-[#2D5A27]/10 text-brand'
                   : 'bg-amber-50 text-amber-600'
               }`}>
                 <span className={`w-1.5 h-1.5 rounded-full ${calendar.status === 'active' ? 'bg-[#2D5A27]' : 'bg-amber-500'}`} />
@@ -369,18 +369,18 @@ export function IntegrationsPage() {
           </div>
 
           {calendarLoading ? (
-            <div className="flex items-center gap-2 text-sm text-[#999] py-4">
+            <div className="flex items-center gap-2 text-sm text-tertiary py-4">
               <div className="h-4 w-4 animate-spin rounded-full border-2 border-[#2D5A27] border-r-transparent" />
               Carregando…
             </div>
           ) : calendar ? (
             <div className="space-y-4">
-              <div className="flex items-center gap-3 p-3 bg-[#F8F9FA] border border-[#E0E0E0] rounded-lg">
-                <div className="w-8 h-8 rounded-full bg-white border border-[#E0E0E0] flex items-center justify-center flex-shrink-0">
+              <div className="flex items-center gap-3 p-3 bg-background border border-neutral-light rounded-lg">
+                <div className="w-8 h-8 rounded-full bg-surface border border-neutral-light flex items-center justify-center flex-shrink-0">
                   <img src="/calendar.png" alt="Google Calendar" className="w-5 h-5 object-contain" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-[13px] font-medium text-[#1a1a1a]">Google Calendar</p>
+                  <p className="text-[13px] font-medium text-primary">Google Calendar</p>
                   <p className="text-[11px] text-[#888]">
                     Conectado em {new Date(calendar.connected_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}
                   </p>
@@ -420,7 +420,7 @@ export function IntegrationsPage() {
           {calendarMessage && (
             <div className={`mt-4 flex items-center gap-2 text-[13px] px-3 py-2.5 rounded-lg ${
               calendarMessage.type === 'success'
-                ? 'bg-[#2D5A27]/8 text-[#2D5A27]'
+                ? 'bg-[#2D5A27]/8 text-brand'
                 : 'bg-[#DC3545]/8 text-[#DC3545]'
             }`}>
               {calendarMessage.type === 'success'
@@ -440,8 +440,8 @@ export function IntegrationsPage() {
               <img src="/hubspot.webp" alt="HubSpot" className="w-6 h-6 object-contain" />
             </div>
             <div>
-              <h2 className="text-[16px] font-semibold text-[#1a1a1a]">HubSpot</h2>
-              <p className="text-[13px] text-[#666]">
+              <h2 className="text-[16px] font-semibold text-primary">HubSpot</h2>
+              <p className="text-[13px] text-secondary">
                 Envie resumos de reuniões e crie deals de follow-up direto no seu CRM.
               </p>
             </div>
@@ -454,18 +454,18 @@ export function IntegrationsPage() {
           </div>
 
           {hubspotLoading ? (
-            <div className="flex items-center gap-2 text-sm text-[#999] py-4">
+            <div className="flex items-center gap-2 text-sm text-tertiary py-4">
               <div className="h-4 w-4 animate-spin rounded-full border-2 border-[#FF7A59] border-r-transparent" />
               Carregando…
             </div>
           ) : hubspotConnected ? (
             <div className="space-y-4">
-              <div className="flex items-center gap-3 p-3 bg-[#F8F9FA] border border-[#E0E0E0] rounded-lg">
-                <div className="w-8 h-8 rounded-full bg-white border border-[#E0E0E0] flex items-center justify-center flex-shrink-0">
+              <div className="flex items-center gap-3 p-3 bg-background border border-neutral-light rounded-lg">
+                <div className="w-8 h-8 rounded-full bg-surface border border-neutral-light flex items-center justify-center flex-shrink-0">
                   <img src="/hubspot.webp" alt="HubSpot" className="w-5 h-5 object-contain" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-[13px] font-medium text-[#1a1a1a]">HubSpot</p>
+                  <p className="text-[13px] font-medium text-primary">HubSpot</p>
                   {hubspotConnectedAt && (
                     <p className="text-[11px] text-[#888]">
                       Conectado em {new Date(hubspotConnectedAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}
@@ -523,18 +523,18 @@ export function IntegrationsPage() {
         <Card className="p-6">
           <div className="flex items-center gap-3 mb-5">
             <div className="w-10 h-10 rounded-xl bg-[#2D5A27]/10 flex items-center justify-center flex-shrink-0">
-              <Webhook className="h-5 w-5 text-[#2D5A27]" />
+              <Webhook className="h-5 w-5 text-brand" />
             </div>
             <div>
-              <h2 className="text-[16px] font-semibold text-[#1a1a1a]">Webhook de Reunião Concluída</h2>
-              <p className="text-[13px] text-[#666]">
+              <h2 className="text-[16px] font-semibold text-primary">Webhook de Reunião Concluída</h2>
+              <p className="text-[13px] text-secondary">
                 Receba os dados e follow-ups automaticamente assim que uma reunião for processada.
               </p>
             </div>
             {webhook && (
               <span className={`ml-auto flex-shrink-0 inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${
                 webhook.active
-                  ? 'bg-[#2D5A27]/10 text-[#2D5A27]'
+                  ? 'bg-[#2D5A27]/10 text-brand'
                   : 'bg-[#E0E0E0] text-[#888]'
               }`}>
                 <span className={`w-1.5 h-1.5 rounded-full ${webhook.active ? 'bg-[#2D5A27]' : 'bg-[#aaa]'}`} />
@@ -544,7 +544,7 @@ export function IntegrationsPage() {
           </div>
 
           {isLoading ? (
-            <div className="flex items-center gap-2 text-sm text-[#999] py-4">
+            <div className="flex items-center gap-2 text-sm text-tertiary py-4">
               <div className="h-4 w-4 animate-spin rounded-full border-2 border-[#2D5A27] border-r-transparent" />
               Carregando…
             </div>
@@ -552,7 +552,7 @@ export function IntegrationsPage() {
             <div className="space-y-4">
               {/* URL input */}
               <div>
-                <label className="block text-[13px] font-medium text-[#333] mb-1.5">
+                <label className="block text-[13px] font-medium text-primary mb-1.5">
                   URL do Endpoint
                 </label>
                 <div className="flex gap-2">
@@ -561,7 +561,7 @@ export function IntegrationsPage() {
                     value={urlInput}
                     onChange={e => { setUrlInput(e.target.value); setSaveError(''); }}
                     placeholder="https://sua-api.com/webhooks/lemon"
-                    className="flex-1 px-3 py-2 text-sm border border-[#E0E0E0] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2D5A27]/30 focus:border-[#2D5A27] transition-colors"
+                    className="flex-1 px-3 py-2 text-sm border border-neutral-light rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2D5A27]/30 focus:border-[#2D5A27] transition-colors"
                   />
                   <Button
                     variant="secondary"
@@ -589,7 +589,7 @@ export function IntegrationsPage() {
               {testStatus !== 'idle' && testStatus !== 'loading' && (
                 <div className={`flex items-center gap-2 text-[13px] px-3 py-2.5 rounded-lg ${
                   testStatus === 'success'
-                    ? 'bg-[#2D5A27]/8 text-[#2D5A27]'
+                    ? 'bg-[#2D5A27]/8 text-brand'
                     : 'bg-[#DC3545]/8 text-[#DC3545]'
                 }`}>
                   {testStatus === 'success'
@@ -642,14 +642,14 @@ export function IntegrationsPage() {
         {/* Payload example */}
         {activeTab === 'webhooks' && (
         <Card className="p-6">
-          <h3 className="text-[14px] font-semibold text-[#1a1a1a] mb-3">Exemplo de Payload</h3>
-          <pre className="bg-[#F8F9FA] border border-[#E0E0E0] rounded-lg p-4 text-[12px] text-[#444] leading-relaxed overflow-x-auto font-mono">
+          <h3 className="text-[14px] font-semibold text-primary mb-3">Exemplo de Payload</h3>
+          <pre className="bg-background border border-neutral-light rounded-lg p-4 text-[12px] text-[#444] leading-relaxed overflow-x-auto font-mono">
             {PAYLOAD_EXAMPLE}
           </pre>
           <p className="mt-3 text-[12px] text-[#888]">
-            O payload é enviado via <code className="bg-[#F0F0F0] px-1 py-0.5 rounded text-[11px]">POST</code> com{' '}
-            <code className="bg-[#F0F0F0] px-1 py-0.5 rounded text-[11px]">Content-Type: application/json</code>.
-            O cabeçalho <code className="bg-[#F0F0F0] px-1 py-0.5 rounded text-[11px]">X-Lemon-Webhook</code> identifica a origem.
+            O payload é enviado via <code className="bg-neutral-lighter px-1 py-0.5 rounded text-[11px]">POST</code> com{' '}
+            <code className="bg-neutral-lighter px-1 py-0.5 rounded text-[11px]">Content-Type: application/json</code>.
+            O cabeçalho <code className="bg-neutral-lighter px-1 py-0.5 rounded text-[11px]">X-Lemon-Webhook</code> identifica a origem.
           </p>
         </Card>
         )}

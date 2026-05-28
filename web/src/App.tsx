@@ -40,7 +40,7 @@ function App() {
       <AuthProvider>
         <SubscriptionProvider>
         <Suspense fallback={
-          <div className="flex h-screen items-center justify-center bg-[#F8F9FA]">
+          <div className="flex h-screen items-center justify-center bg-background">
             <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-[#2D5A27] border-r-transparent" />
           </div>
         }>

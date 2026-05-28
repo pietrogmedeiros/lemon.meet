@@ -135,18 +135,18 @@ export function PublicWebinarPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#FAFAFA] flex items-center justify-center">
-        <Loader className="animate-spin text-[#2D5A27]" size={48} />
+      <div className="min-h-screen bg-neutral-lighter flex items-center justify-center">
+        <Loader className="animate-spin text-brand" size={48} />
       </div>
     )
   }
 
   if (error || !config) {
     return (
-      <div className="min-h-screen bg-[#FAFAFA] flex items-center justify-center px-4">
-        <div className="bg-white rounded-2xl shadow-lg p-12 max-w-md text-center">
-          <h1 className="text-2xl font-bold text-[#333] mb-3">Página não encontrada</h1>
-          <p className="text-[#666]">{error}</p>
+      <div className="min-h-screen bg-neutral-lighter flex items-center justify-center px-4">
+        <div className="bg-surface rounded-2xl shadow-lg p-12 max-w-md text-center">
+          <h1 className="text-2xl font-bold text-primary mb-3">Página não encontrada</h1>
+          <p className="text-secondary">{error}</p>
         </div>
       </div>
     )
@@ -155,15 +155,15 @@ export function PublicWebinarPage() {
   const selectedSession = config.sessions.find(s => s.id === selectedSessionId) ?? null
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA] flex items-center justify-center p-6">
-      <div className="w-full max-w-3xl bg-white rounded-2xl shadow-lg overflow-hidden">
+    <div className="min-h-screen bg-neutral-lighter flex items-center justify-center p-6">
+      <div className="w-full max-w-3xl bg-surface rounded-2xl shadow-lg overflow-hidden">
         {/* Header com logo */}
-        <div className="px-8 pt-8 pb-6 border-b border-[#F0F0F0] flex items-center gap-4">
+        <div className="px-8 pt-8 pb-6 border-b border-neutral-light flex items-center gap-4">
           {config.logo_url ? (
             <img
               src={config.logo_url}
               alt={config.team_name ?? 'Logo'}
-              className="w-14 h-14 rounded-xl object-contain border border-[#E0E0E0] bg-white"
+              className="w-14 h-14 rounded-xl object-contain border border-neutral-light bg-surface"
             />
           ) : (
             <div className="w-14 h-14 rounded-xl bg-[#2D5A27] flex items-center justify-center text-white font-bold text-xl">
@@ -171,14 +171,14 @@ export function PublicWebinarPage() {
             </div>
           )}
           <div className="min-w-0">
-            {config.team_name && <p className="text-xs text-[#666] uppercase tracking-wider mb-1">{config.team_name}</p>}
-            <h1 className="text-2xl font-bold text-[#333] truncate">{config.title}</h1>
+            {config.team_name && <p className="text-xs text-secondary uppercase tracking-wider mb-1">{config.team_name}</p>}
+            <h1 className="text-2xl font-bold text-primary truncate">{config.title}</h1>
           </div>
         </div>
 
         <div className="p-8">
           {config.description && !resultLink && (
-            <p className="text-sm text-[#666] mb-6">{config.description}</p>
+            <p className="text-sm text-secondary mb-6">{config.description}</p>
           )}
 
           {/* Step: Success — link disponível */}
@@ -187,14 +187,14 @@ export function PublicWebinarPage() {
               <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-6">
                 <CheckCircle className="text-green-600" size={40} />
               </div>
-              <h2 className="text-2xl font-bold text-[#2D5A27] mb-2">Inscrição confirmada!</h2>
-              <p className="text-[#666] mb-6">
+              <h2 className="text-2xl font-bold text-brand mb-2">Inscrição confirmada!</h2>
+              <p className="text-secondary mb-6">
                 {selectedSession ? `Sessão: ${formatPretty(selectedSession.scheduled_at)}` : ''}
               </p>
-              <p className="text-sm text-[#666] mb-3">
+              <p className="text-sm text-secondary mb-3">
                 Copie o link abaixo para acessar o webinar na hora marcada:
               </p>
-              <div className="p-4 bg-[#F8F9FA] border border-[#E0E0E0] rounded-xl break-all text-sm text-[#333] mb-4">
+              <div className="p-4 bg-background border border-neutral-light rounded-xl break-all text-sm text-primary mb-4">
                 {resultLink}
               </div>
               <div className="flex flex-wrap gap-3 justify-center">
@@ -210,7 +210,7 @@ export function PublicWebinarPage() {
                     href={buildGoogleCalendarUrl(config.title, selectedSession.scheduled_at, resultLink)}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-2 border border-[#2D5A27] text-[#2D5A27] px-6 py-3 rounded-xl hover:bg-[#2D5A27]/5 transition-colors font-medium"
+                    className="flex items-center gap-2 border border-[#2D5A27] text-brand px-6 py-3 rounded-xl hover:bg-[#2D5A27]/5 transition-colors font-medium"
                   >
                     <CalendarPlus size={18} />
                     Adicionar à agenda
@@ -220,7 +220,7 @@ export function PublicWebinarPage() {
                   href={resultLink}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-2 border border-[#2D5A27] text-[#2D5A27] px-6 py-3 rounded-xl hover:bg-[#2D5A27]/5 transition-colors font-medium"
+                  className="flex items-center gap-2 border border-[#2D5A27] text-brand px-6 py-3 rounded-xl hover:bg-[#2D5A27]/5 transition-colors font-medium"
                 >
                   <ExternalLink size={18} />
                   Abrir agora
@@ -230,9 +230,9 @@ export function PublicWebinarPage() {
           ) : !selectedSessionId ? (
             // Step 1: escolher sessão
             <div>
-              <h2 className="text-lg font-semibold text-[#333] mb-4">Escolha uma data</h2>
+              <h2 className="text-lg font-semibold text-primary mb-4">Escolha uma data</h2>
               {config.sessions.length === 0 ? (
-                <p className="text-sm text-[#666] py-6 text-center">Nenhuma sessão disponível no momento.</p>
+                <p className="text-sm text-secondary py-6 text-center">Nenhuma sessão disponível no momento.</p>
               ) : (
                 <div className="space-y-3">
                   {config.sessions.map(s => (
@@ -240,10 +240,10 @@ export function PublicWebinarPage() {
                       key={s.id}
                       type="button"
                       onClick={() => setSelectedSessionId(s.id)}
-                      className="w-full px-6 py-4 border-2 border-[#E0E0E0] rounded-xl hover:border-[#2D5A27] hover:bg-[#2D5A27]/5 transition-all text-left flex items-center gap-3"
+                      className="w-full px-6 py-4 border-2 border-neutral-light rounded-xl hover:border-[#2D5A27] hover:bg-[#2D5A27]/5 transition-all text-left flex items-center gap-3"
                     >
-                      <Calendar size={20} className="text-[#2D5A27] shrink-0" />
-                      <span className="font-medium text-[#333]">{formatPretty(s.scheduled_at)}</span>
+                      <Calendar size={20} className="text-brand shrink-0" />
+                      <span className="font-medium text-primary">{formatPretty(s.scheduled_at)}</span>
                     </button>
                   ))}
                 </div>
@@ -255,15 +255,15 @@ export function PublicWebinarPage() {
               <button
                 type="button"
                 onClick={() => setSelectedSessionId(null)}
-                className="flex items-center gap-2 text-[#666] hover:text-[#333] mb-6 text-sm"
+                className="flex items-center gap-2 text-secondary hover:text-primary mb-6 text-sm"
               >
                 <ChevronLeft size={18} />
                 Voltar
               </button>
 
-              <h2 className="text-lg font-semibold text-[#333] mb-2">Seus dados</h2>
+              <h2 className="text-lg font-semibold text-primary mb-2">Seus dados</h2>
               {selectedSession && (
-                <div className="flex items-center gap-2 text-sm text-[#666] mb-6">
+                <div className="flex items-center gap-2 text-sm text-secondary mb-6">
                   <Clock size={14} />
                   <span>{formatPretty(selectedSession.scheduled_at)}</span>
                 </div>
@@ -271,36 +271,36 @@ export function PublicWebinarPage() {
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-[#333] mb-1.5">Nome *</label>
+                  <label className="block text-sm font-medium text-primary mb-1.5">Nome *</label>
                   <input
                     type="text"
                     value={guestName}
                     onChange={e => setGuestName(e.target.value)}
                     required
                     placeholder="João Silva"
-                    className="w-full px-4 py-3 border border-[#E0E0E0] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2D5A27]"
+                    className="w-full px-4 py-3 border border-neutral-light rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2D5A27]"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-[#333] mb-1.5">E-mail *</label>
+                  <label className="block text-sm font-medium text-primary mb-1.5">E-mail *</label>
                   <input
                     type="email"
                     value={guestEmail}
                     onChange={e => setGuestEmail(e.target.value)}
                     required
                     placeholder="joao@empresa.com"
-                    className="w-full px-4 py-3 border border-[#E0E0E0] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2D5A27]"
+                    className="w-full px-4 py-3 border border-neutral-light rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2D5A27]"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-[#333] mb-1.5">Telefone *</label>
+                  <label className="block text-sm font-medium text-primary mb-1.5">Telefone *</label>
                   <input
                     type="tel"
                     value={guestPhone}
                     onChange={e => setGuestPhone(e.target.value)}
                     required
                     placeholder="(11) 99999-9999"
-                    className="w-full px-4 py-3 border border-[#E0E0E0] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2D5A27]"
+                    className="w-full px-4 py-3 border border-neutral-light rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2D5A27]"
                   />
                 </div>
                 <button
@@ -320,15 +320,15 @@ export function PublicWebinarPage() {
           )}
         </div>
 
-        <div className="px-8 py-4 bg-[#F8F9FA] border-t border-[#E0E0E0] text-center">
-          <p className="text-xs text-[#666]">
-            Powered by <span className="font-semibold text-[#2D5A27]">Lemon Meet</span>
+        <div className="px-8 py-4 bg-background border-t border-neutral-light text-center">
+          <p className="text-xs text-secondary">
+            Powered by <span className="font-semibold text-brand">Lemon Meet</span>
           </p>
           <a
             href="https://espremaseulimao.web.app/"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-xs text-[#2D5A27] hover:underline mt-1 inline-block"
+            className="text-xs text-brand hover:underline mt-1 inline-block"
           >
             Conheça mais sobre o Lemon.meet
           </a>

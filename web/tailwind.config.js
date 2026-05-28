@@ -9,6 +9,7 @@ export default {
     extend: {
       colors: {
         // Lemon.meet Design System
+        // Marca (NÃO flipa no dark): verde, accent, danger, success — hex fixo.
         primary: {
           DEFAULT: '#2D5A27', // Lemon Green - Títulos, botões, identidade
           light: '#4CAF50',   // Vibrant Green - Hover, links ativos, sucesso
@@ -19,12 +20,6 @@ export default {
           light: '#FFE55C',
           dark: '#E6C200',
         },
-        neutral: {
-          dark: '#333333',    // Text body
-          mid: '#666666',     // Sub-texto
-          light: '#E0E0E0',   // Border/Divider
-          lighter: '#F5F5F5', // Background sutil
-        },
         success: {
           DEFAULT: '#4CAF50', // Vibrant Green
           light: '#6DC470',
@@ -33,17 +28,27 @@ export default {
           DEFAULT: '#DC3545',
           light: '#E55563',
         },
-        background: '#F8F9FA', // Cinza quase branco
-        surface: '#FFFFFF',    // Branco puro para cards
+        // Neutros semânticos (FLIPAM no dark via CSS vars em index.css).
+        neutral: {
+          dark: 'rgb(var(--text) / <alpha-value>)',          // texto principal
+          mid: 'rgb(var(--text-secondary) / <alpha-value>)', // sub-texto
+          light: 'rgb(var(--border) / <alpha-value>)',       // borda/divisor
+          lighter: 'rgb(var(--surface-2) / <alpha-value>)',  // superfície sutil
+        },
+        background: 'rgb(var(--bg) / <alpha-value>)',      // fundo da página
+        surface: 'rgb(var(--surface) / <alpha-value>)',    // cards/superfície
+        // Verde da marca COMO TEXTO/ícone — clareia no dark p/ manter legível
+        // (diferente de bg-primary, que mantém o verde escuro de preenchimento).
+        brand: 'rgb(var(--brand) / <alpha-value>)',
       },
       textColor: {
-        primary: '#333333',
-        secondary: '#666666',
-        tertiary: '#999999',
+        primary: 'rgb(var(--text) / <alpha-value>)',
+        secondary: 'rgb(var(--text-secondary) / <alpha-value>)',
+        tertiary: 'rgb(var(--text-tertiary) / <alpha-value>)',
       },
       borderColor: {
-        DEFAULT: '#E0E0E0',
-        light: '#F0F0F0',
+        DEFAULT: 'rgb(var(--border) / <alpha-value>)',
+        light: 'rgb(var(--border-subtle) / <alpha-value>)',
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],

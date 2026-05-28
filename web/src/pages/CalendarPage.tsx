@@ -27,7 +27,7 @@ const PLATFORM_COLORS: Record<string, { bg: string; text: string; border: string
   meet:  { bg: 'bg-green-50',  text: 'text-green-700',  border: 'border-green-200', dot: 'bg-green-500' },
   zoom:  { bg: 'bg-blue-50',   text: 'text-blue-700',   border: 'border-blue-200',  dot: 'bg-blue-500' },
   teams: { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200', dot: 'bg-purple-500' },
-  other: { bg: 'bg-[#F5F5F5]', text: 'text-[#666666]',  border: 'border-[#E0E0E0]', dot: 'bg-[#BBBBBB]' },
+  other: { bg: 'bg-neutral-lighter', text: 'text-secondary',  border: 'border-neutral-light', dot: 'bg-[#BBBBBB]' },
 }
 
 const PLATFORM_LABELS: Record<string, string> = {
@@ -147,11 +147,11 @@ export function CalendarPage() {
       <MainLayout>
         <div className="flex flex-col items-center justify-center py-24 sm:py-32 gap-5 px-4">
           <div className="w-16 h-16 rounded-2xl bg-[#2D5A27]/10 flex items-center justify-center">
-            <CalendarOff size={28} className="text-[#2D5A27]" />
+            <CalendarOff size={28} className="text-brand" />
           </div>
           <div className="text-center">
-            <h2 className="text-lg font-bold text-[#333333]">Calendário não conectado</h2>
-            <p className="text-sm text-[#666666] mt-1.5 max-w-xs">
+            <h2 className="text-lg font-bold text-primary">Calendário não conectado</h2>
+            <p className="text-sm text-secondary mt-1.5 max-w-xs">
               Conecte seu Google Calendar para visualizar seus eventos aqui.
             </p>
           </div>
@@ -173,36 +173,36 @@ export function CalendarPage() {
         {/* ── Header ── */}
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
-            <h1 className="text-lg sm:text-xl font-bold text-[#333333]">
+            <h1 className="text-lg sm:text-xl font-bold text-primary">
               {MONTHS[viewMonth]} {viewYear}
             </h1>
-            {loading && <Loader size={15} className="animate-spin text-[#2D5A27]" />}
+            {loading && <Loader size={15} className="animate-spin text-brand" />}
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={goToday}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-[#E0E0E0] text-[#666666] hover:bg-[#F5F5F5] transition"
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-neutral-light text-secondary hover:bg-neutral-lighter transition"
             >
               Hoje
             </button>
             <button
               onClick={loadEvents}
               disabled={loading}
-              className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E0E0E0] text-[#999999] hover:bg-[#F5F5F5] transition disabled:opacity-50"
+              className="w-8 h-8 flex items-center justify-center rounded-lg border border-neutral-light text-tertiary hover:bg-neutral-lighter transition disabled:opacity-50"
               title="Atualizar"
             >
               <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
             </button>
-            <div className="flex rounded-xl border border-[#E0E0E0] overflow-hidden">
+            <div className="flex rounded-xl border border-neutral-light overflow-hidden">
               <button
                 onClick={prevMonth}
-                className="px-3 py-1.5 text-[#666666] hover:bg-[#F5F5F5] transition border-r border-[#E0E0E0]"
+                className="px-3 py-1.5 text-secondary hover:bg-neutral-lighter transition border-r border-neutral-light"
               >
                 <ChevronLeft size={16} />
               </button>
               <button
                 onClick={nextMonth}
-                className="px-3 py-1.5 text-[#666666] hover:bg-[#F5F5F5] transition"
+                className="px-3 py-1.5 text-secondary hover:bg-neutral-lighter transition"
               >
                 <ChevronRight size={16} />
               </button>
@@ -217,17 +217,17 @@ export function CalendarPage() {
         `}>
 
           {/* ── Grade do calendário ── */}
-          <div className="bg-white border border-[#E0E0E0] rounded-2xl shadow-sm overflow-hidden min-w-0">
+          <div className="bg-surface border border-neutral-light rounded-2xl shadow-sm overflow-hidden min-w-0">
 
             {/* Cabeçalho dias da semana */}
-            <div className="grid grid-cols-7 border-b border-[#F0F0F0]">
+            <div className="grid grid-cols-7 border-b border-neutral-light">
               {WEEKDAYS_FULL.map((full, i) => (
                 <div key={full} className="text-center py-2 sm:py-2.5">
                   {/* Mobile: letra única | sm+: abreviação */}
-                  <span className="sm:hidden text-[10px] font-semibold text-[#999999] uppercase">
+                  <span className="sm:hidden text-[10px] font-semibold text-tertiary uppercase">
                     {WEEKDAYS_SHORT[i]}
                   </span>
-                  <span className="hidden sm:inline text-[10px] font-semibold text-[#999999] uppercase tracking-wider">
+                  <span className="hidden sm:inline text-[10px] font-semibold text-tertiary uppercase tracking-wider">
                     {full}
                   </span>
                 </div>
@@ -253,7 +253,7 @@ export function CalendarPage() {
                       p-1 sm:p-2
                       ${!isLastRow ? 'border-b' : ''} border-[#F5F5F5]
                       ${(i % 7) < 6 ? 'border-r' : ''} border-[#F5F5F5]
-                      ${selected ? 'bg-[#2D5A27]/5' : 'hover:bg-[#F8F9FA]'}
+                      ${selected ? 'bg-[#2D5A27]/5' : 'hover:bg-background'}
                       ${!current ? 'opacity-35' : ''}
                     `}
                   >
@@ -264,8 +264,8 @@ export function CalendarPage() {
                       ${todayCell
                         ? 'bg-[#2D5A27] text-white'
                         : selected
-                          ? 'bg-[#2D5A27]/15 text-[#2D5A27]'
-                          : 'text-[#333333]'}
+                          ? 'bg-[#2D5A27]/15 text-brand'
+                          : 'text-primary'}
                     `}>
                       {date.getDate()}
                     </div>
@@ -309,7 +309,7 @@ export function CalendarPage() {
                         )
                       })}
                       {dayEvents.length > 3 && (
-                        <div className="text-[10px] text-[#999999] font-medium pl-1">
+                        <div className="text-[10px] text-tertiary font-medium pl-1">
                           +{dayEvents.length - 3}
                         </div>
                       )}
@@ -322,20 +322,20 @@ export function CalendarPage() {
 
           {/* ── Painel do dia selecionado ── */}
           {selectedDay && (
-            <div className="bg-white border border-[#E0E0E0] rounded-2xl shadow-sm overflow-hidden lg:self-start">
+            <div className="bg-surface border border-neutral-light rounded-2xl shadow-sm overflow-hidden lg:self-start">
               {/* Cabeçalho */}
-              <div className="px-4 py-3 border-b border-[#F0F0F0] flex items-center justify-between">
+              <div className="px-4 py-3 border-b border-neutral-light flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-semibold text-[#999999] uppercase tracking-wider">
+                  <p className="text-xs font-semibold text-tertiary uppercase tracking-wider">
                     {WEEKDAYS_FULL[selectedDay.getDay()]}
                   </p>
-                  <p className="text-base sm:text-lg font-bold text-[#333333]">
+                  <p className="text-base sm:text-lg font-bold text-primary">
                     {selectedDay.getDate()} de {MONTHS[selectedDay.getMonth()]}
                   </p>
                 </div>
                 <button
                   onClick={() => setSelectedDay(null)}
-                  className="w-7 h-7 flex items-center justify-center rounded-lg text-[#BBBBBB] hover:text-[#666666] hover:bg-[#F5F5F5] transition"
+                  className="w-7 h-7 flex items-center justify-center rounded-lg text-[#BBBBBB] hover:text-secondary hover:bg-neutral-lighter transition"
                 >
                   <X size={14} />
                 </button>
@@ -346,7 +346,7 @@ export function CalendarPage() {
                 {selectedDayEvents.length === 0 ? (
                   <div className="flex flex-col items-center py-10 gap-2">
                     <Calendar size={22} className="text-[#CCCCCC]" />
-                    <p className="text-sm text-[#999999]">Nenhum evento</p>
+                    <p className="text-sm text-tertiary">Nenhum evento</p>
                   </div>
                 ) : selectedDayEvents.map(ev => {
                   const platform = ev.meeting_platform ?? 'other'
@@ -354,7 +354,7 @@ export function CalendarPage() {
                   return (
                     <div key={ev.event_id} className="px-4 py-3 space-y-1.5">
                       <div className="flex items-start justify-between gap-2">
-                        <p className="text-sm font-semibold text-[#333333] leading-snug flex-1">
+                        <p className="text-sm font-semibold text-primary leading-snug flex-1">
                           {ev.title}
                         </p>
                         {ev.meeting_url && (
@@ -362,7 +362,7 @@ export function CalendarPage() {
                             href={ev.meeting_url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="shrink-0 w-7 h-7 rounded-lg flex items-center justify-center text-[#999999] hover:text-[#2D5A27] hover:bg-[#2D5A27]/10 transition"
+                            className="shrink-0 w-7 h-7 rounded-lg flex items-center justify-center text-tertiary hover:text-brand hover:bg-[#2D5A27]/10 transition"
                             title="Abrir reunião"
                           >
                             <ExternalLink size={13} />
@@ -370,7 +370,7 @@ export function CalendarPage() {
                         )}
                       </div>
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-xs text-[#666666]">
+                        <span className="text-xs text-secondary">
                           {formatTime(ev.start_time)} – {formatTime(ev.end_time)}
                         </span>
                         {ev.meeting_platform && (
@@ -380,7 +380,7 @@ export function CalendarPage() {
                           </span>
                         )}
                         {ev.bot_scheduled && (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-[#2D5A27]/10 text-[#2D5A27] border border-[#2D5A27]/20">
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-[#2D5A27]/10 text-brand border border-[#2D5A27]/20">
                             🤖 Bot
                           </span>
                         )}
@@ -405,13 +405,13 @@ export function CalendarPage() {
             return (
               <div key={key} className="flex items-center gap-1.5">
                 <div className={`w-2.5 h-2.5 rounded-sm border ${colors.bg} ${colors.border}`} />
-                <span className="text-xs text-[#999999]">{label}</span>
+                <span className="text-xs text-tertiary">{label}</span>
               </div>
             )
           })}
           <div className="flex items-center gap-1.5">
-            <div className="w-2.5 h-2.5 rounded-sm bg-[#F5F5F5] border border-[#E0E0E0]" />
-            <span className="text-xs text-[#999999]">Sem link</span>
+            <div className="w-2.5 h-2.5 rounded-sm bg-neutral-lighter border border-neutral-light" />
+            <span className="text-xs text-tertiary">Sem link</span>
           </div>
         </div>
 

@@ -21,7 +21,7 @@ export function Button({
 }: ButtonProps) {
   const variantStyles = {
     primary: 'bg-accent hover:bg-accent-light text-primary font-bold disabled:opacity-50',
-    secondary: 'bg-white hover:bg-neutral-lighter text-primary border border-primary hover:border-primary-light disabled:opacity-50',
+    secondary: 'bg-surface hover:bg-neutral-lighter text-primary border border-primary hover:border-primary-light disabled:opacity-50',
     text: 'bg-transparent hover:bg-neutral-lighter text-primary hover:text-primary-light disabled:opacity-50',
     danger: 'bg-danger hover:bg-danger-light text-white disabled:opacity-50',
     ghost: 'bg-transparent hover:bg-neutral-lighter text-secondary hover:text-primary disabled:opacity-50',

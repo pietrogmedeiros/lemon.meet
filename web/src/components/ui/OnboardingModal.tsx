@@ -90,17 +90,17 @@ export function OnboardingModal({ open, onClose }: OnboardingModalProps) {
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
       <div
-        className={`bg-white rounded-2xl shadow-2xl w-full flex flex-col overflow-hidden transition-all duration-300 ${page === 2 ? 'max-w-2xl' : 'max-w-lg'}`}
+        className={`bg-surface rounded-2xl shadow-2xl w-full flex flex-col overflow-hidden transition-all duration-300 ${page === 2 ? 'max-w-2xl' : 'max-w-lg'}`}
         style={{ maxHeight: '92vh' }}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-[#F0F0F0]">
+        <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-neutral-light">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-[#F0F7EE] flex items-center justify-center text-xl">
               🍋
             </div>
             <div>
-              <h2 className="text-[16px] font-bold text-[#1a1a1a] leading-tight">
+              <h2 className="text-[16px] font-bold text-primary leading-tight">
                 {page === 1 ? 'Como usar o Lemon.meet' : 'Permissões necessárias'}
               </h2>
               <p className="text-[12px] text-[#888] mt-0.5">
@@ -116,7 +116,7 @@ export function OnboardingModal({ open, onClose }: OnboardingModalProps) {
             </div>
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg text-[#aaa] hover:text-[#444] hover:bg-[#F5F5F5] transition-colors"
+              className="p-1.5 rounded-lg text-[#aaa] hover:text-[#444] hover:bg-neutral-lighter transition-colors"
               aria-label="Fechar"
             >
               <X size={18} />
@@ -145,9 +145,9 @@ export function OnboardingModal({ open, onClose }: OnboardingModalProps) {
                   <div className="pb-4 flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <Icon size={15} style={{ color: step.color }} className="shrink-0" />
-                      <span className="text-[14px] font-semibold text-[#1a1a1a]">{step.title}</span>
+                      <span className="text-[14px] font-semibold text-primary">{step.title}</span>
                     </div>
-                    <p className="text-[13px] text-[#666] leading-relaxed">{step.description}</p>
+                    <p className="text-[13px] text-secondary leading-relaxed">{step.description}</p>
                     {step.action && (
                       step.action.internal ? (
                         <a
@@ -197,7 +197,7 @@ export function OnboardingModal({ open, onClose }: OnboardingModalProps) {
                 <div className="w-6 h-6 rounded-full bg-[#EBF3FF] flex items-center justify-center shrink-0">
                   <Calendar size={13} className="text-[#4285F4]" />
                 </div>
-                <span className="text-[14px] font-semibold text-[#1a1a1a]">Integrando o Google Calendar</span>
+                <span className="text-[14px] font-semibold text-primary">Integrando o Google Calendar</span>
               </div>
               <ol className="space-y-3 ml-1">
                 <li className="flex gap-3 items-start">
@@ -208,7 +208,7 @@ export function OnboardingModal({ open, onClose }: OnboardingModalProps) {
                       <img
                         src="/permissaocalendar1.png"
                         alt="Clique em Avançado"
-                        className="w-full rounded-xl border border-[#E0E0E0] object-contain max-h-64 transition-opacity group-hover:opacity-90"
+                        className="w-full rounded-xl border border-neutral-light object-contain max-h-64 transition-opacity group-hover:opacity-90"
                       />
                       <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                         <div className="bg-black/50 rounded-full p-2">
@@ -226,7 +226,7 @@ export function OnboardingModal({ open, onClose }: OnboardingModalProps) {
                       <img
                         src="/permissaocalendar2.png"
                         alt="Acessar Lemon.meet (não seguro)"
-                        className="w-full rounded-xl border border-[#E0E0E0] object-contain max-h-64 transition-opacity group-hover:opacity-90"
+                        className="w-full rounded-xl border border-neutral-light object-contain max-h-64 transition-opacity group-hover:opacity-90"
                       />
                       <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                         <div className="bg-black/50 rounded-full p-2">
@@ -240,15 +240,15 @@ export function OnboardingModal({ open, onClose }: OnboardingModalProps) {
             </div>
 
             {/* Divisor */}
-            <div className="border-t border-[#F0F0F0]" />
+            <div className="border-t border-neutral-light" />
 
             {/* Seção bot na reunião */}
             <div>
               <div className="flex items-center gap-2 mb-3">
                 <div className="w-6 h-6 rounded-full bg-[#F0F7EE] flex items-center justify-center shrink-0">
-                  <Bot size={13} className="text-[#2D5A27]" />
+                  <Bot size={13} className="text-brand" />
                 </div>
-                <span className="text-[14px] font-semibold text-[#1a1a1a]">Permitindo o bot na reunião</span>
+                <span className="text-[14px] font-semibold text-primary">Permitindo o bot na reunião</span>
               </div>
               <ol className="space-y-3 ml-1">
                 <li className="flex gap-3 items-start">
@@ -259,7 +259,7 @@ export function OnboardingModal({ open, onClose }: OnboardingModalProps) {
                       <img
                         src="/permissaonotetaker2.jpeg"
                         alt="Clique nos 3 pontos"
-                        className="w-full rounded-xl border border-[#E0E0E0] object-contain max-h-64 transition-opacity group-hover:opacity-90"
+                        className="w-full rounded-xl border border-neutral-light object-contain max-h-64 transition-opacity group-hover:opacity-90"
                       />
                       <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                         <div className="bg-black/50 rounded-full p-2">
@@ -277,7 +277,7 @@ export function OnboardingModal({ open, onClose }: OnboardingModalProps) {
                       <img
                         src="/permissaonotetaker1.jpeg"
                         alt="Permitir Entrada"
-                        className="w-full rounded-xl border border-[#E0E0E0] object-contain max-h-64 transition-opacity group-hover:opacity-90"
+                        className="w-full rounded-xl border border-neutral-light object-contain max-h-64 transition-opacity group-hover:opacity-90"
                       />
                       <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                         <div className="bg-black/50 rounded-full p-2">
@@ -293,7 +293,7 @@ export function OnboardingModal({ open, onClose }: OnboardingModalProps) {
         )}
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-[#F0F0F0] flex items-center justify-between gap-3">
+        <div className="px-6 py-4 border-t border-neutral-light flex items-center justify-between gap-3">
           <label className="flex items-center gap-2 cursor-pointer select-none">
             <input
               type="checkbox"
@@ -310,7 +310,7 @@ export function OnboardingModal({ open, onClose }: OnboardingModalProps) {
             {page === 2 && (
               <button
                 onClick={() => setPage(1)}
-                className="px-4 py-2 rounded-lg text-[13px] font-semibold text-[#666] hover:bg-[#F5F5F5] transition-colors"
+                className="px-4 py-2 rounded-lg text-[13px] font-semibold text-secondary hover:bg-neutral-lighter transition-colors"
               >
                 Voltar
               </button>

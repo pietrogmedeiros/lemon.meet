@@ -78,7 +78,7 @@ function RapportDataDisplay({ data }: { data: RapportData }) {
       {data.company && (
         <div className="rounded-lg border border-[#E8F5E9] bg-[#F9FFF9] p-4">
           <h3 className="flex items-center gap-2 text-sm font-semibold text-primary mb-1">
-            <Building2 className="h-4 w-4 text-[#2D5A27]" />
+            <Building2 className="h-4 w-4 text-brand" />
             {data.company.name}
           </h3>
           {data.company.description && (
@@ -239,14 +239,14 @@ export function RapportSection({ meetingId, initialRapport, apiUrl, getAuthHeade
   }, [meetingId, website, linkedin, instagram, apiUrl, getAuthHeader, hasAnyUrl, loading]);
 
   return (
-    <Card className="p-5 border-l-4 border-l-[#2D5A27] bg-white">
+    <Card className="p-5 border-l-4 border-l-[#2D5A27] bg-surface">
       {/* Cabeçalho */}
       <div className="flex items-center justify-between flex-wrap gap-3 mb-2">
         <div className="flex flex-col gap-1.5">
           <h2 className="text-headline-2 text-primary flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-[#2D5A27]" />
+            <Sparkles className="h-5 w-5 text-brand" />
             Enriquecer Rapport
-            <span className="ml-1 text-xs bg-[#2D5A27]/10 text-[#2D5A27] px-2 py-0.5 rounded-full font-medium">
+            <span className="ml-1 text-xs bg-[#2D5A27]/10 text-brand px-2 py-0.5 rounded-full font-medium">
               Pré-reunião
             </span>
             <span className="ml-1 text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium border border-amber-200">
@@ -281,7 +281,7 @@ export function RapportSection({ meetingId, initialRapport, apiUrl, getAuthHeade
                 placeholder="https://empresa.com"
                 value={website}
                 onChange={e => setWebsite(e.target.value)}
-                className="rounded-lg border border-[#E0E0E0] bg-white px-3 py-2 text-sm text-primary placeholder:text-[#BDBDBD] focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30 transition-colors"
+                className="rounded-lg border border-neutral-light bg-surface px-3 py-2 text-sm text-primary placeholder:text-tertiary focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30 transition-colors"
               />
             </div>
 
@@ -296,7 +296,7 @@ export function RapportSection({ meetingId, initialRapport, apiUrl, getAuthHeade
                 placeholder="https://linkedin.com/in/nome"
                 value={linkedin}
                 onChange={e => setLinkedin(e.target.value)}
-                className="rounded-lg border border-[#E0E0E0] bg-white px-3 py-2 text-sm text-primary placeholder:text-[#BDBDBD] focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30 transition-colors"
+                className="rounded-lg border border-neutral-light bg-surface px-3 py-2 text-sm text-primary placeholder:text-tertiary focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30 transition-colors"
               />
             </div>
 
@@ -311,7 +311,7 @@ export function RapportSection({ meetingId, initialRapport, apiUrl, getAuthHeade
                 placeholder="https://instagram.com/perfil"
                 value={instagram}
                 onChange={e => setInstagram(e.target.value)}
-                className="rounded-lg border border-[#E0E0E0] bg-white px-3 py-2 text-sm text-primary placeholder:text-[#BDBDBD] focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30 transition-colors"
+                className="rounded-lg border border-neutral-light bg-surface px-3 py-2 text-sm text-primary placeholder:text-tertiary focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30 transition-colors"
               />
             </div>
 

@@ -78,11 +78,11 @@ export function FeedbackSurveyModal({ isOpen, onSubmitted }: FeedbackSurveyModal
       {/* Overlay — sem onClick para impedir fechar clicando fora */}
       <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
         {/* Modal */}
-        <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="bg-surface rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
           {/* Header — sem botão de fechar */}
-          <div className="px-6 py-4 border-b border-[#E0E0E0]">
-            <h2 className="text-xl font-bold text-[#333333]">Queremos ouvir você! 🎤</h2>
-            <p className="text-sm text-[#666666] mt-1">
+          <div className="px-6 py-4 border-b border-neutral-light">
+            <h2 className="text-xl font-bold text-primary">Queremos ouvir você! 🎤</h2>
+            <p className="text-sm text-secondary mt-1">
               Ajude-nos a melhorar o Lemon.meet respondendo 3 perguntas rápidas
             </p>
           </div>
@@ -91,53 +91,53 @@ export function FeedbackSurveyModal({ isOpen, onSubmitted }: FeedbackSurveyModal
           <form onSubmit={handleSubmit} className="px-6 py-6 space-y-6">
             {/* Pergunta 1 */}
             <div>
-              <label className="block text-sm font-semibold text-[#333333] mb-2">
+              <label className="block text-sm font-semibold text-primary mb-2">
                 1. Como você está utilizando o Lemon.meet?
               </label>
               <textarea
                 value={howUsing}
                 onChange={(e) => setHowUsing(e.target.value)}
                 placeholder="Ex: Para gravar minhas reuniões comerciais, análise de vendas..."
-                className="w-full px-4 py-3 border border-[#E0E0E0] rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-[#2D5A27]/20 focus:border-[#2D5A27] transition text-sm"
+                className="w-full px-4 py-3 border border-neutral-light rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-[#2D5A27]/20 focus:border-[#2D5A27] transition text-sm"
                 rows={3}
                 maxLength={2000}
                 disabled={isSubmitting}
               />
-              <div className="text-xs text-[#999999] mt-1 text-right">{howUsing.length}/2000</div>
+              <div className="text-xs text-tertiary mt-1 text-right">{howUsing.length}/2000</div>
             </div>
 
             {/* Pergunta 2 */}
             <div>
-              <label className="block text-sm font-semibold text-[#333333] mb-2">
+              <label className="block text-sm font-semibold text-primary mb-2">
                 2. O que você está achando do Lemon.meet?
               </label>
               <textarea
                 value={whatThink}
                 onChange={(e) => setWhatThink(e.target.value)}
                 placeholder="Ex: Adorei a feature de insights, mas sinto falta de..."
-                className="w-full px-4 py-3 border border-[#E0E0E0] rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-[#2D5A27]/20 focus:border-[#2D5A27] transition text-sm"
+                className="w-full px-4 py-3 border border-neutral-light rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-[#2D5A27]/20 focus:border-[#2D5A27] transition text-sm"
                 rows={3}
                 maxLength={2000}
                 disabled={isSubmitting}
               />
-              <div className="text-xs text-[#999999] mt-1 text-right">{whatThink.length}/2000</div>
+              <div className="text-xs text-tertiary mt-1 text-right">{whatThink.length}/2000</div>
             </div>
 
             {/* Pergunta 3 */}
             <div>
-              <label className="block text-sm font-semibold text-[#333333] mb-2">
+              <label className="block text-sm font-semibold text-primary mb-2">
                 3. Se pudesse fazer UM pedido de nova funcionalidade ou melhoria, qual seria?
               </label>
               <textarea
                 value={featureRequest}
                 onChange={(e) => setFeatureRequest(e.target.value)}
                 placeholder="Ex: Gostaria de integração com Notion, ou melhor..."
-                className="w-full px-4 py-3 border border-[#E0E0E0] rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-[#2D5A27]/20 focus:border-[#2D5A27] transition text-sm"
+                className="w-full px-4 py-3 border border-neutral-light rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-[#2D5A27]/20 focus:border-[#2D5A27] transition text-sm"
                 rows={4}
                 maxLength={2000}
                 disabled={isSubmitting}
               />
-              <div className="text-xs text-[#999999] mt-1 text-right">{featureRequest.length}/2000</div>
+              <div className="text-xs text-tertiary mt-1 text-right">{featureRequest.length}/2000</div>
             </div>
 
             {/* Error */}
@@ -148,7 +148,7 @@ export function FeedbackSurveyModal({ isOpen, onSubmitted }: FeedbackSurveyModal
             )}
 
             {/* Footer — apenas botão de enviar */}
-            <div className="flex items-center justify-end pt-4 border-t border-[#E0E0E0]">
+            <div className="flex items-center justify-end pt-4 border-t border-neutral-light">
               <button
                 type="submit"
                 disabled={isSubmitting || !howUsing.trim() || !whatThink.trim() || !featureRequest.trim()}
@@ -165,7 +165,7 @@ export function FeedbackSurveyModal({ isOpen, onSubmitted }: FeedbackSurveyModal
               </button>
             </div>
 
-            <p className="text-xs text-center text-[#999999]">
+            <p className="text-xs text-center text-tertiary">
               Seu feedback nos ajuda a criar um produto melhor para você! ❤️
             </p>
           </form>

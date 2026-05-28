@@ -360,7 +360,7 @@ function FollowUpSection({ suggestions, emailLoading, onGenerateEmail, copiedInd
                         className={`relative px-3 py-1.5 text-xs font-medium rounded-md border transition-all ${
                           selectedTone === value
                             ? 'bg-primary text-white border-primary'
-                            : 'bg-white text-secondary border-primary/20 hover:border-primary/40 hover:bg-primary/5'
+                            : 'bg-surface text-secondary border-primary/20 hover:border-primary/40 hover:bg-primary/5'
                         } ${isRegenerating ? 'opacity-50 cursor-not-allowed' : ''}`}
                         title={description}
                       >
@@ -435,7 +435,7 @@ function FollowUpSection({ suggestions, emailLoading, onGenerateEmail, copiedInd
                             className={`px-2 py-1 text-xs font-medium rounded border transition-all ${
                               !currentTone
                                 ? 'bg-primary text-white border-primary'
-                                : 'bg-white text-secondary/70 border-primary/10 hover:border-primary/30'
+                                : 'bg-surface text-secondary/70 border-primary/10 hover:border-primary/30'
                             }`}
                             title="Versão original"
                           >
@@ -448,7 +448,7 @@ function FollowUpSection({ suggestions, emailLoading, onGenerateEmail, copiedInd
                               className={`px-2 py-1 text-xs font-medium rounded border transition-all ${
                                 currentTone === tone
                                   ? 'bg-primary text-white border-primary'
-                                  : 'bg-white text-secondary/70 border-primary/10 hover:border-primary/30'
+                                  : 'bg-surface text-secondary/70 border-primary/10 hover:border-primary/30'
                               }`}
                               title={`Tom: ${toneLabels.find(t => t.value === tone)?.label}`}
                             >
@@ -465,7 +465,7 @@ function FollowUpSection({ suggestions, emailLoading, onGenerateEmail, copiedInd
                         className={`flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-md border transition-all ${
                           isEditing
                             ? 'bg-primary text-white border-primary'
-                            : 'bg-white text-secondary border-primary/20 hover:border-primary/40 hover:bg-primary/5'
+                            : 'bg-surface text-secondary border-primary/20 hover:border-primary/40 hover:bg-primary/5'
                         } ${isRegenerating ? 'opacity-50 cursor-not-allowed' : ''}`}
                       >
                         <RefreshCw className="h-3 w-3" />
@@ -479,7 +479,7 @@ function FollowUpSection({ suggestions, emailLoading, onGenerateEmail, copiedInd
                         className={`flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-md border transition-all ${
                           copiedIndex === i
                             ? 'bg-primary text-white border-primary'
-                            : 'bg-white text-secondary border-primary/20 hover:border-primary/40 hover:bg-primary/5'
+                            : 'bg-surface text-secondary border-primary/20 hover:border-primary/40 hover:bg-primary/5'
                         } ${isRegenerating ? 'opacity-50 cursor-not-allowed' : ''}`}
                       >
                         {copiedIndex === i ? (
@@ -519,12 +519,12 @@ function FollowUpSection({ suggestions, emailLoading, onGenerateEmail, copiedInd
       {/* Overlay de bloqueio para plano Starter */}
       {!isPro && (
         <div className="absolute inset-0 flex flex-col items-center justify-center rounded-xl bg-white/60 backdrop-blur-[2px]">
-          <div className="flex flex-col items-center gap-2 px-6 py-4 rounded-xl bg-white shadow-lg border border-[#E8E8E8]">
+          <div className="flex flex-col items-center gap-2 px-6 py-4 rounded-xl bg-surface shadow-lg border border-[#E8E8E8]">
             <Lock className="h-6 w-6 text-[#888]" />
             <p className="text-sm font-semibold text-[#444]">Disponível no plano Professional</p>
             <a
               href="/subscription"
-              className="mt-1 text-xs font-medium text-[#2D5A27] underline underline-offset-2 hover:text-[#1a3a17]"
+              className="mt-1 text-xs font-medium text-brand underline underline-offset-2 hover:text-[#1a3a17]"
             >
               Fazer upgrade
             </a>
@@ -1073,7 +1073,7 @@ export function TranscricaoDetalhesPage() {
                 className={`flex items-center gap-2 text-[13px] font-medium px-3 py-2 rounded-lg border transition-all disabled:opacity-60 ${
                   hubspotSynced
                     ? 'border-[#FF7A59] text-[#FF7A59] bg-[#FF7A59]/8'
-                    : 'border-[#E0E0E0] text-[#555] hover:border-[#FF7A59] hover:text-[#FF7A59] bg-white'
+                    : 'border-neutral-light text-[#555] hover:border-[#FF7A59] hover:text-[#FF7A59] bg-surface'
                 }`}
                 title="Enviar resumo e deal para o HubSpot"
               >
@@ -1201,7 +1201,7 @@ export function TranscricaoDetalhesPage() {
         ) : (meeting.status === 'completed' && meeting.insights && meeting.created_at < '2026-05-24') ? (
           <Card className="p-4 border-l-4 border-l-[#2D5A27] bg-[#F6FBF6]">
             <p className="text-sm text-secondary flex items-start gap-2">
-              <Sparkles className="h-4 w-4 text-[#2D5A27] flex-shrink-0 mt-0.5" />
+              <Sparkles className="h-4 w-4 text-brand flex-shrink-0 mt-0.5" />
               <span>
                 <span className="font-semibold text-primary">Insights que impulsionam decisões</span> está
                 disponível para reuniões a partir de 24/05/2026.
@@ -1526,7 +1526,7 @@ export function TranscricaoDetalhesPage() {
         {/* Email Modal */}
         {emailText && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[85vh]">
+            <div className="bg-surface rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[85vh]">
               <div className="flex items-center justify-between p-5 border-b">
                 <h3 className="text-headline-2 text-primary flex items-center gap-2">
                   <Mail className="h-5 w-5" />
@@ -1581,7 +1581,7 @@ export function TranscricaoDetalhesPage() {
                   document.body.removeChild(link);
                   URL.revokeObjectURL(url);
                 }}
-                className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-[#2D5A27] bg-[#2D5A27]/5 hover:bg-[#2D5A27]/10 rounded-lg transition-colors"
+                className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-brand bg-[#2D5A27]/5 hover:bg-[#2D5A27]/10 rounded-lg transition-colors"
                 title="Exportar transcrição em TXT"
               >
                 <Download size={14} />
@@ -1621,7 +1621,7 @@ export function TranscricaoDetalhesPage() {
       {meeting && meeting.transcript && meeting.transcript.trim().length > 0 && (
         <div className="fixed bottom-8 right-8 z-30">
           {/* Badge "NOVO" */}
-          <div className="absolute -top-1 -right-1 bg-[#FFD700] text-[#1a1a1a] text-[10px] font-bold px-2 py-0.5 rounded-full shadow-md uppercase tracking-wide">
+          <div className="absolute -top-1 -right-1 bg-[#FFD700] text-primary text-[10px] font-bold px-2 py-0.5 rounded-full shadow-md uppercase tracking-wide">
             NOVO
           </div>
           

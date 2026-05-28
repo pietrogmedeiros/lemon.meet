@@ -33,7 +33,7 @@ function formatDate(iso: string) {
 function CardBrandIcon({ brand }: { brand: string }) {
   const labels: Record<string, string> = { visa: 'VISA', mastercard: 'MC', amex: 'AMEX', elo: 'ELO' }
   return (
-    <span className="text-xs font-bold bg-neutral-100 text-[#333] px-2 py-0.5 rounded-md uppercase tracking-wide">
+    <span className="text-xs font-bold bg-neutral-100 text-primary px-2 py-0.5 rounded-md uppercase tracking-wide">
       {labels[brand] ?? brand}
     </span>
   )
@@ -119,7 +119,7 @@ export function SubscriptionPage() {
         <div className="flex items-center justify-between">
           <button
             onClick={() => navigate('/settings')}
-            className="flex items-center gap-1.5 text-sm text-[#666] hover:text-[#333] transition"
+            className="flex items-center gap-1.5 text-sm text-secondary hover:text-primary transition"
           >
             <ArrowLeft size={16} />
             Configurações
@@ -137,18 +137,18 @@ export function SubscriptionPage() {
         </div>
 
         <div>
-          <h1 className="text-2xl font-bold text-[#1a1a1a]">Minha Assinatura</h1>
-          <p className="text-sm text-[#666] mt-1">Detalhes do seu plano e histórico de pagamentos.</p>
+          <h1 className="text-2xl font-bold text-primary">Minha Assinatura</h1>
+          <p className="text-sm text-secondary mt-1">Detalhes do seu plano e histórico de pagamentos.</p>
         </div>
 
         {loading ? (
           <div className="flex items-center justify-center h-64">
-            <Loader size={28} className="animate-spin text-[#2D5A27]" />
+            <Loader size={28} className="animate-spin text-brand" />
           </div>
         ) : !details ? (
-          <div className="bg-white border border-[#E0E0E0] rounded-2xl p-8 text-center">
-            <p className="text-[#666]">Não foi possível carregar os detalhes.</p>
-            <button onClick={fetchDetails} className="mt-3 flex items-center gap-1.5 mx-auto text-sm text-[#2D5A27] font-medium hover:underline">
+          <div className="bg-surface border border-neutral-light rounded-2xl p-8 text-center">
+            <p className="text-secondary">Não foi possível carregar os detalhes.</p>
+            <button onClick={fetchDetails} className="mt-3 flex items-center gap-1.5 mx-auto text-sm text-brand font-medium hover:underline">
               <RefreshCw size={14} /> Tentar novamente
             </button>
           </div>
@@ -164,9 +164,9 @@ export function SubscriptionPage() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
 
               {/* Coluna esquerda — Plano */}
-              <div className="bg-white border border-[#E8E8E8] rounded-2xl overflow-hidden shadow-sm">
-                <div className="px-5 py-4 border-b border-[#F0F0F0]">
-                  <p className="text-xs font-semibold uppercase tracking-widest text-[#999]">Plano</p>
+              <div className="bg-surface border border-[#E8E8E8] rounded-2xl overflow-hidden shadow-sm">
+                <div className="px-5 py-4 border-b border-neutral-light">
+                  <p className="text-xs font-semibold uppercase tracking-widest text-tertiary">Plano</p>
                 </div>
                 <Row
                   label="Plano atual"
@@ -186,32 +186,32 @@ export function SubscriptionPage() {
                   label="Valor"
                   value={
                     details.amount !== null && details.currency
-                      ? <span className="font-semibold text-[#1a1a1a]">{formatCurrency(details.amount, details.currency)}<span className="text-xs text-[#999] font-normal ml-1">/mês</span></span>
-                      : <span className="text-[#999]">—</span>
+                      ? <span className="font-semibold text-primary">{formatCurrency(details.amount, details.currency)}<span className="text-xs text-tertiary font-normal ml-1">/mês</span></span>
+                      : <span className="text-tertiary">—</span>
                   }
                 />
                 <Row
                   label="Próxima cobrança"
                   value={
                     details.currentPeriodEnd
-                      ? <span className="flex items-center gap-1.5 text-[#333]"><Calendar size={13} className="text-[#2D5A27]" />{formatDate(details.currentPeriodEnd)}</span>
-                      : <span className="text-[#999]">—</span>
+                      ? <span className="flex items-center gap-1.5 text-primary"><Calendar size={13} className="text-brand" />{formatDate(details.currentPeriodEnd)}</span>
+                      : <span className="text-tertiary">—</span>
                   }
                   last
                 />
               </div>
 
               {/* Coluna direita — Pagamento */}
-              <div className="bg-white border border-[#E8E8E8] rounded-2xl overflow-hidden shadow-sm">
-                <div className="px-5 py-4 border-b border-[#F0F0F0]">
-                  <p className="text-xs font-semibold uppercase tracking-widest text-[#999]">Pagamento</p>
+              <div className="bg-surface border border-[#E8E8E8] rounded-2xl overflow-hidden shadow-sm">
+                <div className="px-5 py-4 border-b border-neutral-light">
+                  <p className="text-xs font-semibold uppercase tracking-widest text-tertiary">Pagamento</p>
                 </div>
                 <Row
                   label="Último pagamento"
                   value={
                     details.lastPayment
-                      ? <span className="text-[#333]">{formatCurrency(details.lastPayment.amount, details.lastPayment.currency)}<span className="text-[#999] text-xs ml-1">{formatDate(details.lastPayment.date)}</span></span>
-                      : <span className="text-[#999]">Nenhum registrado</span>
+                      ? <span className="text-primary">{formatCurrency(details.lastPayment.amount, details.lastPayment.currency)}<span className="text-tertiary text-xs ml-1">{formatDate(details.lastPayment.date)}</span></span>
+                      : <span className="text-tertiary">Nenhum registrado</span>
                   }
                 />
                 <Row
@@ -221,11 +221,11 @@ export function SubscriptionPage() {
                       ? (
                         <span className="flex items-center gap-2">
                           <CardBrandIcon brand={details.paymentMethod.brand} />
-                          <span className="text-[#333]">•••• {details.paymentMethod.last4}</span>
-                          <span className="text-xs text-[#999]">{details.paymentMethod.expMonth.toString().padStart(2, '0')}/{details.paymentMethod.expYear}</span>
+                          <span className="text-primary">•••• {details.paymentMethod.last4}</span>
+                          <span className="text-xs text-tertiary">{details.paymentMethod.expMonth.toString().padStart(2, '0')}/{details.paymentMethod.expYear}</span>
                         </span>
                       )
-                      : <span className="text-[#999]">—</span>
+                      : <span className="text-tertiary">—</span>
                   }
                   last
                 />
@@ -235,11 +235,11 @@ export function SubscriptionPage() {
             {/* Trial banner */}
             {isTrial && (
               <div className="bg-[#2D5A27]/5 border border-[#2D5A27]/15 rounded-2xl p-5">
-                <p className="text-sm font-semibold text-[#2D5A27] mb-1">Seu período de teste {daysLeft === 0 ? 'termina hoje' : `termina em ${daysLeft} dia${daysLeft !== 1 ? 's' : ''}`}</p>
-                <p className="text-xs text-[#666] mb-3">Escolha um plano para continuar usando o Lemon.meet após o trial.</p>
+                <p className="text-sm font-semibold text-brand mb-1">Seu período de teste {daysLeft === 0 ? 'termina hoje' : `termina em ${daysLeft} dia${daysLeft !== 1 ? 's' : ''}`}</p>
+                <p className="text-xs text-secondary mb-3">Escolha um plano para continuar usando o Lemon.meet após o trial.</p>
                 <button
                   onClick={() => navigate('/settings')}
-                  className="text-sm font-semibold text-[#2D5A27] underline hover:no-underline"
+                  className="text-sm font-semibold text-brand underline hover:no-underline"
                 >
                   Ver planos disponíveis
                 </button>
@@ -254,8 +254,8 @@ export function SubscriptionPage() {
 
 function Row({ label, value, last = false }: { label: string; value: React.ReactNode; last?: boolean }) {
   return (
-    <div className={`flex items-center justify-between px-5 py-4 gap-4 ${!last ? 'border-b border-[#F0F0F0]' : ''}`}>
-      <span className="text-sm text-[#666] shrink-0 w-48">{label}</span>
+    <div className={`flex items-center justify-between px-5 py-4 gap-4 ${!last ? 'border-b border-neutral-light' : ''}`}>
+      <span className="text-sm text-secondary shrink-0 w-48">{label}</span>
       <span className="text-sm text-right">{value}</span>
     </div>
   )

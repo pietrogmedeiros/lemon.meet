@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom'
 
 const PLAN_CONFIG: Record<string, { label: string; cls: string }> = {
   trial:        { label: 'Trial', cls: 'bg-blue-50 text-blue-600 border-blue-200' },
-  starter:      { label: 'Starter', cls: 'bg-[#2D5A27]/8 text-[#2D5A27] border-[#2D5A27]/20' },
+  starter:      { label: 'Starter', cls: 'bg-[#2D5A27]/8 text-brand border-[#2D5A27]/20' },
   professional: { label: 'Professional', cls: 'bg-amber-50 text-amber-600 border-amber-200' },
 }
 
@@ -14,9 +14,9 @@ export function TopNavBar() {
   const navigate = useNavigate()
 
   return (
-    <header className="h-16 bg-white border-b border-neutral-light px-8 flex items-center justify-between sticky top-0 z-40">
+    <header className="h-16 bg-surface border-b border-neutral-light px-8 flex items-center justify-between sticky top-0 z-40">
       {/* Left: tagline sutil */}
-      <p className="text-[12px] text-[#2D5A27] font-semibold tracking-wide select-none hidden sm:block">
+      <p className="text-[12px] text-brand font-semibold tracking-wide select-none hidden sm:block">
         Esprema o melhor das suas reuniões
       </p>
 

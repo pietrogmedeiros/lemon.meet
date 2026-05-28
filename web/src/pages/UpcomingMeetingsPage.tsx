@@ -165,7 +165,7 @@ export function UpcomingMeetingsPage() {
                     return (
                       <div
                         key={meeting.id}
-                        className={`rounded-xl border bg-white dark:bg-gray-800 p-5 transition-shadow hover:shadow-md ${
+                        className={`rounded-xl border bg-surface dark:bg-gray-800 p-5 transition-shadow hover:shadow-md ${
                           todayMeeting
                             ? 'border-primary/30 shadow-sm shadow-primary/10'
                             : 'border-neutral-light dark:border-gray-700'

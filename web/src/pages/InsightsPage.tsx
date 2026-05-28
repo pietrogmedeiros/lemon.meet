@@ -50,7 +50,7 @@ interface Meeting {
 
 function ScorePill({ score }: { score: number }) {
   const cls =
-    score >= 8 ? 'bg-[#2D5A27]/10 text-[#2D5A27]' :
+    score >= 8 ? 'bg-[#2D5A27]/10 text-brand' :
     score > 5 ? 'bg-[#FFD700]/30 text-[#7A5C00]' :
     'bg-[#DC3545]/10 text-[#DC3545]';
   return (
@@ -74,7 +74,7 @@ function ScoreTrendIcon({ scores }: { scores: number[] }) {
   if (scores.length < 2) return <Minus className="h-4 w-4 text-neutral-400" />;
   const last = scores[scores.length - 1];
   const prev = scores[scores.length - 2];
-  if (last > prev) return <TrendingUp className="h-4 w-4 text-[#2D5A27]" />;
+  if (last > prev) return <TrendingUp className="h-4 w-4 text-brand" />;
   if (last < prev) return <TrendingDown className="h-4 w-4 text-[#DC3545]" />;
   return <Minus className="h-4 w-4 text-neutral-400" />;
 }
@@ -268,8 +268,8 @@ export function InsightsPage() {
 
         {/* Header */}
         <div>
-          <h1 className="text-2xl font-bold text-[#1a1a1a]">{t('insights.aggregate.title')}</h1>
-          <p className="mt-1 text-sm text-[#666]">
+          <h1 className="text-2xl font-bold text-primary">{t('insights.aggregate.title')}</h1>
+          <p className="mt-1 text-sm text-secondary">
             {t('insights.aggregate.subtitle', { count: total })}
           </p>
         </div>
@@ -277,13 +277,13 @@ export function InsightsPage() {
         {teams.length > 0 && (
           <div className="space-y-3">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs font-semibold text-[#666666] mr-1">{t('common.team', 'Time')}:</span>
+              <span className="text-xs font-semibold text-secondary mr-1">{t('common.team', 'Time')}:</span>
               <button
                 onClick={() => setSelectedTeamId('all')}
                 className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition ${
                   selectedTeamId === 'all'
                     ? 'bg-[#2D5A27] text-white border-[#2D5A27]'
-                    : 'bg-white text-[#666666] border-[#E0E0E0] hover:border-[#2D5A27] hover:text-[#2D5A27]'
+                    : 'bg-surface text-secondary border-neutral-light hover:border-[#2D5A27] hover:text-brand'
                 }`}
               >
                 {t('common.allTeams', 'Todos os times')}
@@ -295,7 +295,7 @@ export function InsightsPage() {
                   className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition ${
                     selectedTeamId === team.id
                       ? 'bg-[#2D5A27] text-white border-[#2D5A27]'
-                      : 'bg-white text-[#666666] border-[#E0E0E0] hover:border-[#2D5A27] hover:text-[#2D5A27]'
+                      : 'bg-surface text-secondary border-neutral-light hover:border-[#2D5A27] hover:text-brand'
                   }`}
                 >
                   {team.name}
@@ -306,13 +306,13 @@ export function InsightsPage() {
             {/* Filtro de membros */}
             {members.length > 0 && (
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-xs font-semibold text-[#666666] mr-1">Membro:</span>
+                <span className="text-xs font-semibold text-secondary mr-1">Membro:</span>
                 <button
                   onClick={() => setSelectedMemberId('all')}
                   className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition ${
                     selectedMemberId === 'all'
                       ? 'bg-[#2D5A27] text-white border-[#2D5A27]'
-                      : 'bg-white text-[#666666] border-[#E0E0E0] hover:border-[#2D5A27] hover:text-[#2D5A27]'
+                      : 'bg-surface text-secondary border-neutral-light hover:border-[#2D5A27] hover:text-brand'
                   }`}
                 >
                   Todos os membros
@@ -324,7 +324,7 @@ export function InsightsPage() {
                     className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition ${
                       selectedMemberId === member.user_id
                         ? 'bg-[#2D5A27] text-white border-[#2D5A27]'
-                        : 'bg-white text-[#666666] border-[#E0E0E0] hover:border-[#2D5A27] hover:text-[#2D5A27]'
+                        : 'bg-surface text-secondary border-neutral-light hover:border-[#2D5A27] hover:text-brand'
                     }`}
                   >
                     {member.user_name}
@@ -338,8 +338,8 @@ export function InsightsPage() {
         {total === 0 ? (
           <Card className="p-12 text-center">
             <BarChart3 className="h-12 w-12 text-neutral-300 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-[#333]">{t('insights.aggregate.empty.title')}</h3>
-            <p className="mt-2 text-sm text-[#666]">{t('insights.aggregate.empty.text')}</p>
+            <h3 className="text-lg font-semibold text-primary">{t('insights.aggregate.empty.title')}</h3>
+            <p className="mt-2 text-sm text-secondary">{t('insights.aggregate.empty.text')}</p>
           </Card>
         ) : (
           <>
@@ -349,16 +349,16 @@ export function InsightsPage() {
               <Card className="p-5 border-l-4 border-l-[#2D5A27]">
                 <div className="flex items-start justify-between">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-widest text-[#999]">
+                    <p className="text-xs font-semibold uppercase tracking-widest text-tertiary">
                       {t('insights.aggregate.stats.total')}
                     </p>
-                    <p className="mt-2 text-4xl font-bold text-[#1a1a1a]">{total}</p>
+                    <p className="mt-2 text-4xl font-bold text-primary">{total}</p>
                     <p className="mt-1 text-xs text-[#888]">
                       {t('insights.aggregate.stats.completed', { count: completed })}
                     </p>
                   </div>
                   <div className="w-9 h-9 rounded-xl bg-[#2D5A27]/10 flex items-center justify-center">
-                    <Video size={17} className="text-[#2D5A27]" />
+                    <Video size={17} className="text-brand" />
                   </div>
                 </div>
               </Card>
@@ -367,11 +367,11 @@ export function InsightsPage() {
                 <Card className="p-5 border-l-4 border-l-[#E0E0E0]">
                   <div className="flex items-start justify-between">
                     <div>
-                      <p className="text-xs font-semibold uppercase tracking-widest text-[#999]">
+                      <p className="text-xs font-semibold uppercase tracking-widest text-tertiary">
                         {t('insights.aggregate.stats.avgScore')}
                       </p>
                       <div className="mt-2 flex items-end gap-1.5">
-                        <span className="text-4xl font-bold text-[#1a1a1a]">{avgScore}</span>
+                        <span className="text-4xl font-bold text-primary">{avgScore}</span>
                         <span className="text-sm text-[#888] mb-1">/10</span>
                         <span className="mb-1"><ScoreTrendIcon scores={scores} /></span>
                       </div>
@@ -379,14 +379,14 @@ export function InsightsPage() {
                         {t('insights.aggregate.stats.basedOn', { count: withScores.length })}
                       </p>
                     </div>
-                    <div className="w-9 h-9 rounded-xl bg-[#F5F5F5] flex items-center justify-center">
-                      <BarChart3 size={17} className="text-[#666]" />
+                    <div className="w-9 h-9 rounded-xl bg-neutral-lighter flex items-center justify-center">
+                      <BarChart3 size={17} className="text-secondary" />
                     </div>
                   </div>
                 </Card>
               ) : (
                 <Card className="p-5 border-l-4 border-l-[#E0E0E0]">
-                  <p className="text-xs font-semibold uppercase tracking-widest text-[#999]">
+                  <p className="text-xs font-semibold uppercase tracking-widest text-tertiary">
                     {t('insights.aggregate.stats.avgScore')}
                   </p>
                   <p className="mt-2 text-4xl font-bold text-[#ccc]">—</p>
@@ -396,14 +396,14 @@ export function InsightsPage() {
               <Card className="p-5 border-l-4 border-l-[#2D5A27]">
                 <div className="flex items-start justify-between">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-widest text-[#999]">
+                    <p className="text-xs font-semibold uppercase tracking-widest text-tertiary">
                       {t('insights.aggregate.stats.highQuality')}
                     </p>
-                    <p className="mt-2 text-4xl font-bold text-[#2D5A27]">{highQ}</p>
+                    <p className="mt-2 text-4xl font-bold text-brand">{highQ}</p>
                     <p className="mt-1 text-xs text-[#888]">{t('insights.aggregate.stats.scoreHigh')}</p>
                   </div>
                   <div className="w-9 h-9 rounded-xl bg-[#2D5A27]/10 flex items-center justify-center">
-                    <TrendingUp size={17} className="text-[#2D5A27]" />
+                    <TrendingUp size={17} className="text-brand" />
                   </div>
                 </div>
               </Card>
@@ -411,7 +411,7 @@ export function InsightsPage() {
               <Card className="p-5 border-l-4 border-l-[#DC3545]">
                 <div className="flex items-start justify-between">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-widest text-[#999]">
+                    <p className="text-xs font-semibold uppercase tracking-widest text-tertiary">
                       {t('insights.aggregate.stats.needsAttention')}
                     </p>
                     <p className="mt-2 text-4xl font-bold text-[#DC3545]">{lowQ}</p>
@@ -434,7 +434,7 @@ export function InsightsPage() {
                     <div className="w-7 h-7 rounded-lg bg-[#FFD700]/20 flex items-center justify-center">
                       <Award size={15} className="text-[#7A5C00]" />
                     </div>
-                    <h2 className="text-[15px] font-semibold text-[#1a1a1a]">
+                    <h2 className="text-[15px] font-semibold text-primary">
                       {t('insights.aggregate.ranking.title')}
                     </h2>
                   </div>
@@ -443,20 +443,20 @@ export function InsightsPage() {
                       <div
                         key={m.id}
                         onClick={() => navigate(`/meetings/${m.id}`)}
-                        className="flex items-center gap-3 cursor-pointer hover:bg-[#f5f5f5] rounded-lg px-2 py-2 transition-colors group"
+                        className="flex items-center gap-3 cursor-pointer hover:bg-neutral-lighter rounded-lg px-2 py-2 transition-colors group"
                       >
                         <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold flex-shrink-0 ${
-                          i === 0 ? 'bg-[#FFD700] text-[#333]' :
+                          i === 0 ? 'bg-[#FFD700] text-primary' :
                           i === 1 ? 'bg-neutral-300 text-white' :
-                          i === 2 ? 'bg-neutral-200 text-[#666]' :
+                          i === 2 ? 'bg-neutral-200 text-secondary' :
                           'bg-neutral-100 text-[#888]'
                         }`}>{i + 1}</span>
 
                         <div className="flex-1 min-w-0">
-                          <p className="text-[13px] font-medium text-[#222] truncate group-hover:text-[#2D5A27] transition-colors">
+                          <p className="text-[13px] font-medium text-[#222] truncate group-hover:text-brand transition-colors">
                             {m.title || `${t('insights.aggregate.ranking.meeting')} ${m.id.slice(0, 8)}`}
                           </p>
-                          <p className="text-[11px] text-[#999]">{formatDate(m.created_at, lang)}</p>
+                          <p className="text-[11px] text-tertiary">{formatDate(m.created_at, lang)}</p>
                         </div>
 
                         <div className="flex items-center gap-2 flex-shrink-0 w-28">
@@ -474,9 +474,9 @@ export function InsightsPage() {
                 <Card className="p-5">
                   <div className="flex items-center gap-2 mb-5">
                     <div className="w-7 h-7 rounded-lg bg-[#2D5A27]/10 flex items-center justify-center">
-                      <BarChart3 size={15} className="text-[#2D5A27]" />
+                      <BarChart3 size={15} className="text-brand" />
                     </div>
-                    <h2 className="text-[15px] font-semibold text-[#1a1a1a]">
+                    <h2 className="text-[15px] font-semibold text-primary">
                       {t('insights.aggregate.distribution.title')}
                     </h2>
                   </div>
@@ -490,9 +490,9 @@ export function InsightsPage() {
                       return (
                         <div key={key}>
                           <div className="flex justify-between items-center mb-1.5">
-                            <span className="text-[13px] font-medium text-[#333]">{label}</span>
+                            <span className="text-[13px] font-medium text-primary">{label}</span>
                             <div className="flex items-center gap-2">
-                              <span className="text-[11px] text-[#999]">{pct}%</span>
+                              <span className="text-[11px] text-tertiary">{pct}%</span>
                               <span className="text-[13px] font-semibold text-[#555]">
                                 {t('insights.aggregate.distribution.count', { count })}
                               </span>
@@ -510,15 +510,15 @@ export function InsightsPage() {
                   </div>
 
                   {/* Score summary */}
-                  <div className="mt-6 pt-5 border-t border-[#F0F0F0] grid grid-cols-3 gap-3 text-center">
+                  <div className="mt-6 pt-5 border-t border-neutral-light grid grid-cols-3 gap-3 text-center">
                     {[
-                      { label: t('insights.aggregate.distribution.high'),   value: highQ, cls: 'text-[#2D5A27]' },
+                      { label: t('insights.aggregate.distribution.high'),   value: highQ, cls: 'text-brand' },
                       { label: t('insights.aggregate.distribution.medium'), value: medQ,  cls: 'text-[#7A5C00]' },
                       { label: t('insights.aggregate.distribution.low'),    value: lowQ,  cls: 'text-[#DC3545]' },
                     ].map(({ label, value, cls }) => (
-                      <div key={label} className="bg-[#fafafa] rounded-xl py-3">
+                      <div key={label} className="bg-neutral-lighter rounded-xl py-3">
                         <p className={`text-2xl font-bold ${cls}`}>{value}</p>
-                        <p className="text-[11px] text-[#999] mt-0.5 leading-tight">{label}</p>
+                        <p className="text-[11px] text-tertiary mt-0.5 leading-tight">{label}</p>
                       </div>
                     ))}
                   </div>
@@ -529,10 +529,10 @@ export function InsightsPage() {
               {hasSentiment && (
                 <Card className="p-5">
                   <div className="flex items-center gap-2 mb-4">
-                    <div className="w-7 h-7 rounded-lg bg-[#F5F5F5] flex items-center justify-center">
-                      <MessageSquare size={15} className="text-[#666]" />
+                    <div className="w-7 h-7 rounded-lg bg-neutral-lighter flex items-center justify-center">
+                      <MessageSquare size={15} className="text-secondary" />
                     </div>
-                    <h2 className="text-[15px] font-semibold text-[#1a1a1a]">
+                    <h2 className="text-[15px] font-semibold text-primary">
                       {t('insights.aggregate.sentiment.title')}
                     </h2>
                   </div>
@@ -546,7 +546,7 @@ export function InsightsPage() {
                         <span className="text-lg w-5 flex-shrink-0">{emoji}</span>
                         <div className="flex-1">
                           <div className="flex justify-between text-[13px] mb-1">
-                            <span className="font-medium text-[#333]">{t(`insights.aggregate.sentiment.${key}`)}</span>
+                            <span className="font-medium text-primary">{t(`insights.aggregate.sentiment.${key}`)}</span>
                             <span className="text-[#888] tabular-nums">{count}</span>
                           </div>
                           <div className="h-2 rounded-full bg-neutral-100 overflow-hidden">
@@ -567,9 +567,9 @@ export function InsightsPage() {
                 <Card className="p-5">
                   <div className="flex items-center gap-2 mb-4">
                     <div className="w-7 h-7 rounded-lg bg-[#2D5A27]/10 flex items-center justify-center">
-                      <Hash size={15} className="text-[#2D5A27]" />
+                      <Hash size={15} className="text-brand" />
                     </div>
-                    <h2 className="text-[15px] font-semibold text-[#1a1a1a]">
+                    <h2 className="text-[15px] font-semibold text-primary">
                       {t('insights.aggregate.topics.title')}
                     </h2>
                   </div>
@@ -577,7 +577,7 @@ export function InsightsPage() {
                     {topTopics.map(([topic, count]) => (
                       <span
                         key={topic}
-                        className="inline-flex items-center gap-1.5 rounded-full border border-[#2D5A27]/20 bg-[#2D5A27]/6 px-3 py-1.5 text-[13px] font-medium text-[#2D5A27]"
+                        className="inline-flex items-center gap-1.5 rounded-full border border-[#2D5A27]/20 bg-[#2D5A27]/6 px-3 py-1.5 text-[13px] font-medium text-brand"
                       >
                         {topic}
                         {count > 1 && (
@@ -596,7 +596,7 @@ export function InsightsPage() {
                     <div className="w-7 h-7 rounded-lg bg-[#DC3545]/10 flex items-center justify-center">
                       <TrendingDown size={15} className="text-[#DC3545]" />
                     </div>
-                    <h2 className="text-[15px] font-semibold text-[#1a1a1a]">
+                    <h2 className="text-[15px] font-semibold text-primary">
                       {t('insights.aggregate.stats.needsAttention')} ({lowQ})
                     </h2>
                   </div>
@@ -615,7 +615,7 @@ export function InsightsPage() {
                             <p className="text-[13px] font-medium text-[#222] truncate group-hover:text-[#DC3545] transition-colors">
                               {m.title || `${t('insights.aggregate.ranking.meeting')} ${m.id.slice(0, 8)}`}
                             </p>
-                            <p className="text-[11px] text-[#999]">{formatDate(m.created_at, lang)}</p>
+                            <p className="text-[11px] text-tertiary">{formatDate(m.created_at, lang)}</p>
                           </div>
                           <ScorePill score={m.score} />
                         </div>
@@ -630,9 +630,9 @@ export function InsightsPage() {
               <Card className="p-5">
                 <div className="flex items-center gap-2 mb-4">
                   <div className="w-7 h-7 rounded-lg bg-[#2D5A27]/10 flex items-center justify-center">
-                    <Calendar size={15} className="text-[#2D5A27]" />
+                    <Calendar size={15} className="text-brand" />
                   </div>
-                  <h2 className="text-[15px] font-semibold text-[#1a1a1a]">
+                  <h2 className="text-[15px] font-semibold text-primary">
                     {t('insights.aggregate.timeline.title')}
                   </h2>
                 </div>
@@ -643,14 +643,14 @@ export function InsightsPage() {
                       <div
                         key={m.id}
                         onClick={() => navigate(`/meetings/${m.id}`)}
-                        className="flex items-center gap-3 cursor-pointer hover:bg-[#f5f5f5] rounded-lg px-3 py-2.5 transition-colors group"
+                        className="flex items-center gap-3 cursor-pointer hover:bg-neutral-lighter rounded-lg px-3 py-2.5 transition-colors group"
                       >
                         <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${m.score >= 8 ? 'bg-[#2D5A27]' : m.score > 5 ? 'bg-[#FFD700]' : 'bg-[#DC3545]'}`} />
                         <div className="flex-1 min-w-0">
-                          <p className="text-[13px] font-medium text-[#222] truncate group-hover:text-[#2D5A27] transition-colors">
+                          <p className="text-[13px] font-medium text-[#222] truncate group-hover:text-brand transition-colors">
                             {m.title || `${t('insights.aggregate.ranking.meeting')} ${m.id.slice(0, 8)}`}
                           </p>
-                          <p className="text-[11px] text-[#999]">{formatDate(m.created_at, lang)}</p>
+                          <p className="text-[11px] text-tertiary">{formatDate(m.created_at, lang)}</p>
                         </div>
                         <ScorePill score={m.score} />
                       </div>

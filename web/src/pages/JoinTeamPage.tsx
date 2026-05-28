@@ -99,13 +99,13 @@ export function JoinTeamPage() {
   if (!session) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-[#F5F7FA] to-[#E8EFF5] flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-8 text-center space-y-6">
+        <div className="bg-surface rounded-2xl shadow-xl max-w-md w-full p-8 text-center space-y-6">
           <div className="w-16 h-16 rounded-2xl bg-[#2D5A27]/10 flex items-center justify-center mx-auto">
-            <Users size={32} className="text-[#2D5A27]" />
+            <Users size={32} className="text-brand" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-[#333333]">Convite para Time</h1>
-            <p className="text-sm text-[#666666] mt-2">
+            <h1 className="text-2xl font-bold text-primary">Convite para Time</h1>
+            <p className="text-sm text-secondary mt-2">
               Você foi convidado para entrar em um time. Faça login para aceitar o convite.
             </p>
           </div>
@@ -122,15 +122,15 @@ export function JoinTeamPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#F5F7FA] to-[#E8EFF5] flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-8 text-center space-y-6">
+      <div className="bg-surface rounded-2xl shadow-xl max-w-md w-full p-8 text-center space-y-6">
         {status === 'loading' && (
           <>
             <div className="w-16 h-16 rounded-2xl bg-[#2D5A27]/10 flex items-center justify-center mx-auto">
-              <Loader size={32} className="text-[#2D5A27] animate-spin" />
+              <Loader size={32} className="text-brand animate-spin" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-[#333333]">Processando convite...</h1>
-              <p className="text-sm text-[#666666] mt-2">
+              <h1 className="text-2xl font-bold text-primary">Processando convite...</h1>
+              <p className="text-sm text-secondary mt-2">
                 Aguarde enquanto adicionamos você ao time.
               </p>
             </div>
@@ -143,11 +143,11 @@ export function JoinTeamPage() {
               <CheckCircle size={32} className="text-[#4CAF50]" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-[#333333]">Bem-vindo ao time!</h1>
-              <p className="text-sm text-[#666666] mt-2">
+              <h1 className="text-2xl font-bold text-primary">Bem-vindo ao time!</h1>
+              <p className="text-sm text-secondary mt-2">
                 Você entrou no time <strong>{teamName}</strong> com sucesso.
               </p>
-              <p className="text-xs text-[#999999] mt-3">
+              <p className="text-xs text-tertiary mt-3">
                 Redirecionando...
               </p>
             </div>
@@ -160,12 +160,12 @@ export function JoinTeamPage() {
               <AlertCircle size={32} className="text-[#DC3545]" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-[#333333]">Ops! Algo deu errado</h1>
-              <p className="text-sm text-[#666666] mt-2">{errorMessage}</p>
+              <h1 className="text-2xl font-bold text-primary">Ops! Algo deu errado</h1>
+              <p className="text-sm text-secondary mt-2">{errorMessage}</p>
             </div>
             <button
               onClick={() => navigate('/team')}
-              className="w-full py-3 rounded-xl border border-[#E0E0E0] text-[#666666] font-semibold hover:bg-[#F8F9FA] transition"
+              className="w-full py-3 rounded-xl border border-neutral-light text-secondary font-semibold hover:bg-background transition"
             >
               Voltar para Times
             </button>

@@ -102,23 +102,23 @@ export function PublicSchedulingPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#FAFAFA] flex items-center justify-center">
-        <Loader className="animate-spin text-[#2D5A27]" size={48} />
+      <div className="min-h-screen bg-neutral-lighter flex items-center justify-center">
+        <Loader className="animate-spin text-brand" size={48} />
       </div>
     )
   }
 
   if (error || !config) {
     return (
-      <div className="min-h-screen bg-[#FAFAFA] flex items-center justify-center px-4">
-        <div className="bg-white rounded-2xl shadow-lg p-12 max-w-md text-center">
+      <div className="min-h-screen bg-neutral-lighter flex items-center justify-center px-4">
+        <div className="bg-surface rounded-2xl shadow-lg p-12 max-w-md text-center">
           <div className="w-20 h-20 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-6">
             <span className="text-4xl">❌</span>
           </div>
-          <h1 className="text-2xl font-bold text-[#333333] mb-3">
+          <h1 className="text-2xl font-bold text-primary mb-3">
             Página não encontrada
           </h1>
-          <p className="text-[#666666]">{error}</p>
+          <p className="text-secondary">{error}</p>
         </div>
       </div>
     )
@@ -126,21 +126,21 @@ export function PublicSchedulingPage() {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-[#FAFAFA] flex items-center justify-center p-8">
-        <div className="bg-white rounded-2xl shadow-lg p-12 max-w-md text-center">
+      <div className="min-h-screen bg-neutral-lighter flex items-center justify-center p-8">
+        <div className="bg-surface rounded-2xl shadow-lg p-12 max-w-md text-center">
           <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-6">
             <CheckCircle className="text-green-600" size={40} />
           </div>
-          <h1 className="text-3xl font-bold text-[#2D5A27] mb-3">
+          <h1 className="text-3xl font-bold text-brand mb-3">
             Agendamento Confirmado!
           </h1>
-          <p className="text-[#666666] mb-8">
+          <p className="text-secondary mb-8">
             Seu agendamento foi confirmado com sucesso
           </p>
-          <div className="p-6 bg-[#F8F9FA] rounded-xl text-left space-y-3">
+          <div className="p-6 bg-background rounded-xl text-left space-y-3">
             <div className="flex items-center gap-3 text-sm">
-              <Calendar size={18} className="text-[#2D5A27]" />
-              <span className="text-[#333333] font-medium">
+              <Calendar size={18} className="text-brand" />
+              <span className="text-primary font-medium">
                 {new Date(selectedDate + 'T12:00:00').toLocaleDateString('pt-BR', {
                   day: '2-digit',
                   month: 'long',
@@ -150,11 +150,11 @@ export function PublicSchedulingPage() {
               </span>
             </div>
             <div className="flex items-center gap-3 text-sm">
-              <Clock size={18} className="text-[#2D5A27]" />
-              <span className="text-[#333333] font-medium">{selectedTime}</span>
+              <Clock size={18} className="text-brand" />
+              <span className="text-primary font-medium">{selectedTime}</span>
             </div>
           </div>
-          <p className="text-sm text-[#999999] mt-8">
+          <p className="text-sm text-tertiary mt-8">
             O evento já foi adicionado na sua agenda e na agenda do responsável
           </p>
         </div>
@@ -181,17 +181,17 @@ export function PublicSchedulingPage() {
   })
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA] flex items-center justify-center p-8">
-      <div className="w-full max-w-6xl bg-white rounded-2xl shadow-lg overflow-hidden">
+    <div className="min-h-screen bg-neutral-lighter flex items-center justify-center p-8">
+      <div className="w-full max-w-6xl bg-surface rounded-2xl shadow-lg overflow-hidden">
         <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr] min-h-[600px]">
           {/* Left Sidebar - Event Info */}
-          <div className="bg-white border-r border-[#E0E0E0] p-8">
+          <div className="bg-surface border-r border-neutral-light p-8">
             <div className="flex items-center gap-3 mb-6">
               {config.logo_url ? (
                 <img 
                   src={config.logo_url} 
                   alt={config.team_name}
-                  className="w-12 h-12 rounded-full object-cover border border-[#E0E0E0]"
+                  className="w-12 h-12 rounded-full object-cover border border-neutral-light"
                 />
               ) : (
                 <div className="w-12 h-12 rounded-full bg-[#2D5A27] flex items-center justify-center text-white font-bold text-lg">
@@ -199,22 +199,22 @@ export function PublicSchedulingPage() {
                 </div>
               )}
               <div>
-                <p className="text-sm text-[#666666]">{config.team_name}</p>
-                <h1 className="text-xl font-bold text-[#333333]">{config.title}</h1>
+                <p className="text-sm text-secondary">{config.team_name}</p>
+                <h1 className="text-xl font-bold text-primary">{config.title}</h1>
               </div>
             </div>
             
             {config.description && (
-              <p className="text-sm text-[#666666] mb-6">{config.description}</p>
+              <p className="text-sm text-secondary mb-6">{config.description}</p>
             )}
 
             <div className="space-y-3 text-sm">
-              <div className="flex items-center gap-3 text-[#666666]">
-                <Clock size={18} className="text-[#2D5A27]" />
+              <div className="flex items-center gap-3 text-secondary">
+                <Clock size={18} className="text-brand" />
                 <span>{config.meeting_duration_minutes} minutos</span>
               </div>
-              <div className="flex items-center gap-3 text-[#666666]">
-                <Calendar size={18} className="text-[#2D5A27]" />
+              <div className="flex items-center gap-3 text-secondary">
+                <Calendar size={18} className="text-brand" />
                 <span>Reunião por vídeo</span>
               </div>
             </div>
@@ -225,16 +225,16 @@ export function PublicSchedulingPage() {
             {!selectedDate ? (
               // Step 1: Select Date
               <div>
-                <h2 className="text-2xl font-bold text-[#333333] mb-6">Selecione uma data</h2>
+                <h2 className="text-2xl font-bold text-primary mb-6">Selecione uma data</h2>
                 <div className="grid gap-3 max-w-md">
                   {availableDates.map((date) => (
                     <button
                       key={date}
                       type="button"
                       onClick={() => setSelectedDate(date)}
-                      className="px-6 py-4 border-2 border-[#E0E0E0] rounded-xl hover:border-[#2D5A27] hover:bg-[#2D5A27]/5 transition-all text-left"
+                      className="px-6 py-4 border-2 border-neutral-light rounded-xl hover:border-[#2D5A27] hover:bg-[#2D5A27]/5 transition-all text-left"
                     >
-                      <div className="font-semibold text-[#333333]">
+                      <div className="font-semibold text-primary">
                         {new Date(date + 'T12:00:00').toLocaleDateString('pt-BR', {
                           weekday: 'long',
                           day: '2-digit',
@@ -250,19 +250,19 @@ export function PublicSchedulingPage() {
               <div>
                 <button
                   onClick={() => setSelectedDate('')}
-                  className="flex items-center gap-2 text-[#666666] hover:text-[#333333] mb-6"
+                  className="flex items-center gap-2 text-secondary hover:text-primary mb-6"
                 >
                   <ChevronLeft size={20} />
                   Voltar
                 </button>
-                <h2 className="text-2xl font-bold text-[#333333] mb-2">
+                <h2 className="text-2xl font-bold text-primary mb-2">
                   {new Date(selectedDate + 'T12:00:00').toLocaleDateString('pt-BR', {
                     weekday: 'long',
                     day: '2-digit',
                     month: 'long'
                   })}
                 </h2>
-                <p className="text-sm text-[#666666] mb-6">Escolha um horário disponível</p>
+                <p className="text-sm text-secondary mb-6">Escolha um horário disponível</p>
                 
                 <div className="grid grid-cols-2 gap-3 max-w-md">
                   {timeSlots.map((time) => (
@@ -270,7 +270,7 @@ export function PublicSchedulingPage() {
                       key={time}
                       type="button"
                       onClick={() => setSelectedTime(time)}
-                      className="px-6 py-3 border-2 border-[#E0E0E0] rounded-xl hover:border-[#2D5A27] hover:bg-[#2D5A27]/5 transition-all font-medium text-[#333333]"
+                      className="px-6 py-3 border-2 border-neutral-light rounded-xl hover:border-[#2D5A27] hover:bg-[#2D5A27]/5 transition-all font-medium text-primary"
                     >
                       {time}
                     </button>
@@ -283,14 +283,14 @@ export function PublicSchedulingPage() {
                 <button
                   type="button"
                   onClick={() => setSelectedTime('')}
-                  className="flex items-center gap-2 text-[#666666] hover:text-[#333333] mb-6"
+                  className="flex items-center gap-2 text-secondary hover:text-primary mb-6"
                 >
                   <ChevronLeft size={20} />
                   Voltar
                 </button>
                 
-                <h2 className="text-2xl font-bold text-[#333333] mb-2">Seus dados</h2>
-                <div className="flex items-center gap-2 text-sm text-[#666666] mb-6">
+                <h2 className="text-2xl font-bold text-primary mb-2">Seus dados</h2>
+                <div className="flex items-center gap-2 text-sm text-secondary mb-6">
                   <Calendar size={16} />
                   <span>
                     {new Date(selectedDate + 'T12:00:00').toLocaleDateString('pt-BR', {
@@ -302,7 +302,7 @@ export function PublicSchedulingPage() {
 
                 <div className="space-y-4 max-w-md">
                   <div>
-                    <label className="block text-sm font-medium text-[#333333] mb-2">
+                    <label className="block text-sm font-medium text-primary mb-2">
                       Seu nome *
                     </label>
                     <input
@@ -311,12 +311,12 @@ export function PublicSchedulingPage() {
                       onChange={(e) => setGuestName(e.target.value)}
                       placeholder="João Silva"
                       required
-                      className="w-full px-4 py-3 border border-[#E0E0E0] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2D5A27]"
+                      className="w-full px-4 py-3 border border-neutral-light rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2D5A27]"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-[#333333] mb-2">
+                    <label className="block text-sm font-medium text-primary mb-2">
                       Seu e-mail *
                     </label>
                     <input
@@ -325,12 +325,12 @@ export function PublicSchedulingPage() {
                       onChange={(e) => setGuestEmail(e.target.value)}
                       placeholder="joao@empresa.com"
                       required
-                      className="w-full px-4 py-3 border border-[#E0E0E0] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2D5A27]"
+                      className="w-full px-4 py-3 border border-neutral-light rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2D5A27]"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-[#333333] mb-2">
+                    <label className="block text-sm font-medium text-primary mb-2">
                       Telefone (opcional)
                     </label>
                     <input
@@ -338,12 +338,12 @@ export function PublicSchedulingPage() {
                       value={guestPhone}
                       onChange={(e) => setGuestPhone(e.target.value)}
                       placeholder="(11) 99999-9999"
-                      className="w-full px-4 py-3 border border-[#E0E0E0] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2D5A27]"
+                      className="w-full px-4 py-3 border border-neutral-light rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2D5A27]"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-[#333333] mb-2">
+                    <label className="block text-sm font-medium text-primary mb-2">
                       Observações (opcional)
                     </label>
                     <textarea
@@ -351,7 +351,7 @@ export function PublicSchedulingPage() {
                       onChange={(e) => setGuestNotes(e.target.value)}
                       placeholder="Conte-nos brevemente sobre o que gostaria de conversar..."
                       rows={3}
-                      className="w-full px-4 py-3 border border-[#E0E0E0] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2D5A27]"
+                      className="w-full px-4 py-3 border border-neutral-light rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2D5A27]"
                     />
                   </div>
 
@@ -376,9 +376,9 @@ export function PublicSchedulingPage() {
         </div>
 
         {/* Footer */}
-        <div className="px-8 py-4 bg-[#F8F9FA] border-t border-[#E0E0E0] text-center">
-          <p className="text-sm text-[#666666]">
-            Powered by <span className="font-semibold text-[#2D5A27]">Lemon Meet</span>
+        <div className="px-8 py-4 bg-background border-t border-neutral-light text-center">
+          <p className="text-sm text-secondary">
+            Powered by <span className="font-semibold text-brand">Lemon Meet</span>
           </p>
         </div>
       </div>

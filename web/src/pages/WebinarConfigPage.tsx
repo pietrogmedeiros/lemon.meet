@@ -292,7 +292,7 @@ export function WebinarConfigPage() {
 
   // ── Gates ─────────────────────────────────────────────────
   if (!authChecked) {
-    return <MainLayout><div className="p-6 text-sm text-[#666]">Verificando sessão…</div></MainLayout>
+    return <MainLayout><div className="p-6 text-sm text-secondary">Verificando sessão…</div></MainLayout>
   }
   if (!isAllowed) {
     return (
@@ -300,8 +300,8 @@ export function WebinarConfigPage() {
         <div className="p-6">
           <Card>
             <h1 className="text-lg font-semibold mb-2">Acesso restrito</h1>
-            <p className="text-sm text-[#666]">Apenas admins autorizados podem acessar esta página.</p>
-            <p className="text-xs text-[#999] mt-2">Logado como: {userEmail ?? '—'}</p>
+            <p className="text-sm text-secondary">Apenas admins autorizados podem acessar esta página.</p>
+            <p className="text-xs text-tertiary mt-2">Logado como: {userEmail ?? '—'}</p>
           </Card>
         </div>
       </MainLayout>
@@ -314,8 +314,8 @@ export function WebinarConfigPage() {
       <div className="max-w-5xl mx-auto px-4 py-8">
         <div className="mb-6 flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-[#2D5A27] mb-1">Webinars</h1>
-            <p className="text-[#666666] text-sm">Configure datas, gerencie inscrições e compartilhe o link público</p>
+            <h1 className="text-2xl font-bold text-brand mb-1">Webinars</h1>
+            <p className="text-secondary text-sm">Configure datas, gerencie inscrições e compartilhe o link público</p>
           </div>
           {config && (
             <span className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium ${
@@ -327,7 +327,7 @@ export function WebinarConfigPage() {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-2 mb-6 border-b border-[#E0E0E0]">
+        <div className="flex gap-2 mb-6 border-b border-neutral-light">
           {[
             { key: 'config', label: 'Configuração', icon: Settings },
             { key: 'sessions', label: 'Sessões', icon: Calendar },
@@ -337,7 +337,7 @@ export function WebinarConfigPage() {
               key={key}
               onClick={() => setTab(key as any)}
               className={`flex items-center gap-2 px-4 py-2 border-b-2 transition-colors ${
-                tab === key ? 'border-[#2D5A27] text-[#2D5A27] font-medium' : 'border-transparent text-[#666] hover:text-[#2D5A27]'
+                tab === key ? 'border-[#2D5A27] text-brand font-medium' : 'border-transparent text-secondary hover:text-brand'
               }`}
             >
               <Icon size={18} />
@@ -348,26 +348,26 @@ export function WebinarConfigPage() {
 
         {loading && !config && (
           <div className="flex items-center justify-center py-12">
-            <Loader className="animate-spin text-[#2D5A27]" size={32} />
+            <Loader className="animate-spin text-brand" size={32} />
           </div>
         )}
 
         {/* Tab: Configuração */}
         {tab === 'config' && (
-          <div className="bg-white rounded-2xl border border-[#E0E0E0] p-6 space-y-6">
+          <div className="bg-surface rounded-2xl border border-neutral-light p-6 space-y-6">
             {/* Logo */}
             <div>
-              <label className="block text-sm font-medium text-[#333] mb-3">Logo da empresa (opcional)</label>
+              <label className="block text-sm font-medium text-primary mb-3">Logo da empresa (opcional)</label>
               <div className="flex items-center gap-6">
-                <div className="w-24 h-24 rounded-xl border-2 border-dashed border-[#E0E0E0] flex items-center justify-center bg-[#F8F9FA] overflow-hidden">
+                <div className="w-24 h-24 rounded-xl border-2 border-dashed border-neutral-light flex items-center justify-center bg-background overflow-hidden">
                   {(logoPreview || config?.logo_url) ? (
                     <img src={logoPreview || config?.logo_url || ''} alt="Logo" className="w-full h-full object-contain" />
                   ) : (
-                    <p className="text-xs text-[#999]">Logo</p>
+                    <p className="text-xs text-tertiary">Logo</p>
                   )}
                 </div>
                 <div>
-                  <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 border border-[#2D5A27] text-[#2D5A27] rounded-xl hover:bg-[#2D5A27]/5 transition-colors">
+                  <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 border border-[#2D5A27] text-brand rounded-xl hover:bg-[#2D5A27]/5 transition-colors">
                     {uploadingLogo ? <><Loader size={16} className="animate-spin" /> Enviando…</> : (config?.logo_url ? 'Alterar logo' : 'Enviar logo')}
                     <input
                       type="file"
@@ -377,56 +377,56 @@ export function WebinarConfigPage() {
                       className="hidden"
                     />
                   </label>
-                  <p className="text-xs text-[#666] mt-2">PNG ou JPEG, até 5MB. Salve a configuração antes de subir.</p>
+                  <p className="text-xs text-secondary mt-2">PNG ou JPEG, até 5MB. Salve a configuração antes de subir.</p>
                 </div>
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-[#333] mb-2">Slug (URL pública) *</label>
+              <label className="block text-sm font-medium text-primary mb-2">Slug (URL pública) *</label>
               <input
                 type="text"
                 value={slug}
                 onChange={e => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
                 placeholder="meu-webinar"
-                className="w-full px-4 py-2 border border-[#E0E0E0] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2D5A27]"
+                className="w-full px-4 py-2 border border-neutral-light rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2D5A27]"
               />
-              <p className="text-xs text-[#666] mt-1">
+              <p className="text-xs text-secondary mt-1">
                 Exemplo: {window.location.origin}/webinar/<strong>{slug || 'meu-webinar'}</strong>
               </p>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-[#333] mb-2">Título</label>
+              <label className="block text-sm font-medium text-primary mb-2">Título</label>
               <input
                 type="text"
                 value={title}
                 onChange={e => setTitle(e.target.value)}
                 placeholder="Webinar"
-                className="w-full px-4 py-2 border border-[#E0E0E0] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2D5A27]"
+                className="w-full px-4 py-2 border border-neutral-light rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2D5A27]"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-[#333] mb-2">Descrição (opcional)</label>
+              <label className="block text-sm font-medium text-primary mb-2">Descrição (opcional)</label>
               <textarea
                 value={description}
                 onChange={e => setDescription(e.target.value)}
                 placeholder="Descreva o webinar…"
                 rows={3}
-                className="w-full px-4 py-2 border border-[#E0E0E0] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2D5A27]"
+                className="w-full px-4 py-2 border border-neutral-light rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2D5A27]"
               />
             </div>
 
-            <div className="flex items-center gap-3 p-4 bg-[#F5F5F5] rounded-xl">
+            <div className="flex items-center gap-3 p-4 bg-neutral-lighter rounded-xl">
               <input
                 type="checkbox"
                 id="webinar-active"
                 checked={isActive}
                 onChange={e => setIsActive(e.target.checked)}
-                className="w-5 h-5 text-[#2D5A27] rounded focus:ring-[#2D5A27]"
+                className="w-5 h-5 text-brand rounded focus:ring-[#2D5A27]"
               />
-              <label htmlFor="webinar-active" className="text-sm text-[#333] font-medium">
+              <label htmlFor="webinar-active" className="text-sm text-primary font-medium">
                 Ativar página pública
               </label>
             </div>
@@ -442,7 +442,7 @@ export function WebinarConfigPage() {
               {publicLink && (
                 <button
                   onClick={copyLink}
-                  className="flex items-center gap-2 px-6 py-3 border border-[#2D5A27] text-[#2D5A27] rounded-xl hover:bg-[#2D5A27] hover:text-white transition-colors"
+                  className="flex items-center gap-2 px-6 py-3 border border-[#2D5A27] text-brand rounded-xl hover:bg-[#2D5A27] hover:text-white transition-colors"
                 >
                   {linkCopied ? <Check size={20} /> : <Copy size={20} />}
                   {linkCopied ? 'Copiado!' : 'Copiar Link'}
@@ -475,26 +475,26 @@ export function WebinarConfigPage() {
         {/* Tab: Sessões */}
         {tab === 'sessions' && (
           <div className="space-y-4">
-            <div className="bg-white rounded-2xl border border-[#E0E0E0] p-4">
-              <h3 className="font-semibold text-[#333] mb-3">Nova sessão</h3>
+            <div className="bg-surface rounded-2xl border border-neutral-light p-4">
+              <h3 className="font-semibold text-primary mb-3">Nova sessão</h3>
               <div className="grid grid-cols-1 md:grid-cols-[1fr_2fr_auto] gap-3 items-end">
                 <div>
-                  <label className="block text-xs text-[#666] mb-1">Data e hora</label>
+                  <label className="block text-xs text-secondary mb-1">Data e hora</label>
                   <input
                     type="datetime-local"
                     value={newSessionAt}
                     onChange={e => setNewSessionAt(e.target.value)}
-                    className="w-full px-3 py-2 border border-[#E0E0E0] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#2D5A27]"
+                    className="w-full px-3 py-2 border border-neutral-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#2D5A27]"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-[#666] mb-1">Link do webinar</label>
+                  <label className="block text-xs text-secondary mb-1">Link do webinar</label>
                   <input
                     type="url"
                     value={newSessionLink}
                     onChange={e => setNewSessionLink(e.target.value)}
                     placeholder="https://zoom.us/j/123…"
-                    className="w-full px-3 py-2 border border-[#E0E0E0] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#2D5A27]"
+                    className="w-full px-3 py-2 border border-neutral-light rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#2D5A27]"
                   />
                 </div>
                 <button
@@ -509,12 +509,12 @@ export function WebinarConfigPage() {
               </div>
             </div>
 
-            <div className="bg-white rounded-2xl border border-[#E0E0E0] overflow-hidden">
-              <div className="p-4 border-b border-[#E0E0E0]">
-                <h3 className="font-semibold text-[#333]">Sessões ({sessions.length})</h3>
+            <div className="bg-surface rounded-2xl border border-neutral-light overflow-hidden">
+              <div className="p-4 border-b border-neutral-light">
+                <h3 className="font-semibold text-primary">Sessões ({sessions.length})</h3>
               </div>
               {sessions.length === 0 ? (
-                <div className="p-8 text-center text-[#666]">
+                <div className="p-8 text-center text-secondary">
                   <Calendar size={48} className="mx-auto mb-3 opacity-30" />
                   <p>Nenhuma sessão criada ainda</p>
                 </div>
@@ -524,8 +524,8 @@ export function WebinarConfigPage() {
                     <div key={s.id} className="p-4 flex items-center justify-between gap-4">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
-                          <Calendar size={16} className="text-[#2D5A27] shrink-0" />
-                          <p className="font-medium text-[#333]">{formatPretty(s.scheduled_at)}</p>
+                          <Calendar size={16} className="text-brand shrink-0" />
+                          <p className="font-medium text-primary">{formatPretty(s.scheduled_at)}</p>
                           {!s.is_active && (
                             <span className="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-600">Inativa</span>
                           )}
@@ -534,7 +534,7 @@ export function WebinarConfigPage() {
                           href={s.webinar_link}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-xs text-[#666] hover:text-[#2D5A27] hover:underline truncate inline-flex items-center gap-1 max-w-full"
+                          className="text-xs text-secondary hover:text-brand hover:underline truncate inline-flex items-center gap-1 max-w-full"
                         >
                           {s.webinar_link}
                           <ExternalLink size={12} className="shrink-0" />
@@ -543,14 +543,14 @@ export function WebinarConfigPage() {
                       <div className="flex items-center gap-2 shrink-0">
                         <button
                           onClick={() => handleToggleSession(s)}
-                          className="p-2 rounded-lg border border-[#E0E0E0] text-[#666] hover:bg-[#F5F5F5]"
+                          className="p-2 rounded-lg border border-neutral-light text-secondary hover:bg-neutral-lighter"
                           title={s.is_active ? 'Desativar' : 'Ativar'}
                         >
                           {s.is_active ? <Power size={16} /> : <PowerOff size={16} />}
                         </button>
                         <button
                           onClick={() => handleDeleteSession(s.id)}
-                          className="p-2 rounded-lg border border-[#E0E0E0] text-[#999] hover:bg-[#F5F5F5] hover:text-red-600"
+                          className="p-2 rounded-lg border border-neutral-light text-tertiary hover:bg-neutral-lighter hover:text-red-600"
                           title="Excluir"
                         >
                           <Trash2 size={16} />
@@ -566,20 +566,20 @@ export function WebinarConfigPage() {
 
         {/* Tab: Inscrições */}
         {tab === 'registrations' && (
-          <div className="bg-white rounded-2xl border border-[#E0E0E0] overflow-hidden">
-            <div className="p-4 border-b border-[#E0E0E0]">
-              <h3 className="font-semibold text-[#333]">Inscrições ({registrations.length})</h3>
-              <p className="text-xs text-[#666] mt-0.5">Últimas 500</p>
+          <div className="bg-surface rounded-2xl border border-neutral-light overflow-hidden">
+            <div className="p-4 border-b border-neutral-light">
+              <h3 className="font-semibold text-primary">Inscrições ({registrations.length})</h3>
+              <p className="text-xs text-secondary mt-0.5">Últimas 500</p>
             </div>
             {registrations.length === 0 ? (
-              <div className="p-8 text-center text-[#666]">
+              <div className="p-8 text-center text-secondary">
                 <Users size={48} className="mx-auto mb-3 opacity-30" />
                 <p>Nenhuma inscrição ainda</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="bg-[#F8F9FA] text-xs text-[#666] uppercase tracking-wider">
+                  <thead className="bg-background text-xs text-secondary uppercase tracking-wider">
                     <tr>
                       <th className="text-left px-4 py-2">Inscrito em</th>
                       <th className="text-left px-4 py-2">Nome</th>
@@ -590,14 +590,14 @@ export function WebinarConfigPage() {
                   </thead>
                   <tbody className="divide-y divide-[#F0F0F0]">
                     {registrations.map(r => (
-                      <tr key={r.id} className="hover:bg-[#FAFAFA]">
-                        <td className="px-4 py-2 text-[#666] whitespace-nowrap">
+                      <tr key={r.id} className="hover:bg-neutral-lighter">
+                        <td className="px-4 py-2 text-secondary whitespace-nowrap">
                           {new Date(r.registered_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}
                         </td>
-                        <td className="px-4 py-2 font-medium text-[#333]">{r.guest_name}</td>
-                        <td className="px-4 py-2 text-[#333]">{r.guest_email}</td>
-                        <td className="px-4 py-2 text-[#666]">{r.guest_phone ?? '—'}</td>
-                        <td className="px-4 py-2 text-[#666] whitespace-nowrap">
+                        <td className="px-4 py-2 font-medium text-primary">{r.guest_name}</td>
+                        <td className="px-4 py-2 text-primary">{r.guest_email}</td>
+                        <td className="px-4 py-2 text-secondary">{r.guest_phone ?? '—'}</td>
+                        <td className="px-4 py-2 text-secondary whitespace-nowrap">
                           <span className="inline-flex items-center gap-1">
                             <Clock size={12} />
                             {formatPretty(r.webinar_sessions.scheduled_at)}

@@ -5,6 +5,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth, useSubscription } from '@/contexts'
 import { clsx } from 'clsx'
 import { OnboardingModal, useOnboarding } from '@/components/ui/OnboardingModal'
+import { ThemeToggle } from '@/components/ui/ThemeToggle'
 
 interface MenuItem {
   id: string
@@ -126,7 +127,7 @@ export function Sidebar() {
     <>
       <aside
         className={clsx(
-          'h-screen bg-white border-r border-[#EAEAEA] flex flex-col sticky top-0 transition-all duration-300 overflow-hidden',
+          'h-screen bg-surface border-r border-neutral-light flex flex-col sticky top-0 transition-all duration-300 overflow-hidden',
           expanded ? 'w-60' : 'w-[72px]'
         )}
       >
@@ -137,7 +138,10 @@ export function Sidebar() {
         )}>
           <img src="/logo.png" alt="Lemon.meet" className="w-9 h-9 object-contain shrink-0" />
           {expanded && (
-            <span className="font-bold text-[14px] text-[#111] tracking-tight truncate">Lemon.meet</span>
+            <>
+              <span className="font-bold text-[14px] text-primary tracking-tight truncate">Lemon.meet</span>
+              <ThemeToggle className="ml-auto" />
+            </>
           )}
         </div>
 
@@ -146,12 +150,12 @@ export function Sidebar() {
           {groups.map((group, gi) => (
             <div key={gi} className={clsx(gi > 0 && 'mt-5')}>
               {expanded && group.section && (
-                <p className="px-5 pt-2 pb-1.5 text-[9.5px] font-semibold uppercase tracking-[0.14em] text-[#9CA3AF]">
+                <p className="px-5 pt-2 pb-1.5 text-[9.5px] font-semibold uppercase tracking-[0.14em] text-tertiary">
                   {group.section}
                 </p>
               )}
               {!expanded && group.section && gi > 0 && (
-                <div className="mx-auto w-8 border-t border-[#F0F0F0] my-3" />
+                <div className="mx-auto w-8 border-t border-neutral-light my-3" />
               )}
 
               {group.items.map((item) => {
@@ -175,10 +179,10 @@ export function Sidebar() {
                         'group relative w-full flex items-center transition-all duration-150',
                         expanded ? 'gap-3 px-5 py-2.5' : 'justify-center py-2.5',
                         isLocked
-                          ? 'opacity-60 cursor-not-allowed text-[#9CA3AF]'
+                          ? 'opacity-60 cursor-not-allowed text-tertiary'
                           : active
-                            ? 'bg-[#F3F4F6] text-[#2D5A27]'
-                            : 'text-[#374151] hover:bg-[#F8F9FA]'
+                            ? 'bg-neutral-lighter text-brand'
+                            : 'text-primary hover:bg-background'
                       )}
                     >
                       {/* Borda esquerda quando ativo */}
@@ -191,23 +195,23 @@ export function Sidebar() {
                         strokeWidth={1.75}
                         className={clsx(
                           'shrink-0 transition-colors',
-                          isLocked ? 'text-[#B0B0B0]' : active ? 'text-[#2D5A27]' : 'text-[#6B7280] group-hover:text-[#2D5A27]'
+                          isLocked ? 'text-tertiary' : active ? 'text-brand' : 'text-secondary group-hover:text-brand'
                         )}
                       />
 
                       {expanded && (
                         <span className={clsx(
                           'text-[12.5px] leading-5 truncate flex-1 flex items-center gap-1.5 text-left',
-                          active ? 'font-semibold text-[#2D5A27]' : 'font-medium text-[#1F2937]'
+                          active ? 'font-semibold text-brand' : 'font-medium text-primary'
                         )}>
                           {item.label}
                           {item.id === 'router' && (
-                            <span className="text-[8.5px] font-semibold uppercase px-1.5 py-0.5 rounded bg-[#2D5A27]/10 text-[#2D5A27] tracking-wide">
+                            <span className="text-[8.5px] font-semibold uppercase px-1.5 py-0.5 rounded bg-[#2D5A27]/10 text-brand tracking-wide">
                               Novo
                             </span>
                           )}
                           {item.id === 'webinar' && (
-                            <span className="text-[8.5px] font-semibold uppercase px-1.5 py-0.5 rounded bg-[#2D5A27]/10 text-[#2D5A27] tracking-wide">
+                            <span className="text-[8.5px] font-semibold uppercase px-1.5 py-0.5 rounded bg-[#2D5A27]/10 text-brand tracking-wide">
                               Novo
                             </span>
                           )}
@@ -218,13 +222,13 @@ export function Sidebar() {
                         <ChevronDown
                           size={14}
                           className={clsx(
-                            'shrink-0 transition-transform duration-200 text-[#9CA3AF]',
+                            'shrink-0 transition-transform duration-200 text-tertiary',
                             childrenOpen && 'rotate-180'
                           )}
                         />
                       )}
 
-                      {isLocked && expanded && <Lock size={12} className="shrink-0 text-[#B0B0B0]" />}
+                      {isLocked && expanded && <Lock size={12} className="shrink-0 text-tertiary" />}
 
                       {!expanded && active && (
                         <span className="absolute right-1.5 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-[#2D5A27]" />
@@ -250,8 +254,8 @@ export function Sidebar() {
                           className={clsx(
                             'w-full flex items-center gap-3 pl-12 pr-5 py-1.5 text-[11.5px] transition-colors',
                             childActive
-                              ? 'text-[#2D5A27] font-semibold bg-[#F3F4F6]'
-                              : 'text-[#6B7280] hover:text-[#2D5A27] hover:bg-[#F8F9FA]'
+                              ? 'text-brand font-semibold bg-neutral-lighter'
+                              : 'text-secondary hover:text-brand hover:bg-background'
                           )}
                         >
                           <ChildIcon size={13} strokeWidth={1.75} className="shrink-0" />
@@ -267,13 +271,13 @@ export function Sidebar() {
         </nav>
 
         {/* Footer */}
-        <div className="shrink-0 border-t border-[#EAEAEA]">
+        <div className="shrink-0 border-t border-neutral-light">
           {/* Como Usar — discreto */}
           <button
             onClick={openOnboarding}
             title={expanded ? undefined : 'Como Usar'}
             className={clsx(
-              'group relative w-full flex items-center transition-colors text-[#6B7280] hover:text-[#2D5A27] hover:bg-[#F8F9FA]',
+              'group relative w-full flex items-center transition-colors text-secondary hover:text-brand hover:bg-background',
               expanded ? 'gap-3 px-5 py-2.5' : 'justify-center py-2.5'
             )}
           >
@@ -289,7 +293,7 @@ export function Sidebar() {
 
           {/* User block */}
           <div className={clsx(
-            'flex items-center border-t border-[#EAEAEA]',
+            'flex items-center border-t border-neutral-light',
             expanded ? 'gap-3 px-5 py-3' : 'justify-center py-3'
           )}>
             {userAvatar ? (
@@ -302,12 +306,12 @@ export function Sidebar() {
             {expanded && (
               <>
                 <div className="flex-1 min-w-0">
-                  <p className="text-[12px] font-semibold text-[#1F2937] truncate leading-tight">{userName}</p>
-                  <p className="text-[10px] text-[#9CA3AF] truncate leading-tight mt-0.5">Usuário</p>
+                  <p className="text-[12px] font-semibold text-primary truncate leading-tight">{userName}</p>
+                  <p className="text-[10px] text-tertiary truncate leading-tight mt-0.5">Usuário</p>
                 </div>
                 <button
                   onClick={() => navigate('/settings')}
-                  className="p-1.5 rounded-md hover:bg-[#F3F4F6] text-[#9CA3AF] hover:text-[#2D5A27] transition-colors"
+                  className="p-1.5 rounded-md hover:bg-neutral-lighter text-tertiary hover:text-brand transition-colors"
                   title="Configurações"
                 >
                   <Settings size={16} strokeWidth={1.75} />
@@ -321,17 +325,17 @@ export function Sidebar() {
             onClick={handleLogout}
             title={expanded ? undefined : t('nav.logout', 'Sair')}
             className={clsx(
-              'group relative w-full flex items-center justify-center border-t border-[#EAEAEA] transition-colors hover:bg-[#FEF2F2]',
+              'group relative w-full flex items-center justify-center border-t border-neutral-light transition-colors hover:bg-[#FEF2F2]',
               expanded ? 'py-3' : 'py-3'
             )}
           >
             {expanded ? (
-              <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#6B7280] group-hover:text-[#DC3545]">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-secondary group-hover:text-[#DC3545]">
                 Sair da Conta
               </span>
             ) : (
               <>
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-[#6B7280] group-hover:text-[#DC3545]">Sair</span>
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-secondary group-hover:text-[#DC3545]">Sair</span>
                 <div className="absolute left-full ml-3 px-2.5 py-1.5 bg-[#1a1a1a] text-white text-xs font-medium rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 shadow-lg">
                   {t('nav.logout', 'Sair')}
                   <span className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-[#1a1a1a]" />
@@ -344,7 +348,7 @@ export function Sidebar() {
           <button
             onClick={() => setExpanded(!expanded)}
             className={clsx(
-              'w-full flex items-center justify-center gap-2 py-2 border-t border-[#EAEAEA] text-[#9CA3AF] hover:text-[#6B7280] transition-colors',
+              'w-full flex items-center justify-center gap-2 py-2 border-t border-neutral-light text-tertiary hover:text-secondary transition-colors',
             )}
             title={expanded ? 'Recolher' : 'Expandir'}
           >

@@ -57,10 +57,10 @@ export function CheckoutPage() {
   }, [loading, session, plan, navigate])
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-[#F8F9FA] gap-4">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-background gap-4">
       <img src="/logo.png" alt="Lemon.meet" className="w-12 h-12 object-contain" />
-      <Loader size={24} className="animate-spin text-[#2D5A27]" />
-      <p className="text-sm text-[#666]">Preparando seu checkout...</p>
+      <Loader size={24} className="animate-spin text-brand" />
+      <p className="text-sm text-secondary">Preparando seu checkout...</p>
     </div>
   )
 }

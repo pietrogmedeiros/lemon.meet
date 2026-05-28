@@ -217,7 +217,7 @@ export function MeetingsPage() {
         </div>
 
         {!isLoading && (meetings.length > 0 || teams.length > 0) && (
-          <div className="flex items-center gap-1.5 bg-[#F5F5F5] rounded-xl p-1 w-fit">
+          <div className="flex items-center gap-1.5 bg-neutral-lighter rounded-xl p-1 w-fit">
             <button
               onClick={() => {
                 setViewMode('mine');
@@ -225,8 +225,8 @@ export function MeetingsPage() {
               }}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                 viewMode === 'mine'
-                  ? 'bg-white text-[#2D5A27] shadow-sm font-semibold'
-                  : 'text-[#666666] hover:text-[#333333]'
+                  ? 'bg-surface text-brand shadow-sm font-semibold'
+                  : 'text-secondary hover:text-primary'
               }`}
             >
               <User size={14} />
@@ -239,8 +239,8 @@ export function MeetingsPage() {
               }}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                 viewMode === 'team'
-                  ? 'bg-white text-[#2D5A27] shadow-sm font-semibold'
-                  : 'text-[#666666] hover:text-[#333333]'
+                  ? 'bg-surface text-brand shadow-sm font-semibold'
+                  : 'text-secondary hover:text-primary'
               }`}
             >
               <Users size={14} />
@@ -251,13 +251,13 @@ export function MeetingsPage() {
 
         {!isLoading && viewMode === 'team' && teams.length > 1 && (
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs font-semibold text-[#666666] mr-1">Filtrar por time:</span>
+            <span className="text-xs font-semibold text-secondary mr-1">Filtrar por time:</span>
             <button
               onClick={() => setSelectedTeamId('all')}
               className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition ${
                 selectedTeamId === 'all'
                   ? 'bg-[#2D5A27] text-white border-[#2D5A27]'
-                  : 'bg-white text-[#666666] border-[#E0E0E0] hover:border-[#2D5A27] hover:text-[#2D5A27]'
+                  : 'bg-surface text-secondary border-neutral-light hover:border-[#2D5A27] hover:text-brand'
               }`}
             >
               Todos os times
@@ -269,7 +269,7 @@ export function MeetingsPage() {
                 className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition ${
                   selectedTeamId === team.id
                     ? 'bg-[#2D5A27] text-white border-[#2D5A27]'
-                    : 'bg-white text-[#666666] border-[#E0E0E0] hover:border-[#2D5A27] hover:text-[#2D5A27]'
+                    : 'bg-surface text-secondary border-neutral-light hover:border-[#2D5A27] hover:text-brand'
                 }`}
               >
                 {team.name}
@@ -283,18 +283,18 @@ export function MeetingsPage() {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             {/* Campo de busca */}
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#999999] pointer-events-none" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-tertiary pointer-events-none" />
               <input
                 type="text"
                 placeholder="Buscar por título, plataforma..."
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                className="w-full pl-9 pr-9 py-2 text-sm rounded-xl border border-[#E0E0E0] bg-white text-[#333333] placeholder:text-[#BBBBBB] focus:outline-none focus:border-[#2D5A27] focus:ring-1 focus:ring-[#2D5A27]/30 transition"
+                className="w-full pl-9 pr-9 py-2 text-sm rounded-xl border border-neutral-light bg-surface text-primary placeholder:text-[#BBBBBB] focus:outline-none focus:border-[#2D5A27] focus:ring-1 focus:ring-[#2D5A27]/30 transition"
               />
               {search && (
                 <button
                   onClick={() => setSearch('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#BBBBBB] hover:text-[#666666] transition"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#BBBBBB] hover:text-secondary transition"
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -310,7 +310,7 @@ export function MeetingsPage() {
                   className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition ${
                     statusFilter === opt.value
                       ? 'bg-[#2D5A27] text-white border-[#2D5A27]'
-                      : 'bg-white text-[#666666] border-[#E0E0E0] hover:border-[#2D5A27] hover:text-[#2D5A27]'
+                      : 'bg-surface text-secondary border-neutral-light hover:border-[#2D5A27] hover:text-brand'
                   }`}
                 >
                   {opt.label}
@@ -322,13 +322,13 @@ export function MeetingsPage() {
           {/* Filtro por usuário - aparece se houver múltiplos usuários */}
           {uniqueUsers.length > 1 && (
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs font-semibold text-[#666666] mr-1">Filtrar por pessoa:</span>
+              <span className="text-xs font-semibold text-secondary mr-1">Filtrar por pessoa:</span>
               <button
                 onClick={() => setUserFilter('all')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition ${
                   userFilter === 'all'
                     ? 'bg-[#2D5A27] text-white border-[#2D5A27]'
-                    : 'bg-white text-[#666666] border-[#E0E0E0] hover:border-[#2D5A27] hover:text-[#2D5A27]'
+                    : 'bg-surface text-secondary border-neutral-light hover:border-[#2D5A27] hover:text-brand'
                 }`}
               >
                 Todos os membros
@@ -340,7 +340,7 @@ export function MeetingsPage() {
                   className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold border transition ${
                     userFilter === u.id
                       ? 'bg-[#2D5A27] text-white border-[#2D5A27]'
-                      : 'bg-white text-[#666666] border-[#E0E0E0] hover:border-[#2D5A27] hover:text-[#2D5A27]'
+                      : 'bg-surface text-secondary border-neutral-light hover:border-[#2D5A27] hover:text-brand'
                   }`}
                 >
                   {u.avatar_url ? (
@@ -423,12 +423,12 @@ export function MeetingsPage() {
                     </span>
                   )}
                   {(meeting.has_transcript ?? (meeting.transcript && meeting.transcript.trim().length > 0)) ? (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-[#2D5A27]/10 text-[#2D5A27] border border-[#2D5A27]/20">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-[#2D5A27]/10 text-brand border border-[#2D5A27]/20">
                       <FileText className="w-3 h-3" />
                       Com transcrição
                     </span>
                   ) : (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-[#999999]/10 text-[#666666] border border-[#CCCCCC]">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-[#999999]/10 text-secondary border border-[#CCCCCC]">
                       <FileText className="w-3 h-3" />
                       Sem transcrição
                     </span>

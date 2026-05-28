@@ -4,13 +4,44 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Tema (light/dark) ──────────────────────────────────────────────
+   Cores semânticas em triplet RGB (space-separated) pra suportar os
+   modificadores de opacidade do Tailwind (ex.: text-secondary/60).
+   A classe .dark no <html> é alternada pelo ThemeContext. Marca
+   (verde/accent/danger) NÃO flipa — fica em hex fixo no tailwind.config. */
+:root {
+  color-scheme: light;
+  --bg: 248 249 250;          /* #F8F9FA */
+  --surface: 255 255 255;     /* #FFFFFF */
+  --surface-2: 245 245 245;   /* #F5F5F5 */
+  --text: 51 51 51;           /* #333333 */
+  --text-secondary: 102 102 102; /* #666666 */
+  --text-tertiary: 153 153 153;  /* #999999 */
+  --border: 224 224 224;      /* #E0E0E0 */
+  --border-subtle: 240 240 240;  /* #F0F0F0 */
+  --brand: 45 90 39;          /* #2D5A27 verde marca (texto) */
+}
+
+.dark {
+  color-scheme: dark;
+  --bg: 14 17 22;             /* #0E1116 */
+  --surface: 22 26 32;        /* #161A20 */
+  --surface-2: 30 35 43;      /* #1E232B */
+  --text: 230 232 235;        /* #E6E8EB */
+  --text-secondary: 154 161 171; /* #9AA1AB */
+  --text-tertiary: 107 114 124;  /* #6B727C */
+  --border: 42 47 55;         /* #2A2F37 */
+  --border-subtle: 35 40 48;  /* #232830 */
+  --brand: 95 174 99;         /* #5FAE63 verde claro p/ texto no dark */
+}
+
 @layer base {
   * {
-    @apply border-neutral-light dark:border-gray-700;
+    @apply border-neutral-light;
   }
 
   body {
-    @apply bg-background dark:bg-gray-900 text-primary dark:text-gray-100 font-sans antialiased;
+    @apply bg-background text-primary font-sans antialiased;
     font-feature-settings: 'cv11', 'ss01';
     font-variation-settings: 'opsz' auto;
   }
@@ -27,13 +58,13 @@
 @layer components {
   /* Cards */
   .card {
-    @apply bg-white border border-neutral-light rounded-lg shadow-sm;
+    @apply bg-surface border border-neutral-light rounded-lg shadow-sm;
   }
 
   /* Inputs */
   .input {
     @apply w-full px-4 py-2 rounded-md;
-    @apply border border-neutral-light;
+    @apply border border-neutral-light bg-surface;
     @apply focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent;
     @apply text-neutral-dark;
   }
@@ -44,15 +75,15 @@
   .text-headline-1 {
     @apply text-2xl font-bold leading-8;
   }
-  
+
   .text-headline-2 {
     @apply text-lg font-semibold leading-6;
   }
-  
+
   .text-body-large {
     @apply text-base leading-6;
   }
-  
+
   .text-body-small {
     @apply text-xs leading-4;
   }

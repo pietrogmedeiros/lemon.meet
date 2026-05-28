@@ -17,17 +17,17 @@ export function DecisionInsightsAnnounceModal({ isOpen, onClose }: Props) {
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden">
+      <div className="bg-surface rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden">
         {/* Header */}
-        <div className="px-6 py-5 border-b border-[#E0E0E0]">
-          <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#2D5A27] bg-[#2D5A27]/10 px-2.5 py-1 rounded-full mb-3">
+        <div className="px-6 py-5 border-b border-neutral-light">
+          <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand bg-[#2D5A27]/10 px-2.5 py-1 rounded-full mb-3">
             <Sparkles className="h-3.5 w-3.5" />
             Novidade
           </span>
-          <h2 className="text-xl font-bold text-[#333333] flex items-center gap-2">
+          <h2 className="text-xl font-bold text-primary flex items-center gap-2">
             Insights que impulsionam decisões
           </h2>
-          <p className="text-sm text-[#666666] mt-1">
+          <p className="text-sm text-secondary mt-1">
             Toda reunião analisada agora traz, no topo, uma síntese pronta pra você decidir o próximo passo —
             sem precisar reler a transcrição inteira.
           </p>
@@ -41,19 +41,19 @@ export function DecisionInsightsAnnounceModal({ isOpen, onClose }: Props) {
                 <r.icon className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-sm font-semibold text-[#333333]">{r.title}</p>
-                <p className="text-sm text-[#666666] leading-relaxed">{r.desc}</p>
+                <p className="text-sm font-semibold text-primary">{r.title}</p>
+                <p className="text-sm text-secondary leading-relaxed">{r.desc}</p>
               </div>
             </div>
           ))}
-          <p className="text-xs text-[#999999] pt-1">
+          <p className="text-xs text-tertiary pt-1">
             Cada ponto vem com a evidência da própria conversa, gerado automaticamente.
-            Disponível nas reuniões a partir de <span className="font-medium text-[#666666]">24/05/2026</span>.
+            Disponível nas reuniões a partir de <span className="font-medium text-secondary">24/05/2026</span>.
           </p>
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-[#E0E0E0] flex justify-end">
+        <div className="px-6 py-4 border-t border-neutral-light flex justify-end">
           <button
             onClick={onClose}
             className="px-6 py-2.5 bg-[#2D5A27] text-white rounded-xl hover:bg-[#234520] transition text-sm font-semibold"

@@ -129,7 +129,7 @@ function DeltaBadge({ curr, prev }: { curr: number | null; prev: number | null }
   const diff = curr - prev;
   if (Math.abs(diff) < 0.05) return <span className="inline-flex items-center gap-0.5 text-xs text-[#888]"><Minus size={11} /> igual</span>;
   if (diff > 0) return (
-    <span className="inline-flex items-center gap-0.5 text-xs font-semibold text-[#2D5A27]">
+    <span className="inline-flex items-center gap-0.5 text-xs font-semibold text-brand">
       <TrendingUp size={11} /> +{diff.toFixed(1)}
     </span>
   );
@@ -144,7 +144,7 @@ function DeltaCountBadge({ curr, prev }: { curr: number; prev: number }) {
   const diff = curr - prev;
   if (diff === 0) return <span className="inline-flex items-center gap-0.5 text-xs text-[#888]"><Minus size={11} /> igual</span>;
   if (diff > 0) return (
-    <span className="inline-flex items-center gap-0.5 text-xs font-semibold text-[#2D5A27]">
+    <span className="inline-flex items-center gap-0.5 text-xs font-semibold text-brand">
       <TrendingUp size={11} /> +{diff}
     </span>
   );
@@ -157,7 +157,7 @@ function DeltaCountBadge({ curr, prev }: { curr: number; prev: number }) {
 
 function ScorePill({ score }: { score: number }) {
   const cls =
-    score >= 8 ? 'bg-[#2D5A27]/10 text-[#2D5A27]' :
+    score >= 8 ? 'bg-[#2D5A27]/10 text-brand' :
     score >= 5 ? 'bg-[#FFD700]/30 text-[#7A5C00]' :
     'bg-[#DC3545]/10 text-[#DC3545]';
   return (
@@ -321,7 +321,7 @@ export function RelatorioPage() {
     : 'neutro';
 
   const sentimentColor =
-    dominantSentiment === 'positivo' ? 'text-[#2D5A27]' :
+    dominantSentiment === 'positivo' ? 'text-brand' :
     dominantSentiment === 'negativo' ? 'text-[#DC3545]' : 'text-[#888]';
 
   /* Temporariamente desabilitado - Exportação de PDF
@@ -657,8 +657,8 @@ export function RelatorioPage() {
         {/* Header + week nav + export */}
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-[#1a1a1a]">Relatório Semanal</h1>
-            <p className="mt-1 text-sm text-[#666]">Resumo consolidado das suas reuniões por semana</p>
+            <h1 className="text-2xl font-bold text-primary">Relatório Semanal</h1>
+            <p className="mt-1 text-sm text-secondary">Resumo consolidado das suas reuniões por semana</p>
           </div>
 
           <div className="flex items-center gap-3">
@@ -674,7 +674,7 @@ export function RelatorioPage() {
             */}
 
             {/* Week navigation */}
-            <div className="flex items-center gap-2 bg-white border border-[#E0E0E0] rounded-xl px-3 py-2">
+            <div className="flex items-center gap-2 bg-surface border border-neutral-light rounded-xl px-3 py-2">
               <button
                 onClick={() => setWeekOffset(w => w - 1)}
                 className="p-1 rounded hover:bg-neutral-100 transition-colors text-[#555]"
@@ -682,7 +682,7 @@ export function RelatorioPage() {
               >
                 <ChevronLeft size={16} />
               </button>
-              <span className="text-sm font-medium text-[#333] min-w-[150px] text-center">
+              <span className="text-sm font-medium text-primary min-w-[150px] text-center">
                 {isCurrentWeek ? 'Esta semana' : formatWeekLabel(start, end)}
               </span>
               <button
@@ -700,13 +700,13 @@ export function RelatorioPage() {
         {teams.length > 0 && (
           <div className="space-y-3">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs font-semibold text-[#666666] mr-1">{t('common.team', 'Time')}:</span>
+              <span className="text-xs font-semibold text-secondary mr-1">{t('common.team', 'Time')}:</span>
               <button
                 onClick={() => setSelectedTeamId('all')}
                 className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition ${
                   selectedTeamId === 'all'
                     ? 'bg-[#2D5A27] text-white border-[#2D5A27]'
-                    : 'bg-white text-[#666666] border-[#E0E0E0] hover:border-[#2D5A27] hover:text-[#2D5A27]'
+                    : 'bg-surface text-secondary border-neutral-light hover:border-[#2D5A27] hover:text-brand'
                 }`}
               >
                 {t('common.allTeams', 'Todos os times')}
@@ -718,7 +718,7 @@ export function RelatorioPage() {
                   className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition ${
                     selectedTeamId === team.id
                       ? 'bg-[#2D5A27] text-white border-[#2D5A27]'
-                      : 'bg-white text-[#666666] border-[#E0E0E0] hover:border-[#2D5A27] hover:text-[#2D5A27]'
+                      : 'bg-surface text-secondary border-neutral-light hover:border-[#2D5A27] hover:text-brand'
                   }`}
                 >
                   {team.name}
@@ -729,13 +729,13 @@ export function RelatorioPage() {
             {/* Filtro de membros */}
             {members.length > 0 && (
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-xs font-semibold text-[#666666] mr-1">Membro:</span>
+                <span className="text-xs font-semibold text-secondary mr-1">Membro:</span>
                 <button
                   onClick={() => setSelectedMemberId('all')}
                   className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition ${
                     selectedMemberId === 'all'
                       ? 'bg-[#2D5A27] text-white border-[#2D5A27]'
-                      : 'bg-white text-[#666666] border-[#E0E0E0] hover:border-[#2D5A27] hover:text-[#2D5A27]'
+                      : 'bg-surface text-secondary border-neutral-light hover:border-[#2D5A27] hover:text-brand'
                   }`}
                 >
                   Todos os membros
@@ -747,7 +747,7 @@ export function RelatorioPage() {
                     className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition ${
                       selectedMemberId === member.user_id
                         ? 'bg-[#2D5A27] text-white border-[#2D5A27]'
-                        : 'bg-white text-[#666666] border-[#E0E0E0] hover:border-[#2D5A27] hover:text-[#2D5A27]'
+                        : 'bg-surface text-secondary border-neutral-light hover:border-[#2D5A27] hover:text-brand'
                     }`}
                   >
                     {member.user_name}
@@ -769,8 +769,8 @@ export function RelatorioPage() {
         {curr.total === 0 && (
           <Card className="p-12 text-center">
             <Calendar className="h-12 w-12 text-neutral-300 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-[#333]">Nenhuma reunião nesta semana</h3>
-            <p className="mt-2 text-sm text-[#666]">Use as setas para navegar para semanas com dados.</p>
+            <h3 className="text-lg font-semibold text-primary">Nenhuma reunião nesta semana</h3>
+            <p className="mt-2 text-sm text-secondary">Use as setas para navegar para semanas com dados.</p>
           </Card>
         )}
 
@@ -782,13 +782,13 @@ export function RelatorioPage() {
               <Card className="p-5 border-l-4 border-l-[#2D5A27]">
                 <div className="flex items-start justify-between">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-widest text-[#999]">Reuniões</p>
-                    <p className="mt-2 text-4xl font-bold text-[#1a1a1a]">{curr.total}</p>
+                    <p className="text-xs font-semibold uppercase tracking-widest text-tertiary">Reuniões</p>
+                    <p className="mt-2 text-4xl font-bold text-primary">{curr.total}</p>
                     <p className="mt-1 text-xs text-[#888]">{curr.completed} concluídas</p>
                   </div>
                   <div className="flex flex-col items-end gap-1">
                     <div className="w-8 h-8 rounded-xl bg-[#2D5A27]/10 flex items-center justify-center">
-                      <Video size={15} className="text-[#2D5A27]" />
+                      <Video size={15} className="text-brand" />
                     </div>
                     <DeltaCountBadge curr={curr.total} prev={prev.total} />
                   </div>
@@ -798,8 +798,8 @@ export function RelatorioPage() {
               <Card className="p-5 border-l-4 border-l-[#E0E0E0]">
                 <div className="flex items-start justify-between">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-widest text-[#999]">Score médio</p>
-                    <p className="mt-2 text-4xl font-bold text-[#1a1a1a]">
+                    <p className="text-xs font-semibold uppercase tracking-widest text-tertiary">Score médio</p>
+                    <p className="mt-2 text-4xl font-bold text-primary">
                       {curr.avgScore !== null ? curr.avgScore : <span className="text-[#ccc]">—</span>}
                     </p>
                     <p className="mt-1 text-xs text-[#888]">
@@ -808,7 +808,7 @@ export function RelatorioPage() {
                   </div>
                   <div className="flex flex-col items-end gap-1">
                     <div className="w-8 h-8 rounded-xl bg-neutral-100 flex items-center justify-center">
-                      <BarChart3 size={15} className="text-[#666]" />
+                      <BarChart3 size={15} className="text-secondary" />
                     </div>
                     <DeltaBadge curr={curr.avgScore} prev={prev.avgScore} />
                   </div>
@@ -818,7 +818,7 @@ export function RelatorioPage() {
               <Card className="p-5 border-l-4 border-l-[#E0E0E0]">
                 <div className="flex items-start justify-between">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-widest text-[#999]">Sentimento</p>
+                    <p className="text-xs font-semibold uppercase tracking-widest text-tertiary">Sentimento</p>
                     <p className={`mt-2 text-2xl font-bold capitalize ${sentimentColor}`}>
                       {curr.completed > 0 ? dominantSentiment : <span className="text-[#ccc]">—</span>}
                     </p>
@@ -829,7 +829,7 @@ export function RelatorioPage() {
                     )}
                   </div>
                   <div className="w-8 h-8 rounded-xl bg-neutral-100 flex items-center justify-center">
-                    <TrendingUp size={15} className="text-[#666]" />
+                    <TrendingUp size={15} className="text-secondary" />
                   </div>
                 </div>
               </Card>
@@ -837,8 +837,8 @@ export function RelatorioPage() {
               <Card className="p-5 border-l-4 border-l-[#FFD700]">
                 <div className="flex items-start justify-between">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-widest text-[#999]">Action items</p>
-                    <p className="mt-2 text-4xl font-bold text-[#1a1a1a]">{curr.pendingActions}</p>
+                    <p className="text-xs font-semibold uppercase tracking-widest text-tertiary">Action items</p>
+                    <p className="mt-2 text-4xl font-bold text-primary">{curr.pendingActions}</p>
                     <p className="mt-1 text-xs text-[#888]">identificados nas reuniões</p>
                   </div>
                   <div className="flex flex-col items-end gap-1">
@@ -858,9 +858,9 @@ export function RelatorioPage() {
               <Card className="p-5 space-y-4">
                 <div className="flex items-center gap-2">
                   <div className="w-7 h-7 rounded-lg bg-[#2D5A27]/10 flex items-center justify-center">
-                    <BarChart3 size={14} className="text-[#2D5A27]" />
+                    <BarChart3 size={14} className="text-brand" />
                   </div>
-                  <h2 className="text-sm font-semibold text-[#333]">Melhores reuniões da semana</h2>
+                  <h2 className="text-sm font-semibold text-primary">Melhores reuniões da semana</h2>
                 </div>
                 {curr.topMeetings.length === 0 ? (
                   <p className="text-sm text-[#aaa] py-4 text-center">Nenhuma reunião com score esta semana</p>
@@ -871,7 +871,7 @@ export function RelatorioPage() {
                         <span className="w-5 h-5 flex-shrink-0 rounded-full bg-neutral-100 text-[10px] font-bold text-[#888] flex items-center justify-center">
                           {i + 1}
                         </span>
-                        <span className="flex-1 text-sm text-[#333] truncate">
+                        <span className="flex-1 text-sm text-primary truncate">
                           {m.title || 'Reunião sem título'}
                         </span>
                         <ScorePill score={m.score} />
@@ -885,9 +885,9 @@ export function RelatorioPage() {
               <Card className="p-5 space-y-4">
                 <div className="flex items-center gap-2">
                   <div className="w-7 h-7 rounded-lg bg-neutral-100 flex items-center justify-center">
-                    <Hash size={14} className="text-[#666]" />
+                    <Hash size={14} className="text-secondary" />
                   </div>
-                  <h2 className="text-sm font-semibold text-[#333]">Tópicos discutidos</h2>
+                  <h2 className="text-sm font-semibold text-primary">Tópicos discutidos</h2>
                 </div>
                 {curr.topics.length === 0 ? (
                   <p className="text-sm text-[#aaa] py-4 text-center">Nenhum tópico registrado</p>

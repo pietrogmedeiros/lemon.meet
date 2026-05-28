@@ -80,12 +80,12 @@ export function MainLayout({ children }: MainLayoutProps) {
               <div className="max-w-lg w-full text-center space-y-7 py-8">
                 {/* Ícone */}
                 <div className="w-20 h-20 rounded-3xl bg-[#2D5A27]/10 flex items-center justify-center mx-auto">
-                  <Lock size={38} className="text-[#2D5A27]" />
+                  <Lock size={38} className="text-brand" />
                 </div>
 
                 <div>
-                  <h2 className="text-2xl font-bold text-[#333333]">Período de teste encerrado</h2>
-                  <p className="mt-2 text-[#666666] text-sm leading-relaxed max-w-sm mx-auto">
+                  <h2 className="text-2xl font-bold text-primary">Período de teste encerrado</h2>
+                  <p className="mt-2 text-secondary text-sm leading-relaxed max-w-sm mx-auto">
                     Seus 7 dias gratuitos chegaram ao fim. Escolha um plano para continuar acessando suas reuniões e insights.
                   </p>
                 </div>
@@ -93,22 +93,22 @@ export function MainLayout({ children }: MainLayoutProps) {
                 {/* Cards de plano */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-left">
                   {/* Starter */}
-                  <div className="border border-[#E0E0E0] rounded-2xl p-6 space-y-3 shadow-sm hover:shadow-md transition">
+                  <div className="border border-neutral-light rounded-2xl p-6 space-y-3 shadow-sm hover:shadow-md transition">
                     <div>
-                      <p className="font-bold text-[#333333] text-base">Starter</p>
-                      <p className="text-xs text-[#999999] mt-0.5">Para indivíduos e freelancers</p>
+                      <p className="font-bold text-primary text-base">Starter</p>
+                      <p className="text-xs text-tertiary mt-0.5">Para indivíduos e freelancers</p>
                     </div>
-                    <p className="text-3xl font-bold text-[#2D5A27]">
-                      R$ 29<span className="text-sm font-normal text-[#666666]">/mês</span>
+                    <p className="text-3xl font-bold text-brand">
+                      R$ 29<span className="text-sm font-normal text-secondary">/mês</span>
                     </p>
-                    <ul className="text-xs text-[#666666] space-y-1.5">
+                    <ul className="text-xs text-secondary space-y-1.5">
                       <li className="flex items-center gap-1.5">✓ Transcrições ilimitadas</li>
                       <li className="flex items-center gap-1.5">✓ Insights com IA</li>
                       <li className="flex items-center gap-1.5">✓ Histórico de reuniões</li>
                     </ul>
                     <button
                       onClick={() => alert('Em breve!')}
-                      className="w-full py-2.5 rounded-xl border-2 border-[#2D5A27] text-[#2D5A27] text-sm font-semibold hover:bg-[#2D5A27]/5 transition"
+                      className="w-full py-2.5 rounded-xl border-2 border-[#2D5A27] text-brand text-sm font-semibold hover:bg-[#2D5A27]/5 transition"
                     >
                       Assinar Starter
                     </button>
@@ -120,13 +120,13 @@ export function MainLayout({ children }: MainLayoutProps) {
                       <Zap size={10} /> Popular
                     </span>
                     <div>
-                      <p className="font-bold text-[#333333] text-base">Professional</p>
-                      <p className="text-xs text-[#999999] mt-0.5">Para equipes e empresas</p>
+                      <p className="font-bold text-primary text-base">Professional</p>
+                      <p className="text-xs text-tertiary mt-0.5">Para equipes e empresas</p>
                     </div>
-                    <p className="text-3xl font-bold text-[#2D5A27]">
-                      R$ 79<span className="text-sm font-normal text-[#666666]">/mês</span>
+                    <p className="text-3xl font-bold text-brand">
+                      R$ 79<span className="text-sm font-normal text-secondary">/mês</span>
                     </p>
-                    <ul className="text-xs text-[#666666] space-y-1.5">
+                    <ul className="text-xs text-secondary space-y-1.5">
                       <li className="flex items-center gap-1.5">✓ Tudo do Starter</li>
                       <li className="flex items-center gap-1.5">✓ Times e membros</li>
                       <li className="flex items-center gap-1.5">✓ Reuniões do time</li>
@@ -142,7 +142,7 @@ export function MainLayout({ children }: MainLayoutProps) {
 
                 <p className="text-xs text-[#BBBBBB]">
                   Dúvidas?{' '}
-                  <a href="mailto:contato@lemon.meet" className="underline text-[#999999] hover:text-[#666666]">
+                  <a href="mailto:contato@lemon.meet" className="underline text-tertiary hover:text-secondary">
                     Fale conosco
                   </a>
                 </p>

@@ -170,7 +170,7 @@ export function FeatureRequestsPage() {
     return (
       <MainLayout>
         <div className="flex items-center justify-center h-96">
-          <Loader className="animate-spin text-[#2D5A27]" size={48} />
+          <Loader className="animate-spin text-brand" size={48} />
         </div>
       </MainLayout>
     )
@@ -186,10 +186,10 @@ export function FeatureRequestsPage() {
               <Lightbulb className="text-white" size={24} />
             </div>
             <div>
-              <h1 className="text-3xl font-bold text-[#333333]">
+              <h1 className="text-3xl font-bold text-primary">
                 Sugestões de Melhorias
               </h1>
-              <p className="text-[#666666]">
+              <p className="text-secondary">
                 Compartilhe suas ideias e vote nas sugestões da comunidade
               </p>
             </div>
@@ -206,14 +206,14 @@ export function FeatureRequestsPage() {
             </button>
 
             {/* Sort */}
-            <div className="flex items-center gap-2 border border-[#E0E0E0] rounded-xl px-3 py-2">
-              <span className="text-sm text-[#666666]">Ordenar:</span>
+            <div className="flex items-center gap-2 border border-neutral-light rounded-xl px-3 py-2">
+              <span className="text-sm text-secondary">Ordenar:</span>
               <button
                 onClick={() => setSortBy('recent')}
                 className={`px-3 py-1 rounded-lg text-sm font-medium transition ${
                   sortBy === 'recent' 
                     ? 'bg-[#2D5A27] text-white' 
-                    : 'text-[#666666] hover:bg-[#F5F5F5]'
+                    : 'text-secondary hover:bg-neutral-lighter'
                 }`}
               >
                 Recentes
@@ -223,7 +223,7 @@ export function FeatureRequestsPage() {
                 className={`px-3 py-1 rounded-lg text-sm font-medium transition ${
                   sortBy === 'popular' 
                     ? 'bg-[#2D5A27] text-white' 
-                    : 'text-[#666666] hover:bg-[#F5F5F5]'
+                    : 'text-secondary hover:bg-neutral-lighter'
                 }`}
               >
                 Populares
@@ -234,7 +234,7 @@ export function FeatureRequestsPage() {
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
-              className="px-4 py-2 border border-[#E0E0E0] rounded-xl text-sm text-[#666666] focus:outline-none focus:ring-2 focus:ring-[#2D5A27]/20"
+              className="px-4 py-2 border border-neutral-light rounded-xl text-sm text-secondary focus:outline-none focus:ring-2 focus:ring-[#2D5A27]/20"
             >
               <option value="">Todos os status</option>
               <option value="pending">Pendente</option>
@@ -248,9 +248,9 @@ export function FeatureRequestsPage() {
 
         {/* Lista de sugestões */}
         {requests.length === 0 ? (
-          <div className="text-center py-12 bg-white rounded-2xl border border-[#E0E0E0]">
-            <Lightbulb className="mx-auto text-[#999999] mb-3" size={48} />
-            <p className="text-[#666666]">
+          <div className="text-center py-12 bg-surface rounded-2xl border border-neutral-light">
+            <Lightbulb className="mx-auto text-tertiary mb-3" size={48} />
+            <p className="text-secondary">
               Nenhuma sugestão encontrada. Seja o primeiro a sugerir!
             </p>
           </div>
@@ -264,7 +264,7 @@ export function FeatureRequestsPage() {
               return (
                 <div
                   key={request.id}
-                  className="bg-white border border-[#E0E0E0] rounded-2xl p-6 hover:border-[#2D5A27]/30 hover:shadow-md transition-all"
+                  className="bg-surface border border-neutral-light rounded-2xl p-6 hover:border-[#2D5A27]/30 hover:shadow-md transition-all"
                 >
                   <div className="flex gap-4">
                     {/* Upvote button */}
@@ -273,8 +273,8 @@ export function FeatureRequestsPage() {
                       disabled={!session}
                       className={`flex flex-col items-center gap-1 px-3 py-2 rounded-xl border-2 transition-all ${
                         hasUpvoted
-                          ? 'border-[#2D5A27] bg-[#2D5A27]/5 text-[#2D5A27]'
-                          : 'border-[#E0E0E0] hover:border-[#2D5A27]/30 text-[#666666]'
+                          ? 'border-[#2D5A27] bg-[#2D5A27]/5 text-brand'
+                          : 'border-neutral-light hover:border-[#2D5A27]/30 text-secondary'
                       } ${!session ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                     >
                       <ThumbsUp size={20} fill={hasUpvoted ? 'currentColor' : 'none'} />
@@ -286,10 +286,10 @@ export function FeatureRequestsPage() {
                       {/* Header */}
                       <div className="flex items-start justify-between mb-3">
                         <div>
-                          <h3 className="text-lg font-bold text-[#333333] mb-2">
+                          <h3 className="text-lg font-bold text-primary mb-2">
                             {request.title}
                           </h3>
-                          <div className="flex items-center gap-3 text-sm text-[#999999]">
+                          <div className="flex items-center gap-3 text-sm text-tertiary">
                             <div className="flex items-center gap-2">
                               {request.user_avatar_url ? (
                                 <img 
@@ -299,7 +299,7 @@ export function FeatureRequestsPage() {
                                 />
                               ) : (
                                 <div className="w-5 h-5 rounded-full bg-[#2D5A27]/10 flex items-center justify-center">
-                                  <User size={12} className="text-[#2D5A27]" />
+                                  <User size={12} className="text-brand" />
                                 </div>
                               )}
                               <span>{request.user_name}</span>
@@ -324,12 +324,12 @@ export function FeatureRequestsPage() {
                       </div>
 
                       {/* Description */}
-                      <p className="text-[#666666] leading-relaxed mb-4">
+                      <p className="text-secondary leading-relaxed mb-4">
                         {request.description}
                       </p>
 
                       {/* Footer */}
-                      <div className="flex items-center gap-4 text-sm text-[#999999]">
+                      <div className="flex items-center gap-4 text-sm text-tertiary">
                         <div className="flex items-center gap-1.5">
                           <MessageCircle size={16} />
                           <span>{request.comments_count} comentários</span>
@@ -347,14 +347,14 @@ export function FeatureRequestsPage() {
       {/* Modal de criar sugestão */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl max-w-2xl w-full p-6">
-            <h2 className="text-2xl font-bold text-[#333333] mb-4">
+          <div className="bg-surface rounded-2xl max-w-2xl w-full p-6">
+            <h2 className="text-2xl font-bold text-primary mb-4">
               Nova Sugestão
             </h2>
 
             <form onSubmit={handleCreateRequest} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-[#333333] mb-2">
+                <label className="block text-sm font-medium text-primary mb-2">
                   Título *
                 </label>
                 <input
@@ -362,13 +362,13 @@ export function FeatureRequestsPage() {
                   name="title"
                   required
                   maxLength={200}
-                  className="w-full px-4 py-2.5 border border-[#E0E0E0] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2D5A27]/20"
+                  className="w-full px-4 py-2.5 border border-neutral-light rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2D5A27]/20"
                   placeholder="Resuma sua sugestão em uma frase"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-[#333333] mb-2">
+                <label className="block text-sm font-medium text-primary mb-2">
                   Descrição *
                 </label>
                 <textarea
@@ -376,18 +376,18 @@ export function FeatureRequestsPage() {
                   required
                   maxLength={5000}
                   rows={6}
-                  className="w-full px-4 py-2.5 border border-[#E0E0E0] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2D5A27]/20 resize-none"
+                  className="w-full px-4 py-2.5 border border-neutral-light rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2D5A27]/20 resize-none"
                   placeholder="Descreva detalhadamente sua sugestão..."
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-[#333333] mb-2">
+                <label className="block text-sm font-medium text-primary mb-2">
                   Categoria (opcional)
                 </label>
                 <select
                   name="category"
-                  className="w-full px-4 py-2.5 border border-[#E0E0E0] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2D5A27]/20"
+                  className="w-full px-4 py-2.5 border border-neutral-light rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2D5A27]/20"
                 >
                   <option value="">Selecione...</option>
                   <option value="feature">Nova funcionalidade</option>
@@ -401,7 +401,7 @@ export function FeatureRequestsPage() {
                 <button
                   type="button"
                   onClick={() => setShowCreateModal(false)}
-                  className="px-6 py-2.5 border border-[#E0E0E0] text-[#666666] rounded-xl hover:bg-[#F5F5F5] transition"
+                  className="px-6 py-2.5 border border-neutral-light text-secondary rounded-xl hover:bg-neutral-lighter transition"
                 >
                   Cancelar
                 </button>
