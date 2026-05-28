@@ -547,7 +547,12 @@ export function TranscricaoDetalhesPage() {
   const [showFeatureAnnounce, setShowFeatureAnnounce] = useState(false);
   const announceKey = user?.id ? `lemon_announce_decision_insights_${user.id}` : null;
   useEffect(() => {
-    if (announceKey && !localStorage.getItem(announceKey)) setShowFeatureAnnounce(true);
+    if (announceKey && !localStorage.getItem(announceKey)) {
+      setShowFeatureAnnounce(true);
+      // Marca como visto JÁ na 1ª exibição — garante 1x por usuário mesmo que
+      // ele feche/saia da página sem clicar em "Entendi".
+      localStorage.setItem(announceKey, '1');
+    }
   }, [announceKey]);
   const dismissFeatureAnnounce = () => {
     if (announceKey) localStorage.setItem(announceKey, '1');
