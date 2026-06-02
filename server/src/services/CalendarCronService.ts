@@ -16,6 +16,7 @@ import { botRouter, type DispatchResult } from './bots/BotRouter.js'
 import type { BotProviderName } from './bots/IBotProvider.js'
 import { resolveMeetingTeamId } from '../utils/teamAccess.js'
 import { fanOutFromOwner } from '../routes/meetingbaas.routes.js'
+import { notificationService } from './NotificationService.js'
 import {
   getValidAccessToken,
   extractMeetingUrl,
@@ -30,8 +31,23 @@ const LOOKBEHIND_MS = 5  * 60 * 1000
 // Intervalo entre cada rodada do cron
 const INTERVAL_MS   = 3  * 60 * 1000
 
+// ── Alerta de reuniões presas em 'requesting' ──────────────────
+// Incidente 2026-05-29→06-02: o worker do Attendee travou e bots agendados
+// pararam de entrar; reuniões ficaram presas em 'requesting' por DIAS sem
+// ninguém perceber (a API segue dando 200, então nada falhava). Este alerta
+// fecha esse buraco de observabilidade: se o horário de início já passou e o
+// bot não entrou (status nunca saiu de 'requesting'), avisa o admin.
+// É só VISIBILIDADE — não reescreve status, não reenvia bot, não muda roteamento.
+// Considera-se presa se o início passou há mais de STUCK_AFTER_MS (o bot já
+// deveria ter virado 'recording'). Ignora backlog antigo (> STUCK_LOOKBACK_MS),
+// que são calls já encerradas e irrecuperáveis. Alerta throttled.
+const STUCK_AFTER_MS        = 12 * 60 * 1000        // início passou há +12min e ainda 'requesting'
+const STUCK_LOOKBACK_MS     = 6  * 60 * 60 * 1000   // não alerta sobre backlog > 6h
+const STUCK_ALERT_THROTTLE_MS = 30 * 60 * 1000      // no máx. 1 alerta a cada 30min
+
 export class CalendarCronService {
   private timer: ReturnType<typeof setInterval> | null = null
+  private lastStuckAlertAt = 0
 
   start(): void {
     if (this.timer) return
@@ -94,6 +110,64 @@ export class CalendarCronService {
         logger.error(`[CalendarCron] Erro ao processar user ${integration.user_id}:`, err)
       }
     }
+
+    // Checagem de saúde: avisa se há reuniões presas em 'requesting' (bot não
+    // entrou). Isolado em try/catch — nunca pode derrubar o ciclo do cron.
+    try {
+      await this.alertStuckRequesting()
+    } catch (err) {
+      logger.error('[CalendarCron] Erro ao checar reuniões presas:', err)
+    }
+  }
+
+  /**
+   * Alerta (throttled) quando reuniões passaram do horário de início e o bot
+   * nunca entrou — status preso em 'requesting'. Só dispara se ALERT_ADMIN_USER_ID
+   * estiver setado. Não altera nada no banco: pura observabilidade.
+   */
+  private async alertStuckRequesting(): Promise<void> {
+    const adminUserId = process.env.ALERT_ADMIN_USER_ID
+    if (!adminUserId) return // sem destinatário, não há o que alertar
+
+    const now = Date.now()
+    const stuckBefore   = new Date(now - STUCK_AFTER_MS).toISOString()
+    const lookbackFloor = new Date(now - STUCK_LOOKBACK_MS).toISOString()
+
+    // Só reuniões "donas" do bot (linkadas herdam status via fan-out) cujo
+    // início caiu na janela [agora-6h, agora-12min] e seguem em 'requesting'.
+    const { data, error } = await supabase
+      .from('meetings')
+      .select('id, bot_provider, started_at')
+      .eq('status', 'requesting')
+      .is('bot_owner_meeting_id', null)
+      .lte('started_at', stuckBefore)
+      .gte('started_at', lookbackFloor)
+
+    if (error) {
+      logger.warn('[CalendarCron] Falha ao consultar reuniões presas em requesting:', error)
+      return
+    }
+    const stuck = data ?? []
+    if (stuck.length === 0) return
+
+    const byProvider = stuck.reduce<Record<string, number>>((acc, m) => {
+      const p = (m.bot_provider as string | null) ?? 'desconhecido'
+      acc[p] = (acc[p] ?? 0) + 1
+      return acc
+    }, {})
+    const breakdown = Object.entries(byProvider).map(([p, n]) => `${p}: ${n}`).join(', ')
+    logger.warn(`[CalendarCron][STUCK] ${stuck.length} reunião(ões) presa(s) em 'requesting' há +${STUCK_AFTER_MS / 60000}min (${breakdown})`)
+
+    // Throttle: evita spam quando há um lote preso (cron roda a cada 3min).
+    if (now - this.lastStuckAlertAt < STUCK_ALERT_THROTTLE_MS) return
+    this.lastStuckAlertAt = now
+
+    await notificationService.notify({
+      user_id: adminUserId,
+      type: 'admin_stuck_requesting',
+      title: '⚠️ Reuniões presas em "requesting"',
+      message: `${stuck.length} reunião(ões) passaram do horário e o bot não entrou (${breakdown}). Pode indicar worker do Attendee travado, fila celery empilhada ou webhook não chegando. Verifique o serviço Attendee no Railway.`,
+    })
   }
 
   private async processUser(
