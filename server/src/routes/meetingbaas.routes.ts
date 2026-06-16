@@ -8,6 +8,10 @@
 // ============================================================
 
 import { Router, type Router as RouterType, type Request, type Response } from 'express'
+import { spawn } from 'node:child_process'
+import { promises as fsp } from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import { supabase } from '../config/supabase.js'
 import { logger } from '../utils/logger.js'
 import { meetingBaasService, type BaasCompletePayload } from '../services/MeetingBaasService.js'
@@ -515,16 +519,9 @@ async function transcribeFromAudioUrl(audioUrl: string, meetingId: string, durat
   if (!res.ok) throw new Error(`download de áudio HTTP ${res.status}`)
   const buf = Buffer.from(await res.arrayBuffer())
 
-  // Limite do Groq Whisper (~25MB). Acima disso não tenta, para evitar rejeição/OOM.
-  const MAX_BYTES = 25 * 1024 * 1024
-  if (buf.length > MAX_BYTES) {
-    throw new Error(`áudio grande demais p/ fallback (${(buf.length / 1048576).toFixed(1)}MB > 25MB)`)
-  }
-
-  // Guard de silêncio: FLAC com bitrate muito baixo = gravação sem fala (foi por isso
-  // que o gladia também não transcreveu). Evita gastar Whisper e, principalmente, evita
-  // que ele alucine frases repetidas ("E aí" xN) sobre silêncio e marque a reunião como
-  // concluída com lixo. Fala real fica bem acima de ~20 kbps; silêncio ~1-2 kbps.
+  // Guard de silêncio (no FLAC original): bitrate muito baixo = gravação sem fala
+  // (foi por isso que o gladia também não transcreveu). Evita gastar Whisper e que
+  // ele alucine frases repetidas sobre silêncio. Fala real >~20 kbps; silêncio ~1-2.
   if (durationSeconds > 30) {
     const kbps = (buf.length * 8) / durationSeconds / 1000
     if (kbps < 8) {
@@ -532,7 +529,20 @@ async function transcribeFromAudioUrl(audioUrl: string, meetingId: string, durat
     }
   }
 
-  const chunks = await transcriptionService.transcribeAudioBuffer(buf, `${meetingId}.flac`)
+  // Transcodifica p/ Opus 16kHz mono e fatia em segmentos que cabem no limite do
+  // Groq Whisper (~25MB). Antes rejeitávamos o áudio inteiro acima de 25MB — FLAC de
+  // reuniões longas estourava (ex.: 67MB → transcription_fallback_failed). O Whisper
+  // só precisa de 16kHz mono, então a compressão é enorme sem perda de qualidade.
+  const parts = await transcodeAndSegment(buf, meetingId)
+  logger.info(`[MeetingBaas] fallback Whisper: ${parts.length} segmento(s) de áudio p/ meeting ${meetingId}`)
+
+  const chunks: any[] = []
+  for (const part of parts) {
+    const cs = await transcriptionService.transcribeAudioBuffer(part.buffer, `${meetingId}-${part.offsetSeconds}.ogg`)
+    for (const c of cs) {
+      chunks.push({ ...c, startSeconds: (c.startSeconds ?? 0) + part.offsetSeconds, endSeconds: (c.endSeconds ?? 0) + part.offsetSeconds })
+    }
+  }
 
   // Guard de alucinação: o Whisper costuma repetir a mesma frase em trechos sem fala.
   // Se quase todos os segmentos são idênticos, trata como transcrição inválida.
@@ -547,6 +557,53 @@ async function transcribeFromAudioUrl(audioUrl: string, meetingId: string, durat
     end: c.endSeconds ?? 0,
     speaker: null,
   }))
+}
+
+// Limite de segurança por segmento, com margem sob o teto de 25MB do Groq Whisper.
+const WHISPER_MAX_BYTES = 24 * 1024 * 1024
+// Janela de fatiamento: 30min de Opus 16kbps mono ≈ 3.6MB, folgado sob o limite.
+const SEGMENT_SECONDS = 1800
+
+/**
+ * Baixa custo do Whisper e contorna o limite de 25MB: transcodifica o FLAC do
+ * MeetingBaas para Opus 16kHz mono (16kbps) e fatia em trechos de SEGMENT_SECONDS.
+ * Retorna os buffers com o offset (em s) de cada trecho, p/ corrigir os timestamps.
+ * Requer `ffmpeg` no PATH (instalado no Dockerfile de produção).
+ */
+async function transcodeAndSegment(flac: Buffer, meetingId: string): Promise<{ buffer: Buffer; offsetSeconds: number }[]> {
+  const dir = await fsp.mkdtemp(path.join(os.tmpdir(), `baas-audio-${meetingId.slice(0, 8)}-`))
+  try {
+    const inPath = path.join(dir, 'in.flac')
+    await fsp.writeFile(inPath, flac)
+    const pattern = path.join(dir, 'seg_%04d.ogg')
+    await runFfmpeg([
+      '-i', inPath, '-vn', '-ac', '1', '-ar', '16000', '-c:a', 'libopus', '-b:a', '16k',
+      '-f', 'segment', '-segment_time', String(SEGMENT_SECONDS), '-reset_timestamps', '1', pattern,
+    ])
+    const files = (await fsp.readdir(dir)).filter(f => f.startsWith('seg_') && f.endsWith('.ogg')).sort()
+    if (files.length === 0) throw new Error('ffmpeg não gerou segmentos de áudio')
+    const parts: { buffer: Buffer; offsetSeconds: number }[] = []
+    for (let i = 0; i < files.length; i++) {
+      const b = await fsp.readFile(path.join(dir, files[i]))
+      if (b.length > WHISPER_MAX_BYTES) {
+        throw new Error(`segmento ${i} ainda grande demais (${(b.length / 1048576).toFixed(1)}MB) — áudio anômalo`)
+      }
+      parts.push({ buffer: b, offsetSeconds: i * SEGMENT_SECONDS })
+    }
+    return parts
+  } finally {
+    await fsp.rm(dir, { recursive: true, force: true }).catch(() => {})
+  }
+}
+
+function runFfmpeg(args: string[]): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const proc = spawn('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', ...args])
+    let stderr = ''
+    proc.stderr.on('data', d => { stderr += d.toString() })
+    proc.on('error', err => reject(new Error(`ffmpeg indisponível: ${err.message}`)))
+    proc.on('close', code => code === 0 ? resolve() : reject(new Error(`ffmpeg saiu com código ${code}: ${stderr.slice(0, 300)}`)))
+  })
 }
 
 async function handleFailed(data: { bot_id: string; error?: string; error_message?: string; error_code?: string; event_uuid?: string }) {

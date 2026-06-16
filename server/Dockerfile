@@ -26,11 +26,12 @@ RUN pnpm --filter @vibe-ai/server build
 # Stage 2: Production
 FROM node:20-bookworm-slim
 
-# Install Chromium and dependencies for Puppeteer
+# Install Chromium (Puppeteer) + ffmpeg (transcode de áudio p/ fallback Whisper)
 RUN apt-get update && apt-get install -y \
     chromium \
     chromium-common \
     chromium-driver \
+    ffmpeg \
     fonts-liberation \
     fonts-noto-color-emoji \
     fonts-freefont-ttf \
