@@ -63,20 +63,27 @@ export class MeetingBaasService {
   }
 
   /**
-   * Monta o corpo da requisição de criação de bot conforme o schema v2
-   * (POST /bots/). A versão anterior enviava campos que NÃO existem no v2
-   * (`transcription_enabled`, `transcription_config`, `callback_enabled`,
-   * `callback_config`, `timeout_config`) — eram silenciosamente ignorados, e
-   * por isso nosso `automatic_leave` no caminho agendado nunca valia (o bot
-   * saía no default de 600s). Campos corretos: `speech_to_text`, `webhook_url`,
-   * `deduplication_key` (top-level), `automatic_leave` e `start_time` (Unix em MS — NÃO segundos,
-   * agendamento — substitui o endpoint legado /bots/scheduled + join_at).
+   * Monta o corpo da requisição de criação de bot. Campos corretos do schema v2:
+   * `speech_to_text`, `webhook_url`, `deduplication_key` (top-level),
+   * `automatic_leave`. A versão pré-v2 enviava campos inexistentes
+   * (`transcription_enabled`, `transcription_config`, `callback_*`,
+   * `timeout_config`) — silenciosamente ignorados.
+   *
+   * Agendamento: `join_at` (ISO 8601) via endpoint /v2/bots/scheduled — NÃO
+   * `start_time` no /v2/bots. Verificado contra a API real
+   * (scripts/verify-baas-start-time.mjs + testes ad-hoc): `start_time` em
+   * /v2/bots NÃO adia o join — o bot do pool entra ~na hora (qualquer unidade,
+   * s ou ms). Com o cron criando o bot ~28min antes do início, ele entrava na
+   * sala de espera adiantado e morria no timeout default 600s ANTES de a
+   * reunião abrir → "Timeout waiting to start recording" (apagão de 15-16/jun,
+   * regressão de 0682148). O /scheduled+join_at fica numa fila agendada e só
+   * entra perto do join_at, então o bot chega no horário da reunião.
    */
   private buildBotPayload(
     meetingUrl: string,
     meetingId: string,
     dedupKey?: string,
-    startTimeUnixMs?: number,
+    joinAtIso?: string,
   ): Record<string, unknown> {
     const body: Record<string, unknown> = {
       meeting_url: meetingUrl,
@@ -88,12 +95,17 @@ export class MeetingBaasService {
       automatic_leave: AUTOMATIC_LEAVE,
       extra: { lemon_meeting_id: meetingId },
     }
-    if (startTimeUnixMs != null) body.start_time = startTimeUnixMs
+    if (joinAtIso != null) body.join_at = joinAtIso
     return body
   }
 
-  private async createBot(body: Record<string, unknown>): Promise<string> {
-    const response = await fetch(`${BAAS_API_URL}/v2/bots`, {
+  /**
+   * Cria o bot. `scheduled=false` → /v2/bots (join imediato);
+   * `scheduled=true` → /v2/bots/scheduled (fila agendada, join no `join_at`).
+   */
+  private async createBot(body: Record<string, unknown>, scheduled = false): Promise<string> {
+    const endpoint = scheduled ? '/v2/bots/scheduled' : '/v2/bots'
+    const response = await fetch(`${BAAS_API_URL}${endpoint}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -121,16 +133,14 @@ export class MeetingBaasService {
   }
 
   /**
-   * Agenda o bot para entrar na reunião em um horário específico, via o campo
-   * v2 `start_time` (Unix em MILISSEGUNDOS) no mesmo endpoint /bots/ — o bot entra
-   * exatamente no horário. Retorna o bot_id do MeetingBaas.
+   * Agenda o bot via /v2/bots/scheduled + `join_at` (ISO) — o bot fica numa fila
+   * e só entra perto do horário, evitando o join ~28min adiantado que matava o
+   * bot no timeout default antes de a reunião abrir. Retorna o bot_id.
    */
   async scheduleBotAt(meetingUrl: string, meetingId: string, joinAt: Date, dedupKey?: string): Promise<string> {
-    // start_time em MILISSEGUNDOS (verificado contra a API real). Em segundos
-    // o bot entra na hora (timestamp interpretado como passado) — bug de 15/jun.
-    const startTimeUnixMs = joinAt.getTime()
-    const botId = await this.createBot(this.buildBotPayload(meetingUrl, meetingId, dedupKey, startTimeUnixMs))
-    logger.info(`[MeetingBaas] Bot ${botId} agendado para meeting ${meetingId} às ${joinAt.toISOString()} (start_time=${startTimeUnixMs}ms)`)
+    const joinAtIso = joinAt.toISOString()
+    const botId = await this.createBot(this.buildBotPayload(meetingUrl, meetingId, dedupKey, joinAtIso), true)
+    logger.info(`[MeetingBaas] Bot ${botId} agendado para meeting ${meetingId} às ${joinAtIso} (/scheduled + join_at)`)
     return botId
   }
 
