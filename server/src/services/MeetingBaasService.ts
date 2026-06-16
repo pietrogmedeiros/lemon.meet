@@ -69,14 +69,14 @@ export class MeetingBaasService {
    * `callback_config`, `timeout_config`) — eram silenciosamente ignorados, e
    * por isso nosso `automatic_leave` no caminho agendado nunca valia (o bot
    * saía no default de 600s). Campos corretos: `speech_to_text`, `webhook_url`,
-   * `deduplication_key` (top-level), `automatic_leave` e `start_time` (Unix s,
+   * `deduplication_key` (top-level), `automatic_leave` e `start_time` (Unix em MS — NÃO segundos,
    * agendamento — substitui o endpoint legado /bots/scheduled + join_at).
    */
   private buildBotPayload(
     meetingUrl: string,
     meetingId: string,
     dedupKey?: string,
-    startTimeUnixSec?: number,
+    startTimeUnixMs?: number,
   ): Record<string, unknown> {
     const body: Record<string, unknown> = {
       meeting_url: meetingUrl,
@@ -88,7 +88,7 @@ export class MeetingBaasService {
       automatic_leave: AUTOMATIC_LEAVE,
       extra: { lemon_meeting_id: meetingId },
     }
-    if (startTimeUnixSec != null) body.start_time = startTimeUnixSec
+    if (startTimeUnixMs != null) body.start_time = startTimeUnixMs
     return body
   }
 
@@ -122,13 +122,15 @@ export class MeetingBaasService {
 
   /**
    * Agenda o bot para entrar na reunião em um horário específico, via o campo
-   * v2 `start_time` (Unix em segundos) no mesmo endpoint /bots/ — o bot entra
+   * v2 `start_time` (Unix em MILISSEGUNDOS) no mesmo endpoint /bots/ — o bot entra
    * exatamente no horário. Retorna o bot_id do MeetingBaas.
    */
   async scheduleBotAt(meetingUrl: string, meetingId: string, joinAt: Date, dedupKey?: string): Promise<string> {
-    const startTimeUnixSec = Math.floor(joinAt.getTime() / 1000)
-    const botId = await this.createBot(this.buildBotPayload(meetingUrl, meetingId, dedupKey, startTimeUnixSec))
-    logger.info(`[MeetingBaas] Bot ${botId} agendado para meeting ${meetingId} às ${joinAt.toISOString()} (start_time=${startTimeUnixSec})`)
+    // start_time em MILISSEGUNDOS (verificado contra a API real). Em segundos
+    // o bot entra na hora (timestamp interpretado como passado) — bug de 15/jun.
+    const startTimeUnixMs = joinAt.getTime()
+    const botId = await this.createBot(this.buildBotPayload(meetingUrl, meetingId, dedupKey, startTimeUnixMs))
+    logger.info(`[MeetingBaas] Bot ${botId} agendado para meeting ${meetingId} às ${joinAt.toISOString()} (start_time=${startTimeUnixMs}ms)`)
     return botId
   }
 
