@@ -6,7 +6,7 @@
 // O BotRouter escolhe qual provider usar em cada dispatch.
 // ============================================================
 
-export type BotProviderName = 'meetingbaas' | 'attendee'
+export type BotProviderName = 'meetingbaas' | 'attendee' | 'skribby'
 
 export interface SendBotResult {
   /** Id do bot no provider (baas_bot_id ou attendee_bot_id). */

@@ -16,6 +16,7 @@ import integrationsRouter from './routes/integrations.routes.js'
 import coachingRouter from './routes/coaching.routes.js'
 import meetingBaasRouter from './routes/meetingbaas.routes.js'
 import { attendeeWebhookHandler } from './routes/attendee.routes.js'
+import { skribbyWebhookHandler } from './routes/skribby.routes.js'
 import calendarRouter from './routes/calendar.routes.js'
 import pipedriveRouter from './routes/pipedrive.routes.js'
 import hubspotRouter from './routes/hubspot.routes.js'
@@ -104,6 +105,11 @@ app.post('/api/subscription/webhook', express.raw({ type: 'application/json' }),
 // Attendee webhook — mesma exigência de raw body para validar a assinatura
 // HMAC-SHA256 (X-Webhook-Signature). Registrado ANTES do express.json().
 app.post('/api/attendee/webhook', express.raw({ type: 'application/json' }), attendeeWebhookHandler)
+
+// Skribby webhook — mesma exigência de raw body para validar a assinatura HMAC.
+// Registrado ANTES do express.json(). Fase 0 (dark): o handler é inerte
+// enquanto SKRIBBY_ENABLED !== 'true'.
+app.post('/api/skribby/webhook', express.raw({ type: 'application/json' }), skribbyWebhookHandler)
 
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
