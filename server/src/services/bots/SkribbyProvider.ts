@@ -20,6 +20,7 @@
 // ============================================================
 
 import type { IBotProvider, SendBotResult } from './IBotProvider.js'
+import { getServerUrl } from '../../config/serverUrl.js'
 import type { SkribbyTranscriptBlock } from './skribbyTranscript.js'
 import { logger } from '../../utils/logger.js'
 
@@ -48,7 +49,7 @@ export class SkribbyProvider implements IBotProvider {
     if (!apiKey) throw new Error('SKRIBBY_API_KEY is not set')
     this.apiUrl = apiUrl.replace(/\/+$/, '') // remove barra final
     this.apiKey = apiKey
-    this.webhookUrl = `${process.env.SERVER_URL ?? 'https://vibe-aiserver-production.up.railway.app'}/api/skribby/webhook`
+    this.webhookUrl = `${getServerUrl()}/api/skribby/webhook`
     this.language = process.env.SKRIBBY_LANGUAGE ?? 'pt-BR'
   }
 

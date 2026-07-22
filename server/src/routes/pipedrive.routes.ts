@@ -1,6 +1,7 @@
 import { Router, Response, IRouter } from 'express'
 import { authMiddleware, AuthRequest } from '../middleware/auth.middleware.js'
 import { supabase } from '../config/supabase.js'
+import { getServerUrl } from '../config/serverUrl.js'
 
 const router: IRouter = Router()
 
@@ -11,9 +12,7 @@ const PIPEDRIVE_API_BASE = 'https://api.pipedrive.com/v1'
 const CLIENT_ID = process.env.PIPEDRIVE_CLIENT_ID!
 const CLIENT_SECRET = process.env.PIPEDRIVE_CLIENT_SECRET!
 const FRONTEND_URL = process.env.FRONTEND_URL || 'https://lemon-meet.web.app'
-const SERVER_URL = process.env.RAILWAY_PUBLIC_DOMAIN
-  ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
-  : (process.env.SERVER_URL || 'https://vibe-aiserver-production.up.railway.app')
+const SERVER_URL = getServerUrl()
 
 const REDIRECT_URI = `${SERVER_URL}/api/pipedrive/callback`
 

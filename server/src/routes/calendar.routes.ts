@@ -10,6 +10,7 @@
 
 import { Router, type Router as RouterType, type Request, type Response } from 'express'
 import { authMiddleware, type AuthRequest } from '../middleware/auth.middleware.js'
+import { getServerUrl } from '../config/serverUrl.js'
 import { supabase } from '../config/supabase.js'
 import { logger } from '../utils/logger.js'
 import {
@@ -40,7 +41,7 @@ function detectPlatform(item: any): 'meet' | 'zoom' | 'teams' | null {
 router.get('/connect', authMiddleware, async (req: AuthRequest, res: Response) => {
   const userId = req.user!.id
   const clientId = process.env.GOOGLE_CALENDAR_CLIENT_ID
-  const serverUrl = process.env.SERVER_URL ?? 'https://vibe-aiserver-production.up.railway.app'
+  const serverUrl = getServerUrl()
   const redirectUri = `${serverUrl}/api/calendar/oauth/callback`
 
   if (!clientId) {
@@ -86,7 +87,7 @@ router.get('/oauth/callback', async (req: Request, res: Response) => {
 
   const clientId     = process.env.GOOGLE_CALENDAR_CLIENT_ID!
   const clientSecret = process.env.GOOGLE_CALENDAR_CLIENT_SECRET!
-  const serverUrl    = process.env.SERVER_URL ?? 'https://vibe-aiserver-production.up.railway.app'
+  const serverUrl    = getServerUrl()
   const redirectUri  = `${serverUrl}/api/calendar/oauth/callback`
 
   let accessToken: string

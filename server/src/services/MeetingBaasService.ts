@@ -4,6 +4,7 @@
 // ============================================================
 
 import { logger } from '../utils/logger.js'
+import { getServerUrl } from '../config/serverUrl.js'
 
 const BAAS_API_URL = 'https://api.meetingbaas.com'
 const BOT_NAME = 'Lemon Notetaker'
@@ -59,7 +60,7 @@ export class MeetingBaasService {
     const apiKey = process.env.MEETINGBAAS_API_KEY
     if (!apiKey) throw new Error('MEETINGBAAS_API_KEY is not set')
     this.apiKey = apiKey
-    this.webhookUrl = `${process.env.SERVER_URL ?? 'https://vibe-aiserver-production.up.railway.app'}/api/meetingbaas/webhook`
+    this.webhookUrl = `${getServerUrl()}/api/meetingbaas/webhook`
   }
 
   /**

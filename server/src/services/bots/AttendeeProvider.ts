@@ -11,6 +11,7 @@
 // ============================================================
 
 import type { IBotProvider, SendBotResult } from './IBotProvider.js'
+import { getServerUrl } from '../../config/serverUrl.js'
 import { logger } from '../../utils/logger.js'
 
 const BOT_NAME = 'Lemon Notetaker'
@@ -40,7 +41,7 @@ export class AttendeeProvider implements IBotProvider {
     if (!apiKey) throw new Error('ATTENDEE_API_KEY is not set')
     this.apiUrl = apiUrl.replace(/\/+$/, '') // remove barra final
     this.apiKey = apiKey
-    this.webhookUrl = `${process.env.SERVER_URL ?? 'https://vibe-aiserver-production.up.railway.app'}/api/attendee/webhook`
+    this.webhookUrl = `${getServerUrl()}/api/attendee/webhook`
     this.deepgramLanguage = process.env.ATTENDEE_DEEPGRAM_LANGUAGE ?? 'pt-BR'
   }
 

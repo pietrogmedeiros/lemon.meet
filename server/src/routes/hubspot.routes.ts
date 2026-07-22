@@ -3,6 +3,7 @@ import { authMiddleware, AuthRequest } from '../middleware/auth.middleware.js'
 import { supabase } from '../config/supabase.js'
 import { logger } from '../utils/logger.js'
 import { getAccessibleMemberIds } from '../utils/teamAccess.js'
+import { getServerUrl } from '../config/serverUrl.js'
 
 const router: IRouter = Router()
 
@@ -13,9 +14,7 @@ const HUBSPOT_API_BASE = 'https://api.hubapi.com'
 const CLIENT_ID = process.env.HUBSPOT_CLIENT_ID!
 const CLIENT_SECRET = process.env.HUBSPOT_CLIENT_SECRET!
 const FRONTEND_URL = process.env.FRONTEND_URL || 'https://lemon-meet.web.app'
-const SERVER_URL = process.env.RAILWAY_PUBLIC_DOMAIN
-  ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
-  : (process.env.SERVER_URL || 'https://vibe-aiserver-production.up.railway.app')
+const SERVER_URL = getServerUrl()
 
 const REDIRECT_URI = `${SERVER_URL}/api/hubspot/callback`
 
