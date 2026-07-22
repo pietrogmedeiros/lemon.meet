@@ -16,14 +16,9 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - FRONTEND_URL=${FRONTEND_URL:-http://localhost:5173}
       - SOCKET_IO_CORS_ORIGIN=${SOCKET_IO_CORS_ORIGIN:-http://localhost:5173}
-      - PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
-      - PUPPETEER_HEADLESS=true
       - MAX_CONCURRENT_MEETINGS=${MAX_CONCURRENT_MEETINGS:-5}
       - MEETING_TIMEOUT_MS=${MEETING_TIMEOUT_MS:-7200000}
-    volumes:
-      - /dev/shm:/dev/shm
-    shm_size: 2gb
-    mem_limit: 2g
+    mem_limit: 1g
     ulimits:
       nofile:
         soft: 262144
