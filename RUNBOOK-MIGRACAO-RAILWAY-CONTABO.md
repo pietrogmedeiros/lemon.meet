@@ -49,7 +49,7 @@ a env **e** re-apontar no provedor onde marcado 🔧:
 
 ## Fase 0 — Pré-flight
 
-- [ ] Definir o domínio do backend, ex.: `api.lemon.meet` (subdomínio dedicado).
+- [x] Domínio do backend definido: **`api.lemon-meet.com`**.
 - [ ] Exportar **todas** as env vars atuais do painel Railway (Variables → copiar).
 - [ ] Confirmar que a Contabo/EasyPanel tem RAM livre pro limite de 1 GB (tem).
 - [ ] Ter à mão acessos: Google Cloud Console, Pipedrive app, HubSpot app,
@@ -86,7 +86,7 @@ código). **Não** setar `RAILWAY_PUBLIC_DOMAIN` nem `RAILWAY_ENVIRONMENT_NAME`
 ```
 NODE_ENV=production
 PORT=3000
-SERVER_URL=https://api.lemon.meet          # ← a NOVA URL pública (crítico)
+SERVER_URL=https://api.lemon-meet.com          # ← a NOVA URL pública (crítico)
 FRONTEND_URL=https://lemon-meet.web.app
 ```
 **Supabase** (⚠️ conferir nome: código lê `SUPABASE_SERVICE_ROLE_KEY` e
@@ -150,11 +150,11 @@ CALENDAR_CRON_ENABLED=true      # (ou omitir DISABLE_CALENDAR_CRON)
 
 ## Fase 3 — Domínio + TLS
 
-1. **DNS:** criar `A` record `api.lemon.meet` → IP da Contabo.
-2. No EasyPanel → app → **Domains** → adicionar `api.lemon.meet`.
+1. **DNS:** criar `A` record `api.lemon-meet.com` → IP da Contabo.
+2. No EasyPanel → app → **Domains** → adicionar `api.lemon-meet.com`.
    O EasyPanel provisiona **TLS (Let's Encrypt) e o proxy automaticamente**;
    WebSocket (Socket.IO) passa transparente. Sem Caddy/nginx manual.
-3. Confirmar `https://api.lemon.meet/health` → 200 de fora.
+3. Confirmar `https://api.lemon-meet.com/health` → 200 de fora.
 
 ---
 
@@ -165,12 +165,12 @@ remover as antigas ainda, pra permitir rollback):
 
 - [ ] **Google Cloud Console** (mesmo OAuth client do Calendar/Drive) →
       Credentials → Authorized redirect URIs, **adicionar**:
-      - `https://api.lemon.meet/api/gdrive/oauth/callback`
-      - `https://api.lemon.meet/api/calendar/oauth/callback`
-- [ ] **Pipedrive app** → redirect URL: `https://api.lemon.meet/api/pipedrive/callback`
-- [ ] **HubSpot app** → redirect URL: `https://api.lemon.meet/api/hubspot/callback`
-- [ ] **AbacatePay** → webhook URL para o novo host (confirmar/rotacionar o
-      `ABACATEPAY_WEBHOOK_SECRET` se o painel gerar novo).
+      - `https://api.lemon-meet.com/api/gdrive/oauth/callback`
+      - `https://api.lemon-meet.com/api/calendar/oauth/callback`
+- [ ] **Pipedrive app** → redirect URL: `https://api.lemon-meet.com/api/pipedrive/callback`
+- [ ] **HubSpot app** → redirect URL: `https://api.lemon-meet.com/api/hubspot/callback`
+- [ ] **AbacatePay** → webhook URL: `https://api.lemon-meet.com/api/subscription/webhook`
+      (confirmar/rotacionar o `ABACATEPAY_WEBHOOK_SECRET` se o painel gerar novo).
 - [ ] **MeetingBaaS / Skribby / Attendee:** nada a fazer — o `webhook_url` é
       enviado no payload de cada bot e já seguirá o novo `SERVER_URL`.
 
@@ -180,7 +180,7 @@ remover as antigas ainda, pra permitir rollback):
 
 Estratégia: rodar **em paralelo** (Railway ainda de pé) e virar o front por último.
 
-1. [ ] Smoke test direto no novo backend (`api.lemon.meet`):
+1. [ ] Smoke test direto no novo backend (`api.lemon-meet.com`):
    - [ ] `/health` 200.
    - [ ] Login/sessão (Supabase) funciona.
    - [ ] Conectar **Google Drive** e **Calendar** (testa os 2 OAuth novos).
@@ -190,7 +190,7 @@ Estratégia: rodar **em paralelo** (Railway ainda de pé) e virar o front por ú
    - [ ] Um pagamento de teste no AbacatePay → webhook chega e processa.
    - [ ] `/admin/metrics` responde com o `ADMIN_METRICS_KEY`.
 2. [ ] Apontar o frontend pro novo backend: `VITE_API_URL` do build do `web`
-       (Firebase) para `https://api.lemon.meet` e **redeploy do Firebase**.
+       (Firebase) para `https://api.lemon-meet.com` e **redeploy do Firebase**.
        (Conferir também `SOCKET_IO_CORS_ORIGIN`/CORS aceitando o domínio do front.)
 3. [ ] Observar logs + `/admin/metrics` por algumas horas.
 
