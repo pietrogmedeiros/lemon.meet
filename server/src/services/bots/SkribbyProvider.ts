@@ -26,12 +26,13 @@ import { logger } from '../../utils/logger.js'
 
 const BOT_NAME = 'Lemon Notetaker'
 
-// Timeouts (s) generosos — mesma lição do MeetingBaas: reuniões comerciais
-// começam atrasadas, então damos folga antes de o bot desistir na sala de
-// espera ou por reunião "vazia". TODO(piloto): confirmar chaves de stop_options.
+// Timeouts do Skribby — o create rejeita valores > 60 (422). O máximo que a
+// API aceita é 60 (confirmado ao vivo em 2026-07-23). Usamos o teto pra dar a
+// maior folga possível antes de o bot desistir na sala de espera ou por reunião
+// "vazia" (reuniões comerciais começam atrasadas).
 const STOP_OPTIONS = {
-  waiting_room_timeout: 1800,
-  empty_meeting_timeout: 1800,
+  waiting_room_timeout: 60,
+  empty_meeting_timeout: 60,
 }
 
 export class SkribbyProvider implements IBotProvider {
