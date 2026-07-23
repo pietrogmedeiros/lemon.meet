@@ -13,7 +13,7 @@ import { randomUUID } from 'crypto'
 import { supabase } from '../config/supabase.js'
 import { logger } from '../utils/logger.js'
 import { botRouter, type DispatchResult } from './bots/BotRouter.js'
-import type { BotProviderName } from './bots/IBotProvider.js'
+import { botIdColumn, type BotProviderName } from './bots/IBotProvider.js'
 import { resolveMeetingTeamId } from '../utils/teamAccess.js'
 import { fanOutFromOwner } from '../routes/meetingbaas.routes.js'
 import { notificationService } from './NotificationService.js'
@@ -248,7 +248,7 @@ export class CalendarCronService {
     // Usa .limit(1) para evitar erro do maybeSingle() com múltiplas linhas
     const { data: existingRows, error: checkError } = await supabase
       .from('meetings')
-      .select('id, status, started_at, baas_bot_id, attendee_bot_id, bot_provider')
+      .select('id, status, started_at, baas_bot_id, attendee_bot_id, skribby_bot_id, bot_provider')
       .eq('user_id', userId)
       .eq('baas_event_uuid', eventId)
       .limit(1)
@@ -259,7 +259,7 @@ export class CalendarCronService {
     }
 
     if (existingRows && existingRows.length > 0) {
-      const existing = existingRows[0] as { id: string; status: string; started_at: string | null; baas_bot_id: string | null; attendee_bot_id: string | null; bot_provider: string | null }
+      const existing = existingRows[0] as { id: string; status: string; started_at: string | null; baas_bot_id: string | null; attendee_bot_id: string | null; skribby_bot_id: string | null; bot_provider: string | null }
 
       // Detecta reagendamento: bot ainda não entrou (status=requesting) e o
       // horário do evento mudou significativamente (>60s). Necessário porque
@@ -285,7 +285,7 @@ export class CalendarCronService {
     // outro bot — era a causa de ~31% de bots desperdiçados.
     const { data: ownerRows } = await supabase
       .from('meetings')
-      .select('id, user_id, team_id, status, bot_provider, baas_bot_id, attendee_bot_id')
+      .select('id, user_id, team_id, status, bot_provider, baas_bot_id, attendee_bot_id, skribby_bot_id')
       .eq('baas_event_uuid', eventId)
       .is('bot_owner_meeting_id', null)
       .order('created_at', { ascending: true })
@@ -315,6 +315,7 @@ export class CalendarCronService {
         bot_provider:       owner.bot_provider,
         baas_bot_id:        owner.baas_bot_id,
         attendee_bot_id:    owner.attendee_bot_id,
+        skribby_bot_id:     owner.skribby_bot_id,
         baas_event_uuid:    eventId,
         bot_owner_meeting_id: owner.id,
         participant_emails: linkedEmails.length > 0 ? linkedEmails : null,
@@ -376,6 +377,7 @@ export class CalendarCronService {
       bot_fallback:      fellBack,
       baas_bot_id:       provider === 'meetingbaas' ? externalId : null,
       attendee_bot_id:   provider === 'attendee' ? externalId : null,
+      skribby_bot_id:    provider === 'skribby' ? externalId : null,
       baas_event_uuid:   eventId,
       participant_emails: participantEmails.length > 0 ? participantEmails : null,
       started_at:      startedAt ?? new Date().toISOString(),
@@ -393,14 +395,14 @@ export class CalendarCronService {
   }
 
   private async rescheduleBot(
-    existing: { id: string; bot_provider: string | null; baas_bot_id: string | null; attendee_bot_id: string | null },
+    existing: { id: string; bot_provider: string | null; baas_bot_id: string | null; attendee_bot_id: string | null; skribby_bot_id: string | null },
     meetingUrl: string,
     newStartedAt: string,
   ): Promise<void> {
     // Cancela bot antigo no provider correto (best-effort — se falhar,
     // seguimos: pior caso é o bot antigo entrar no horário antigo e timeoutar).
     const oldProvider = (existing.bot_provider ?? 'meetingbaas') as BotProviderName
-    const oldExternalId = oldProvider === 'attendee' ? existing.attendee_bot_id : existing.baas_bot_id
+    const oldExternalId = (existing as Record<string, string | null>)[botIdColumn(oldProvider)]
     if (oldExternalId) {
       try {
         await botRouter.removeBot(oldProvider, oldExternalId)
@@ -433,6 +435,7 @@ export class CalendarCronService {
         bot_fallback:    dispatch.fellBack,
         baas_bot_id:     dispatch.provider === 'meetingbaas' ? dispatch.externalId : null,
         attendee_bot_id: dispatch.provider === 'attendee' ? dispatch.externalId : null,
+        skribby_bot_id:  dispatch.provider === 'skribby' ? dispatch.externalId : null,
         started_at:      newStart.toISOString(),
       })
       .eq('id', existing.id)

@@ -21,6 +21,7 @@ import { notificationService } from '../NotificationService.js'
 import type { BotProviderName } from './IBotProvider.js'
 import { MeetingBaasProvider } from './MeetingBaasProvider.js'
 import { AttendeeProvider } from './AttendeeProvider.js'
+import { SkribbyProvider } from './SkribbyProvider.js'
 import { decideProvider } from './botRouterDecision.js'
 
 const ACTIVE_STATUSES = ['requesting', 'recording', 'processing']
@@ -47,6 +48,8 @@ export interface DispatchResult {
 export class BotRouter {
   private readonly meetingbaas = new MeetingBaasProvider()
   private readonly attendee: AttendeeProvider | null
+  private readonly skribby: SkribbyProvider | null
+  private readonly skribbyRolloutPercent: number
   private readonly maxConcurrent: number
   private readonly alertAdminUserId = process.env.ALERT_ADMIN_USER_ID
   private fallbacksSinceAlert = 0
@@ -58,9 +61,20 @@ export class BotRouter {
     this.attendee = enabled && hasCreds ? new AttendeeProvider() : null
     this.maxConcurrent = clampInt(process.env.ATTENDEE_MAX_CONCURRENT, 2, 0, 100)
 
+    // Skribby (provider gerenciado): só instanciado com SKRIBBY_ENABLED='true' e
+    // credenciais presentes. Roteia SKRIBBY_ROLLOUT_PERCENT% dos joins; o resto
+    // segue o caminho Attendee/MeetingBaas. Fallback automático em caso de erro.
+    const skribbyEnabled = process.env.SKRIBBY_ENABLED === 'true'
+    const hasSkribbyCreds = Boolean(process.env.SKRIBBY_API_URL && process.env.SKRIBBY_API_KEY)
+    this.skribby = skribbyEnabled && hasSkribbyCreds ? new SkribbyProvider() : null
+    this.skribbyRolloutPercent = this.skribby ? clampInt(process.env.SKRIBBY_ROLLOUT_PERCENT, 0, 0, 100) : 0
+
+    if (this.skribby) {
+      logger.info(`[BotRouter] Skribby ATIVO — ${this.skribbyRolloutPercent}% dos joins (fallback Attendee/MeetingBaas)`)
+    }
     if (this.attendee) {
       logger.info(`[BotRouter] Híbrido ATIVO (capacity-first) — Attendee até ${this.maxConcurrent} simultâneos, excedente → MeetingBaas`)
-    } else {
+    } else if (!this.skribby) {
       logger.info('[BotRouter] Attendee desabilitado — 100% MeetingBaas')
     }
   }
@@ -121,6 +135,15 @@ export class BotRouter {
 
   /** Decide o provider para um horário-alvo (now p/ imediato, joinAt p/ agendado). */
   private async chooseProvider(targetTime: Date): Promise<BotProviderName> {
+    // Skribby tem prioridade quando ligado: sorteia SKRIBBY_ROLLOUT_PERCENT% dos
+    // joins. Attendee/MeetingBaas ficam como caminho restante e como fallback.
+    if (this.skribby && this.skribbyRolloutPercent > 0) {
+      if (Math.random() * 100 < this.skribbyRolloutPercent) {
+        logger.info(`[BotRouter] chooseProvider: rollout Skribby (${this.skribbyRolloutPercent}%) → skribby`)
+        return 'skribby'
+      }
+    }
+
     if (!this.attendee) return 'meetingbaas'
 
     const attendeeNearbyCount = await this.attendeeCountNear(targetTime)
@@ -145,6 +168,18 @@ export class BotRouter {
     const choice = await this.chooseProvider(new Date())
 
     let fellBack = false
+    if (choice === 'skribby' && this.skribby) {
+      try {
+        const { externalId } = await this.skribby.sendBot(meetingUrl, meetingId, dedupKey)
+        logger.info(`[BotRouter] dispatch imediato via skribby meeting=${meetingId} bot=${externalId}`)
+        return { provider: 'skribby', externalId, fellBack: false }
+      } catch (err) {
+        logger.error(`[BotRouter] Skribby falhou (fallback → MeetingBaas) meeting=${meetingId}:`, err)
+        fellBack = true
+        await this.reportFallback(meetingId, err)
+      }
+    }
+
     if (choice === 'attendee' && this.attendee) {
       try {
         const { externalId } = await this.attendee.sendBot(meetingUrl, meetingId, dedupKey)
@@ -170,6 +205,18 @@ export class BotRouter {
     const choice = await this.chooseProvider(joinAt)
 
     let fellBack = false
+    if (choice === 'skribby' && this.skribby) {
+      try {
+        const { externalId } = await this.skribby.scheduleBotAt(meetingUrl, meetingId, joinAt, dedupKey)
+        logger.info(`[BotRouter] agendado via skribby meeting=${meetingId} bot=${externalId} join_at=${joinAt.toISOString()}`)
+        return { provider: 'skribby', externalId, fellBack: false }
+      } catch (err) {
+        logger.error(`[BotRouter] Skribby falhou ao agendar (fallback → MeetingBaas) meeting=${meetingId}:`, err)
+        fellBack = true
+        await this.reportFallback(meetingId, err)
+      }
+    }
+
     if (choice === 'attendee' && this.attendee) {
       try {
         const { externalId } = await this.attendee.scheduleBotAt(meetingUrl, meetingId, joinAt, dedupKey)
@@ -189,6 +236,11 @@ export class BotRouter {
 
   /** Remove o bot no provider correto. */
   async removeBot(provider: BotProviderName | null | undefined, externalId: string): Promise<void> {
+    if (provider === 'skribby') {
+      if (this.skribby) await this.skribby.removeBot(externalId)
+      else logger.warn(`[BotRouter] removeBot: bot skribby ${externalId} mas Skribby não instanciado (SKRIBBY_ENABLED off?)`)
+      return
+    }
     if (provider === 'attendee' && this.attendee) {
       await this.attendee.removeBot(externalId)
       return

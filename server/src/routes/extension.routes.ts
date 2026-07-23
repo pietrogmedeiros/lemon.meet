@@ -14,6 +14,7 @@ import { authMiddleware, type AuthRequest } from '../middleware/auth.middleware.
 import { supabase } from '../config/supabase.js'
 import { logger } from '../utils/logger.js'
 import { botRouter, type DispatchResult } from '../services/bots/BotRouter.js'
+import { botIdColumn } from '../services/bots/IBotProvider.js'
 import { notificationService } from '../services/NotificationService.js'
 import { insightsService } from '../services/InsightsService.js'
 import { rapportService } from '../services/RapportService.js'
@@ -71,11 +72,11 @@ router.post('/start', authMiddleware, async (req: AuthRequest, res: Response) =>
       return res.status(502).json({ success: false, message: 'Failed to send bot to meeting' })
     }
 
-    await supabase.from('meetings').update(
-      dispatch.provider === 'attendee'
-        ? { bot_provider: 'attendee', attendee_bot_id: dispatch.externalId, bot_fallback: dispatch.fellBack }
-        : { bot_provider: 'meetingbaas', baas_bot_id: dispatch.externalId, bot_fallback: dispatch.fellBack }
-    ).eq('id', meetingId)
+    await supabase.from('meetings').update({
+      bot_provider: dispatch.provider,
+      [botIdColumn(dispatch.provider)]: dispatch.externalId,
+      bot_fallback: dispatch.fellBack,
+    }).eq('id', meetingId)
 
     logger.info(`Meeting started via ${dispatch.provider}: ${meetingId} bot=${dispatch.externalId} user=${userId}`)
     return res.status(201).json({ success: true, meetingId })
@@ -98,7 +99,7 @@ router.post('/:id/stop', authMiddleware, async (req: AuthRequest, res: Response)
     // Verifica ownership
     const { data: meeting, error: fetchError } = await supabase
       .from('meetings')
-      .select('id, baas_bot_id, attendee_bot_id, bot_provider, status')
+      .select('id, baas_bot_id, attendee_bot_id, skribby_bot_id, bot_provider, status')
       .eq('id', id)
       .eq('user_id', userId)
       .single()
@@ -108,7 +109,7 @@ router.post('/:id/stop', authMiddleware, async (req: AuthRequest, res: Response)
     }
 
     // Remove o bot no provider correto — dispara o webhook de conclusão
-    const externalId = meeting.bot_provider === 'attendee' ? meeting.attendee_bot_id : meeting.baas_bot_id
+    const externalId = (meeting as Record<string, string | null>)[botIdColumn(meeting.bot_provider)]
     if (externalId) {
       try {
         await botRouter.removeBot(meeting.bot_provider ?? 'meetingbaas', externalId)

@@ -25,3 +25,12 @@ export interface IBotProvider {
   /** Remove o bot de uma reunião. */
   removeBot(externalId: string): Promise<void>
 }
+
+/** Coluna do banco (meetings) que guarda o id externo do bot, por provider. */
+export type BotIdColumn = 'baas_bot_id' | 'attendee_bot_id' | 'skribby_bot_id'
+
+export function botIdColumn(provider: BotProviderName | null | undefined): BotIdColumn {
+  if (provider === 'attendee') return 'attendee_bot_id'
+  if (provider === 'skribby') return 'skribby_bot_id'
+  return 'baas_bot_id'
+}
