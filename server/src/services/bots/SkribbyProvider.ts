@@ -42,6 +42,9 @@ export class SkribbyProvider implements IBotProvider {
   private readonly apiKey: string
   private readonly webhookUrl: string
   private readonly language: string
+  /** Conta autenticada do Skribby (Authenticated Accounts) — sem isso o bot
+   *  entra como guest anônimo e o Google Meet BARRA (not_admitted). */
+  private readonly accountId?: string
 
   constructor() {
     const apiUrl = process.env.SKRIBBY_API_URL
@@ -52,6 +55,10 @@ export class SkribbyProvider implements IBotProvider {
     this.apiKey = apiKey
     this.webhookUrl = `${getServerUrl()}/api/skribby/webhook`
     this.language = process.env.SKRIBBY_LANGUAGE ?? 'pt-BR'
+    this.accountId = process.env.SKRIBBY_ACCOUNT_ID?.trim() || undefined
+    if (!this.accountId) {
+      logger.warn('[Skribby] SKRIBBY_ACCOUNT_ID não definido — bots entram como guest anônimo e podem ser BARRADOS pelo Google Meet (not_admitted).')
+    }
   }
 
   private headers(): Record<string, string> {
@@ -94,6 +101,12 @@ export class SkribbyProvider implements IBotProvider {
       language: this.language,
       // Modelo default (groq/whisper-large-v3-turbo) NÃO diariza (speaker=null).
       // TODO(piloto): para ter speaker, setar transcription_model p/ Deepgram/AssemblyAI.
+    }
+    // Conta autenticada: o bot faz login (Google) em vez de entrar anônimo —
+    // resolve o `not_admitted` quando o organizador tranca a sala.
+    // `always_authenticate` força o login já no join (não espera ser barrado).
+    if (this.accountId) {
+      body.authentication = { account_id: this.accountId, always_authenticate: true }
     }
     if (joinAt) body.join_at = joinAt.toISOString()
 
