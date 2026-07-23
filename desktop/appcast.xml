@@ -6,6 +6,15 @@
     <description>Atualizações do app Lemon para macOS.</description>
     <language>pt-BR</language>
     <item>
+      <title>Versão 0.2.5</title>
+      <pubDate>Thu, 23 Jul 2026 17:42:57 +0000</pubDate>
+      <sparkle:version>7</sparkle:version>
+      <sparkle:shortVersionString>0.2.5</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+      <description><![CDATA[<ul><li>Correção definitiva: o app pede a permissão de notificação no launch — permita para receber o aviso de gravação quando uma reunião começar.</li></ul>]]></description>
+      <enclosure url="https://github.com/pietrogmedeiros/lemon.meet/releases/download/desktop-v0.2.5/Lemon-latest.dmg" sparkle:edSignature="d0qp20Tp0RPijILbsFIl6zmafMQllDEK0j/3FgSvwVdLFGiwEN1x8dT/1YY5L2R6u7Dpv6mD8ZhJlWttF4TOAA==" length="2320246" type="application/octet-stream" />
+    </item>
+    <item>
       <title>Versão 0.2.4</title>
       <pubDate>Thu, 23 Jul 2026 17:31:14 +0000</pubDate>
       <sparkle:version>6</sparkle:version>
