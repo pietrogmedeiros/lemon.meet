@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>Lemon Desktop</title>
+    <link>https://raw.githubusercontent.com/pietrogmedeiros/lemon.meet/main/desktop/appcast.xml</link>
+    <description>Atualizações do app Lemon para macOS.</description>
+    <language>pt-BR</language>
+    <item>
+      <title>Versão 0.2.0</title>
+      <pubDate>Thu, 23 Jul 2026 12:14:03 +0000</pubDate>
+      <sparkle:version>2</sparkle:version>
+      <sparkle:shortVersionString>0.2.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+      <description><![CDATA[<ul><li>🎙️ Detecção automática de reunião: o Lemon avisa quando você entra numa call e pergunta se quer gravar.</li><li>⬆️ Atualização automática in-app (esta é a última vez que você baixa manualmente).</li></ul>]]></description>
+      <enclosure url="https://github.com/pietrogmedeiros/lemon.meet/releases/download/desktop-v0.2.0/Lemon-0.2.0.dmg" sparkle:edSignature="St/UPwlM5Lma6GUdtaXnrdF6itTdNAbVFM54xQmOoEH04z92N7L1Q489lPpHD03sXmjxOQKl6Si2YXGs4TmkAw==" length="2759035" type="application/octet-stream" />
+    </item>
+  </channel>
+</rss>
