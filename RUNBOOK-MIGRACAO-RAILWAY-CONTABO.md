@@ -60,12 +60,14 @@ a env **e** re-apontar no provedor onde marcado 🔧:
 ## Fase 1 — Criar o app no EasyPanel (server only)
 
 1. No EasyPanel → **Create App** (no projeto que preferir, ex. `lemon`).
-2. **Source = GitHub** apontando pro repo da Lemon (branch `main`).
+2. **Source = GitHub** → repo `pietrogmedeiros/lemon.meet`, ramo `main`.
 3. **Build:**
-   - Método: **Dockerfile**
-   - Build context / root: **`/`** (a raiz do monorepo — o Dockerfile faz
-     `COPY pnpm-workspace.yaml`, `web/package.json` etc.)
-   - Dockerfile path: **`server/Dockerfile`**
+   - **Caminho de Build (context) = `/`** (raiz do monorepo — o Dockerfile faz
+     `COPY pnpm-workspace.yaml`, `web/package.json` etc.).
+   - O EasyPanel-GitHub procura o `Dockerfile` **na raiz** do Caminho de Build.
+     Por isso o Dockerfile foi movido `server/Dockerfile → ./Dockerfile`
+     (mesmo conteúdo, context da raiz). **Não** setar Caminho de Build `server`:
+     quebra o `COPY` dos arquivos de workspace da raiz.
 4. **Deploy / recursos:**
    - Port interno: **3000**
    - Replicas: **1** ⚠️ (ver gotcha do cron — não escalar)

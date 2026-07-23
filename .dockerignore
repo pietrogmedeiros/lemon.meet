@@ -1,0 +1,50 @@
+# Contexto de build = raiz do monorepo (EasyPanel/Railway).
+# NÃO ignorar: pnpm-lock.yaml, pnpm-workspace.yaml, package.json, tsconfig.json
+# (o Dockerfile precisa deles p/ o `pnpm install --frozen-lockfile`).
+
+# Dependências (reinstaladas na imagem)
+node_modules/
+**/node_modules/
+.pnpm-store/
+
+# Saídas de build
+dist/
+**/dist/
+build/
+*.tsbuildinfo
+
+# Env (injetadas em runtime)
+.env
+.env.local
+.env.*.local
+**/.env
+**/.env.local
+
+# Logs
+logs/
+*.log
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Testes
+coverage/
+.nyc_output/
+
+# Git
+.git/
+.gitignore
+
+# Docs / scratch / infra local
+*.md
+docs/
+.maestri/
+.firebase/
+tmp/
+temp/
+**/temp/
