@@ -29,6 +29,7 @@ import adminMetricsRouter from './routes/admin-metrics.routes.js'
 import webinarRouter from './routes/webinar.routes.js'
 import { calendarCronService } from './services/CalendarCronService.js'
 import { setupSocketIO } from './config/socket.js'
+import { metricsMiddleware, metricsHandler } from './metrics.js'
 
 // Load environment variables
 dotenv.config()
@@ -130,6 +131,13 @@ app.get('/health', (req, res) => {
     uptime: process.uptime(),
   })
 })
+
+// Prometheus scrape endpoint. Registrado antes do metricsMiddleware
+// para não instrumentar a si mesmo nem o /health.
+app.get('/metrics', metricsHandler)
+
+// Métricas RED por rota — a partir daqui, tudo é instrumentado.
+app.use(metricsMiddleware)
 
 // API Routes
 app.use('/api/transcricoes', transcricoesRouter)
