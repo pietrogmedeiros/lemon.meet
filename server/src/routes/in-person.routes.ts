@@ -73,6 +73,7 @@ router.post(
 
     const durationSeconds = parseDuration(req.body.durationSeconds)
     const participantEmails = parseParticipants(req.body.participantEmails)
+    const source = parseSource(req.body.source)
 
     const meetingId = randomUUID()
     const teamId = await resolveMeetingTeamId(userId)
@@ -88,7 +89,7 @@ router.post(
       title,
       meet_link: '',
       platform: null,
-      source: 'in_person',
+      source,
       status: 'processing',
       participant_emails: participantEmails.length > 0 ? participantEmails : null,
       started_at: startedAt,
@@ -129,8 +130,8 @@ async function processInPersonRecording(params: {
   const { meetingId, userId, filePath } = params
 
   try {
-    // 1. Transcrição (Groq Whisper)
-    const chunks = await transcriptionService.transcribeAudio(filePath)
+    // 1. Transcrição (Groq Whisper) — smart: chunk automático p/ áudio longo
+    const chunks = await transcriptionService.transcribeAudioSmart(filePath)
 
     if (chunks.length === 0) {
       logger.warn(`[InPerson] Sem segmentos transcritos para meeting ${meetingId}`)
@@ -224,6 +225,12 @@ async function processInPersonRecording(params: {
   } finally {
     await safeUnlink(filePath)
   }
+}
+
+// Allowlist de origem. Default 'in_person' preserva 100% o comportamento do
+// mobile; o app desktop manda source='desktop'.
+function parseSource(raw: unknown): 'in_person' | 'desktop' {
+  return raw === 'desktop' ? 'desktop' : 'in_person'
 }
 
 function parseDuration(raw: unknown): number | null {
