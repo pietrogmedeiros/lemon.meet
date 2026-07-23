@@ -13,7 +13,7 @@
 // ============================================================
 
 import type { Request, Response, NextFunction } from 'express'
-import { Registry, collectDefaultMetrics, Counter, Histogram } from 'prom-client'
+import { Registry, collectDefaultMetrics, Counter, Histogram, Gauge } from 'prom-client'
 import { logger } from './utils/logger.js'
 
 const PREFIX = 'lemon_meet_backend_'
@@ -40,6 +40,196 @@ const httpRequestDuration = new Histogram({
   buckets: [0.01, 0.05, 0.1, 0.3, 0.5, 1, 2, 5],
   registers: [register],
 })
+
+// ============================================================
+// Métricas de PRODUTO (namespace lemon_meet_*)
+// Fluxos de negócio: dispatch de bots, transcrição, reuniões e
+// o cron de calendário. Alimentadas pelos helpers exportados no
+// fim deste arquivo — os serviços chamam os helpers (1 linha),
+// mantendo o código de negócio limpo.
+// ============================================================
+
+// --- Bots / Dispatch ---
+const botDispatchTotal = new Counter({
+  name: 'lemon_meet_bot_dispatch_total',
+  help: 'Dispatches de bot por provider, modo e resultado',
+  labelNames: ['provider', 'mode', 'outcome'] as const, // mode=immediate|scheduled, outcome=success|fail
+  registers: [register],
+})
+
+const botDispatchDuration = new Histogram({
+  name: 'lemon_meet_bot_dispatch_duration_seconds',
+  help: 'Latência da chamada de dispatch ao provider do bot',
+  labelNames: ['provider', 'mode'] as const,
+  buckets: [0.1, 0.3, 0.5, 1, 2, 5, 10, 30],
+  registers: [register],
+})
+
+const botFallbackTotal = new Counter({
+  name: 'lemon_meet_bot_fallback_total',
+  help: 'Fallbacks de provider por FALHA (ex: skribby/attendee → meetingbaas)',
+  labelNames: ['to_provider'] as const,
+  registers: [register],
+})
+
+const botStatusTotal = new Counter({
+  name: 'lemon_meet_bot_status_total',
+  help: 'Transições de status do bot recebidas via webhook',
+  labelNames: ['provider', 'status'] as const, // status interno: requesting|recording|processing|completed|failed
+  registers: [register],
+})
+
+const attendeeActiveBots = new Gauge({
+  name: 'lemon_meet_attendee_active_bots',
+  help: 'Bots Attendee ativos na janela de capacidade (último valor observado no dispatch)',
+  registers: [register],
+})
+
+const attendeeMaxConcurrent = new Gauge({
+  name: 'lemon_meet_attendee_max_concurrent',
+  help: 'Teto de bots Attendee simultâneos (ATTENDEE_MAX_CONCURRENT)',
+  registers: [register],
+})
+
+// --- Transcrição (Groq/Whisper) ---
+const transcriptionDuration = new Histogram({
+  name: 'lemon_meet_transcription_duration_seconds',
+  help: 'Latência da transcrição via Groq por método e resultado',
+  labelNames: ['method', 'result'] as const, // method=file|buffer, result=success|error
+  buckets: [0.5, 1, 2, 5, 10, 30, 60, 120, 300],
+  registers: [register],
+})
+
+const transcriptionTotal = new Counter({
+  name: 'lemon_meet_transcription_total',
+  help: 'Transcrições executadas por método e resultado',
+  labelNames: ['method', 'result'] as const,
+  registers: [register],
+})
+
+const transcriptionAudioSeconds = new Histogram({
+  name: 'lemon_meet_transcription_audio_seconds',
+  help: 'Duração (em segundos) do áudio submetido à transcrição',
+  labelNames: ['source'] as const,
+  buckets: [30, 60, 300, 600, 1800, 3600, 7200],
+  registers: [register],
+})
+
+// --- Reuniões ---
+const meetingsCreatedTotal = new Counter({
+  name: 'lemon_meet_meetings_created_total',
+  help: 'Reuniões criadas por origem e tipo',
+  labelNames: ['source', 'type'] as const, // source=extension|in_person|desktop|calendar, type=online|in_person
+  registers: [register],
+})
+
+const meetingsStuckRequesting = new Gauge({
+  name: 'lemon_meet_meetings_stuck_requesting',
+  help: 'Reuniões presas em requesting por provider (detectado pelo cron)',
+  labelNames: ['provider'] as const,
+  registers: [register],
+})
+
+// --- Calendar cron ---
+const calendarCronTicksTotal = new Counter({
+  name: 'lemon_meet_calendar_cron_ticks_total',
+  help: 'Execuções (ticks) do cron de calendário por resultado',
+  labelNames: ['result'] as const, // success|error
+  registers: [register],
+})
+
+const calendarCronDuration = new Histogram({
+  name: 'lemon_meet_calendar_cron_duration_seconds',
+  help: 'Duração de cada tick do cron de calendário',
+  buckets: [0.5, 1, 2, 5, 10, 30, 60, 120],
+  registers: [register],
+})
+
+const calendarCronEventsMatched = new Counter({
+  name: 'lemon_meet_calendar_cron_events_matched_total',
+  help: 'Eventos de calendário dentro da janela de agendamento (candidatos a bot)',
+  registers: [register],
+})
+
+const calendarCronBotsDispatched = new Counter({
+  name: 'lemon_meet_calendar_cron_bots_dispatched_total',
+  help: 'Bots efetivamente disparados pelo cron de calendário',
+  labelNames: ['mode'] as const, // immediate|scheduled
+  registers: [register],
+})
+
+// ============================================================
+// Helpers de registro — API estável para os serviços de negócio.
+// Todos são no-throw por design (observabilidade nunca deve
+// derrubar o fluxo de negócio).
+// ============================================================
+
+export const botMetrics = {
+  /** Registra o resultado + latência de um dispatch. durationSeconds opcional. */
+  dispatch(provider: string, mode: 'immediate' | 'scheduled', outcome: 'success' | 'fail', durationSeconds?: number): void {
+    try {
+      botDispatchTotal.inc({ provider, mode, outcome })
+      if (typeof durationSeconds === 'number' && durationSeconds >= 0) {
+        botDispatchDuration.observe({ provider, mode }, durationSeconds)
+      }
+    } catch { /* noop */ }
+  },
+  fallback(toProvider: string): void {
+    try { botFallbackTotal.inc({ to_provider: toProvider }) } catch { /* noop */ }
+  },
+  status(provider: string, status: string): void {
+    try { botStatusTotal.inc({ provider, status }) } catch { /* noop */ }
+  },
+  /** Reflete a ocupação observada na decisão de capacidade. */
+  capacity(activeAttendee: number, maxConcurrent: number): void {
+    try {
+      attendeeActiveBots.set(activeAttendee)
+      attendeeMaxConcurrent.set(maxConcurrent)
+    } catch { /* noop */ }
+  },
+}
+
+export const transcriptionMetrics = {
+  observe(method: 'file' | 'buffer', result: 'success' | 'error', durationSeconds: number): void {
+    try {
+      transcriptionTotal.inc({ method, result })
+      if (durationSeconds >= 0) transcriptionDuration.observe({ method, result }, durationSeconds)
+    } catch { /* noop */ }
+  },
+  audioSeconds(source: string, seconds: number): void {
+    try { if (seconds > 0) transcriptionAudioSeconds.observe({ source }, seconds) } catch { /* noop */ }
+  },
+}
+
+export const meetingMetrics = {
+  created(source: string, type: 'online' | 'in_person'): void {
+    try { meetingsCreatedTotal.inc({ source, type }) } catch { /* noop */ }
+  },
+  /** Substitui o gauge de presas em requesting com o breakdown atual por provider. */
+  stuckRequesting(byProvider: Record<string, number>): void {
+    try {
+      meetingsStuckRequesting.reset()
+      for (const [provider, n] of Object.entries(byProvider)) {
+        meetingsStuckRequesting.set({ provider }, n)
+      }
+    } catch { /* noop */ }
+  },
+}
+
+export const cronMetrics = {
+  tick(result: 'success' | 'error', durationSeconds: number): void {
+    try {
+      calendarCronTicksTotal.inc({ result })
+      if (durationSeconds >= 0) calendarCronDuration.observe(durationSeconds)
+    } catch { /* noop */ }
+  },
+  eventsMatched(n: number): void {
+    try { if (n > 0) calendarCronEventsMatched.inc(n) } catch { /* noop */ }
+  },
+  botDispatched(mode: 'immediate' | 'scheduled'): void {
+    try { calendarCronBotsDispatched.inc({ mode }) } catch { /* noop */ }
+  },
+}
 
 /**
  * Resolve o label `route` evitando explosão de cardinalidade.

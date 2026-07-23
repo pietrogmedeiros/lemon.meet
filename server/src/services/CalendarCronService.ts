@@ -17,6 +17,7 @@ import { botIdColumn, type BotProviderName } from './bots/IBotProvider.js'
 import { resolveMeetingTeamId } from '../utils/teamAccess.js'
 import { fanOutFromOwner } from '../routes/meetingbaas.routes.js'
 import { notificationService } from './NotificationService.js'
+import { cronMetrics, meetingMetrics } from '../metrics.js'
 import {
   getValidAccessToken,
   extractMeetingUrl,
@@ -84,39 +85,46 @@ export class CalendarCronService {
   // ── Lógica principal ────────────────────────────────────────
 
   private async run(): Promise<void> {
-    // Busca todos os usuários com integração Google ativa e refresh_token
-    const { data: integrations, error } = await supabase
-      .from('calendar_integrations')
-      .select('user_id, refresh_token, access_token, token_expires_at')
-      .eq('status', 'active')
-      .not('refresh_token', 'is', null)
-
-    if (error) {
-      logger.error('[CalendarCron] Erro ao buscar integrações:', error)
-      return
-    }
-    if (!integrations?.length) return
-
-    logger.info(`[CalendarCron] Verificando ${integrations.length} usuário(s)`)
-
-    const now      = new Date()
-    const timeMin  = new Date(now.getTime() - LOOKBEHIND_MS).toISOString()
-    const timeMax  = new Date(now.getTime() + LOOKAHEAD_MS).toISOString()
-
-    for (const integration of integrations) {
-      try {
-        await this.processUser(integration, timeMin, timeMax)
-      } catch (err) {
-        logger.error(`[CalendarCron] Erro ao processar user ${integration.user_id}:`, err)
-      }
-    }
-
-    // Checagem de saúde: avisa se há reuniões presas em 'requesting' (bot não
-    // entrou). Isolado em try/catch — nunca pode derrubar o ciclo do cron.
+    const t0 = Date.now()
+    let result: 'success' | 'error' = 'success'
     try {
-      await this.alertStuckRequesting()
-    } catch (err) {
-      logger.error('[CalendarCron] Erro ao checar reuniões presas:', err)
+      // Busca todos os usuários com integração Google ativa e refresh_token
+      const { data: integrations, error } = await supabase
+        .from('calendar_integrations')
+        .select('user_id, refresh_token, access_token, token_expires_at')
+        .eq('status', 'active')
+        .not('refresh_token', 'is', null)
+
+      if (error) {
+        logger.error('[CalendarCron] Erro ao buscar integrações:', error)
+        result = 'error'
+        return
+      }
+      if (!integrations?.length) return
+
+      logger.info(`[CalendarCron] Verificando ${integrations.length} usuário(s)`)
+
+      const now      = new Date()
+      const timeMin  = new Date(now.getTime() - LOOKBEHIND_MS).toISOString()
+      const timeMax  = new Date(now.getTime() + LOOKAHEAD_MS).toISOString()
+
+      for (const integration of integrations) {
+        try {
+          await this.processUser(integration, timeMin, timeMax)
+        } catch (err) {
+          logger.error(`[CalendarCron] Erro ao processar user ${integration.user_id}:`, err)
+        }
+      }
+
+      // Checagem de saúde: avisa se há reuniões presas em 'requesting' (bot não
+      // entrou). Isolado em try/catch — nunca pode derrubar o ciclo do cron.
+      try {
+        await this.alertStuckRequesting()
+      } catch (err) {
+        logger.error('[CalendarCron] Erro ao checar reuniões presas:', err)
+      }
+    } finally {
+      cronMetrics.tick(result, (Date.now() - t0) / 1000)
     }
   }
 
@@ -148,13 +156,17 @@ export class CalendarCronService {
       return
     }
     const stuck = data ?? []
-    if (stuck.length === 0) return
+    if (stuck.length === 0) {
+      meetingMetrics.stuckRequesting({}) // zera o gauge quando não há presas
+      return
+    }
 
     const byProvider = stuck.reduce<Record<string, number>>((acc, m) => {
       const p = (m.bot_provider as string | null) ?? 'desconhecido'
       acc[p] = (acc[p] ?? 0) + 1
       return acc
     }, {})
+    meetingMetrics.stuckRequesting(byProvider)
     const breakdown = Object.entries(byProvider).map(([p, n]) => `${p}: ${n}`).join(', ')
     logger.warn(`[CalendarCron][STUCK] ${stuck.length} reunião(ões) presa(s) em 'requesting' há +${STUCK_AFTER_MS / 60000}min (${breakdown})`)
 
@@ -223,6 +235,7 @@ export class CalendarCronService {
 
     if (!filtered.length) return
 
+    cronMetrics.eventsMatched(filtered.length)
     logger.info(`[CalendarCron] ${filtered.length} evento(s) na janela para user ${user_id}`)
 
     for (const item of filtered) {
@@ -351,6 +364,7 @@ export class CalendarCronService {
       provider = dispatch.provider
       externalId = dispatch.externalId
       fellBack = dispatch.fellBack
+      cronMetrics.botDispatched(useScheduled ? 'scheduled' : 'immediate')
     } catch (err) {
       logger.error(`[CalendarCron] Falha ao enviar bot para evento ${eventId}:`, err)
       return
@@ -390,6 +404,7 @@ export class CalendarCronService {
         logger.warn(`[CalendarCron] Falha ao remover bot órfão ${externalId} (${provider}):`, e)
       )
     } else {
+      meetingMetrics.created('calendar', 'online')
       logger.info(`[CalendarCron] ✅ Bot enviado: event=${eventId} meeting=${meetingId} bot=${externalId} provider=${provider} title="${title}"`)
     }
   }

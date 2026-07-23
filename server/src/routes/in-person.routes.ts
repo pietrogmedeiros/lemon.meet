@@ -16,6 +16,7 @@ import multer from 'multer'
 import { authMiddleware, type AuthRequest } from '../middleware/auth.middleware.js'
 import { supabase } from '../config/supabase.js'
 import { logger } from '../utils/logger.js'
+import { meetingMetrics } from '../metrics.js'
 import { resolveMeetingTeamId } from '../utils/teamAccess.js'
 import { transcriptionService } from '../services/TranscriptionService.js'
 import { insightsService } from '../services/InsightsService.js'
@@ -102,6 +103,8 @@ router.post(
       await safeUnlink(file.path)
       return res.status(500).json({ success: false, message: 'Error creating meeting' })
     }
+
+    meetingMetrics.created(source, 'in_person')
 
     logger.info(
       `[InPerson] Meeting ${meetingId} criada (user=${userId}, file=${file.filename}, ${file.size} bytes)`,

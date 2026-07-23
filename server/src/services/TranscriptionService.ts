@@ -1,5 +1,6 @@
 import Groq, { toFile } from 'groq-sdk';
 import { logger } from '../utils/logger.js';
+import { transcriptionMetrics } from '../metrics.js';
 import * as fs from 'fs';
 import * as path from 'path';
 import { spawn } from 'node:child_process';
@@ -28,6 +29,7 @@ export class TranscriptionService {
    * Transcreve um arquivo de áudio usando OpenAI Whisper
    */
   async transcribeAudio(audioFilePath: string): Promise<TranscriptChunk[]> {
+    const t0 = Date.now();
     try {
       logger.info(`Starting transcription for file: ${audioFilePath}`);
 
@@ -51,9 +53,12 @@ export class TranscriptionService {
 
       logger.info(`Transcription completed: ${response.text.length} characters`);
 
-      return this.buildChunks(response as any);
+      const chunks = this.buildChunks(response as any);
+      transcriptionMetrics.observe('file', 'success', (Date.now() - t0) / 1000);
+      return chunks;
 
     } catch (error: any) {
+      transcriptionMetrics.observe('file', 'error', (Date.now() - t0) / 1000);
       logger.error('Error transcribing audio:', error);
       throw error;
     }
@@ -146,16 +151,24 @@ export class TranscriptionService {
    * não força .webm/audio-webm — essencial para áudio não-webm.
    */
   async transcribeAudioBuffer(audioBuffer: Buffer, filename: string): Promise<TranscriptChunk[]> {
-    const audioFile = await toFile(audioBuffer, filename);
-    const response = await groq.audio.transcriptions.create({
-      file: audioFile,
-      model: 'whisper-large-v3-turbo',
-      language: 'pt',
-      response_format: 'verbose_json',
-      timestamp_granularities: ['segment'],
-    });
-    logger.info(`Transcription (buffer ${filename}) completed: ${response.text.length} characters`);
-    return this.buildChunks(response as any);
+    const t0 = Date.now();
+    try {
+      const audioFile = await toFile(audioBuffer, filename);
+      const response = await groq.audio.transcriptions.create({
+        file: audioFile,
+        model: 'whisper-large-v3-turbo',
+        language: 'pt',
+        response_format: 'verbose_json',
+        timestamp_granularities: ['segment'],
+      });
+      logger.info(`Transcription (buffer ${filename}) completed: ${response.text.length} characters`);
+      const chunks = this.buildChunks(response as any);
+      transcriptionMetrics.observe('buffer', 'success', (Date.now() - t0) / 1000);
+      return chunks;
+    } catch (error: any) {
+      transcriptionMetrics.observe('buffer', 'error', (Date.now() - t0) / 1000);
+      throw error;
+    }
   }
 
   /** Converte a resposta verbose_json do Whisper em chunks, filtrando alucinações. */

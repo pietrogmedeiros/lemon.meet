@@ -23,6 +23,7 @@ import type { AttendeeUtterance } from '../services/bots/AttendeeProvider.js'
 import { normalizeAttendeeUtterances } from '../services/bots/attendeeTranscript.js'
 import { notificationService } from '../services/NotificationService.js'
 import { fanOutFromOwner } from './meetingbaas.routes.js'
+import { botMetrics } from '../metrics.js'
 
 // Estado do Attendee → status interno da reunião.
 const STATE_MAP: Record<string, string> = {
@@ -104,6 +105,8 @@ async function handleStateChange(event: any): Promise<void> {
 
   const mapped = STATE_MAP[newState]
   if (!mapped) return // joining, waiting_room, leaving, etc. — ignora
+
+  botMetrics.status('attendee', mapped)
 
   if (mapped === 'failed') {
     const subType: string = event?.data?.event_sub_type ?? 'unknown'

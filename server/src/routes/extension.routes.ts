@@ -15,6 +15,7 @@ import { supabase } from '../config/supabase.js'
 import { logger } from '../utils/logger.js'
 import { botRouter, type DispatchResult } from '../services/bots/BotRouter.js'
 import { botIdColumn } from '../services/bots/IBotProvider.js'
+import { meetingMetrics } from '../metrics.js'
 import { notificationService } from '../services/NotificationService.js'
 import { insightsService } from '../services/InsightsService.js'
 import { rapportService } from '../services/RapportService.js'
@@ -52,6 +53,8 @@ router.post('/start', authMiddleware, async (req: AuthRequest, res: Response) =>
       logger.error('Error creating meeting:', error)
       return res.status(500).json({ success: false, message: 'Error creating meeting' })
     }
+
+    meetingMetrics.created('extension', 'online')
 
     // Envia o bot via roteador híbrido (MeetingBaas padrão; Attendee para a
     // fatia configurada, com fallback automático para MeetingBaas em caso de erro)

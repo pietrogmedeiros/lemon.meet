@@ -23,6 +23,7 @@ import { MeetingBaasProvider } from './MeetingBaasProvider.js'
 import { AttendeeProvider } from './AttendeeProvider.js'
 import { SkribbyProvider } from './SkribbyProvider.js'
 import { decideProvider } from './botRouterDecision.js'
+import { botMetrics } from '../../metrics.js'
 
 const ACTIVE_STATUSES = ['requesting', 'recording', 'processing']
 
@@ -115,6 +116,7 @@ export class BotRouter {
    * (CalendarCronService) só inserem a reunião DEPOIS do dispatch retornar.
    */
   private async reportFallback(meetingId: string, err: unknown): Promise<void> {
+    botMetrics.fallback('meetingbaas')
     this.fallbacksSinceAlert++
     const detail = err instanceof Error ? err.message : String(err)
     logger.warn(`[BotRouter][FALLBACK] Attendee→MeetingBaas meeting=${meetingId} motivo="${detail}" (acum=${this.fallbacksSinceAlert})`)
@@ -147,6 +149,7 @@ export class BotRouter {
     if (!this.attendee) return 'meetingbaas'
 
     const attendeeNearbyCount = await this.attendeeCountNear(targetTime)
+    botMetrics.capacity(attendeeNearbyCount, this.maxConcurrent)
     const provider = decideProvider({
       attendeeEnabled: true,
       maxConcurrent: this.maxConcurrent,
@@ -169,11 +172,14 @@ export class BotRouter {
 
     let fellBack = false
     if (choice === 'skribby' && this.skribby) {
+      const t = Date.now()
       try {
         const { externalId } = await this.skribby.sendBot(meetingUrl, meetingId, dedupKey)
+        botMetrics.dispatch('skribby', 'immediate', 'success', (Date.now() - t) / 1000)
         logger.info(`[BotRouter] dispatch imediato via skribby meeting=${meetingId} bot=${externalId}`)
         return { provider: 'skribby', externalId, fellBack: false }
       } catch (err) {
+        botMetrics.dispatch('skribby', 'immediate', 'fail', (Date.now() - t) / 1000)
         logger.error(`[BotRouter] Skribby falhou (fallback → MeetingBaas) meeting=${meetingId}:`, err)
         fellBack = true
         await this.reportFallback(meetingId, err)
@@ -181,18 +187,23 @@ export class BotRouter {
     }
 
     if (choice === 'attendee' && this.attendee) {
+      const t = Date.now()
       try {
         const { externalId } = await this.attendee.sendBot(meetingUrl, meetingId, dedupKey)
+        botMetrics.dispatch('attendee', 'immediate', 'success', (Date.now() - t) / 1000)
         logger.info(`[BotRouter] dispatch imediato via attendee meeting=${meetingId} bot=${externalId}`)
         return { provider: 'attendee', externalId, fellBack: false }
       } catch (err) {
+        botMetrics.dispatch('attendee', 'immediate', 'fail', (Date.now() - t) / 1000)
         logger.error(`[BotRouter] Attendee falhou (fallback → MeetingBaas) meeting=${meetingId}:`, err)
         fellBack = true
         await this.reportFallback(meetingId, err)
       }
     }
 
+    const t = Date.now()
     const { externalId } = await this.meetingbaas.sendBot(meetingUrl, meetingId, dedupKey)
+    botMetrics.dispatch('meetingbaas', 'immediate', 'success', (Date.now() - t) / 1000)
     logger.info(`[BotRouter] dispatch imediato via meetingbaas meeting=${meetingId} bot=${externalId}`)
     return { provider: 'meetingbaas', externalId, fellBack }
   }
@@ -206,11 +217,14 @@ export class BotRouter {
 
     let fellBack = false
     if (choice === 'skribby' && this.skribby) {
+      const t = Date.now()
       try {
         const { externalId } = await this.skribby.scheduleBotAt(meetingUrl, meetingId, joinAt, dedupKey)
+        botMetrics.dispatch('skribby', 'scheduled', 'success', (Date.now() - t) / 1000)
         logger.info(`[BotRouter] agendado via skribby meeting=${meetingId} bot=${externalId} join_at=${joinAt.toISOString()}`)
         return { provider: 'skribby', externalId, fellBack: false }
       } catch (err) {
+        botMetrics.dispatch('skribby', 'scheduled', 'fail', (Date.now() - t) / 1000)
         logger.error(`[BotRouter] Skribby falhou ao agendar (fallback → MeetingBaas) meeting=${meetingId}:`, err)
         fellBack = true
         await this.reportFallback(meetingId, err)
@@ -218,18 +232,23 @@ export class BotRouter {
     }
 
     if (choice === 'attendee' && this.attendee) {
+      const t = Date.now()
       try {
         const { externalId } = await this.attendee.scheduleBotAt(meetingUrl, meetingId, joinAt, dedupKey)
+        botMetrics.dispatch('attendee', 'scheduled', 'success', (Date.now() - t) / 1000)
         logger.info(`[BotRouter] agendado via attendee meeting=${meetingId} bot=${externalId} join_at=${joinAt.toISOString()}`)
         return { provider: 'attendee', externalId, fellBack: false }
       } catch (err) {
+        botMetrics.dispatch('attendee', 'scheduled', 'fail', (Date.now() - t) / 1000)
         logger.error(`[BotRouter] Attendee falhou ao agendar (fallback → MeetingBaas) meeting=${meetingId}:`, err)
         fellBack = true
         await this.reportFallback(meetingId, err)
       }
     }
 
+    const t = Date.now()
     const { externalId } = await this.meetingbaas.scheduleBotAt(meetingUrl, meetingId, joinAt, dedupKey)
+    botMetrics.dispatch('meetingbaas', 'scheduled', 'success', (Date.now() - t) / 1000)
     logger.info(`[BotRouter] agendado via meetingbaas meeting=${meetingId} bot=${externalId} join_at=${joinAt.toISOString()}`)
     return { provider: 'meetingbaas', externalId, fellBack }
   }

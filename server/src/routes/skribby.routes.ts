@@ -27,6 +27,7 @@
 import type { Request, Response } from 'express'
 import { supabase } from '../config/supabase.js'
 import { logger } from '../utils/logger.js'
+import { botMetrics } from '../metrics.js'
 import { verifyWebhookSignature } from '../services/bots/webhookSignature.js'
 import { runTranscriptPipeline } from '../services/TranscriptPipeline.js'
 import { normalizeSkribbyTranscript } from '../services/bots/skribbyTranscript.js'
@@ -147,6 +148,8 @@ async function handleStatusUpdate(event: any): Promise<void> {
     logger.info(`[Skribby webhook] status sem mapeamento (ignorado): ${newStatus}`)
     return
   }
+
+  botMetrics.status('skribby', mapped)
 
   // Transição não-terminal: nunca sobrescreve um estado terminal (webhooks podem
   // chegar fora de ordem).

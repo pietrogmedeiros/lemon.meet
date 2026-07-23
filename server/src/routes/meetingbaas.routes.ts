@@ -14,6 +14,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { supabase } from '../config/supabase.js'
 import { logger } from '../utils/logger.js'
+import { botMetrics, transcriptionMetrics } from '../metrics.js'
 import { meetingBaasService, type BaasCompletePayload } from '../services/MeetingBaasService.js'
 import { insightsService } from '../services/InsightsService.js'
 import { transcriptionService } from '../services/TranscriptionService.js'
@@ -71,6 +72,8 @@ async function handleStatusChange(data: { bot_id: string; status: { code: string
 
   const meetingStatus = statusMap[code]
   if (!meetingStatus) return // ignora joining_call, in_waiting_room, etc.
+
+  botMetrics.status('meetingbaas', meetingStatus)
 
   // Em falha, registra o motivo (antes era descartado → failure_reason ficava null)
   // e marca ended_at, para a falha deixar de ser silenciosa/indiagnosticável.
@@ -518,6 +521,8 @@ async function transcribeFromAudioUrl(audioUrl: string, meetingId: string, durat
   const res = await fetch(audioUrl)
   if (!res.ok) throw new Error(`download de áudio HTTP ${res.status}`)
   const buf = Buffer.from(await res.arrayBuffer())
+
+  transcriptionMetrics.audioSeconds('meetingbaas', durationSeconds)
 
   // Guard de silêncio (no FLAC original): bitrate muito baixo = gravação sem fala
   // (foi por isso que o gladia também não transcreveu). Evita gastar Whisper e que
