@@ -43,6 +43,24 @@ const STATE_MAP: Record<string, string> = {
   transcribing: 'processing',
 }
 
+// Estados TERMINAIS de FALHA do Skribby → a reunião vira 'failed'. Sem isso,
+// esses status caíam em "sem mapeamento (ignorado)" e a reunião ficava presa
+// em 'requesting' pra SEMPRE (bug: bots not_admitted travando o funil).
+// Só inclui estados onde o bot NUNCA gravou (não pré-cedem um 'finished'):
+// se um 'finished' chegar depois, finalizeMeeting ainda completa normalmente.
+const FAIL_STATES = new Set<string>([
+  'not_admitted',          // Google barrou o bot (não foi admitido)
+  'admission_denied',
+  'denied',
+  'waiting_room_timeout',  // bot ficou preso na sala de espera
+  'empty_meeting_timeout',
+  'empty_meeting',
+  'no_show',
+  'failed',
+  'error',
+  'crashed',
+])
+
 // Provider instanciado sob demanda (só quando SKRIBBY_ENABLED==='true'), para
 // não tocar no BotRouter na Fase 0.
 let providerSingleton: SkribbyProvider | null = null
@@ -139,6 +157,22 @@ async function handleStatusUpdate(event: any): Promise<void> {
 
   if (newStatus === 'finished') {
     await finalizeMeeting(meeting, botId)
+    return
+  }
+
+  // Estado terminal de falha (ex.: not_admitted): marca 'failed' pra não deixar
+  // a reunião presa em 'requesting'. Não sobrescreve estados já terminais.
+  if (FAIL_STATES.has(newStatus)) {
+    botMetrics.status('skribby', 'failed')
+    const { data: updated } = await supabase.from('meetings')
+      .update({ status: 'failed', failure_reason: `skribby_${newStatus}` })
+      .eq('id', meeting.id)
+      .not('status', 'in', '("failed","completed")')
+      .select('id')
+    if (updated && updated.length > 0) {
+      logger.warn(`[Skribby webhook] Meeting ${meeting.id} → failed (${newStatus})`)
+      await notificationService.notifyMeetingNoTranscription(meeting.user_id, meeting.id)
+    }
     return
   }
 

@@ -182,12 +182,40 @@ export class CalendarCronService {
     })
   }
 
+  /**
+   * True se o usuário tem assinatura ATIVA (entitlement pra bot de calendário).
+   * Regra alinhada com subscription.routes: `user_subscriptions.status==='active'`.
+   * Fail-closed: em erro de consulta, retorna false (não dispara bot) — o cron
+   * roda de novo no próximo ciclo, então uma falha transitória não é permanente.
+   */
+  private async hasActiveSubscription(userId: string): Promise<boolean> {
+    const { data, error } = await supabase
+      .from('user_subscriptions')
+      .select('status')
+      .eq('user_id', userId)
+      .maybeSingle()
+    if (error) {
+      logger.warn(`[CalendarCron] Falha ao checar assinatura de ${userId}: ${error.message}`)
+      return false
+    }
+    return data?.status === 'active'
+  }
+
   private async processUser(
     integration: { user_id: string; refresh_token: string; access_token: string | null; token_expires_at: string | null },
     timeMin: string,
     timeMax: string,
   ): Promise<void> {
     const { user_id } = integration
+
+    // ── Gate de assinatura ────────────────────────────────────────────────
+    // Só agenda bot para quem tem assinatura ATIVA (mesma regra de entitlement
+    // usada em subscription.routes: status === 'active'). Sem isso, usuários
+    // com plano expirado/cancelado continuavam recebendo bot nas reuniões.
+    if (!(await this.hasActiveSubscription(user_id))) {
+      logger.info(`[CalendarCron] User ${user_id} sem assinatura ativa — pulando (sem bot)`)
+      return
+    }
 
     // Renova token se necessário
     let accessToken: string
