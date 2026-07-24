@@ -141,6 +141,34 @@ export class SkribbyProvider implements IBotProvider {
   }
 
   /**
+   * Lê o status ATUAL do bot via GET /bot/{id} (endpoint confirmado ao vivo).
+   * Usado pelo reconciliador (poll) para destravar reuniões quando o webhook
+   * de status_update não chega/valida. Devolve 'not_found' se o bot sumiu (404)
+   * — tratado como estado terminal de falha pelo caller.
+   */
+  async getBotStatus(externalId: string): Promise<string | undefined> {
+    const response = await fetch(`${this.apiUrl}/api/v1/bot/${encodeURIComponent(externalId)}`, {
+      method: 'GET',
+      headers: this.headers(),
+    })
+
+    if (response.status === 404) return 'not_found'
+    if (!response.ok) {
+      const body = await response.text()
+      throw new Error(`Skribby get bot status error ${response.status}: ${body}`)
+    }
+
+    const data = await response.json() as { status?: string; state?: string }
+    const status = data.status ?? data.state
+    if (!status) {
+      // Contrato do GET ainda não 100% confirmado — se o campo de status vier
+      // com outro nome, logamos as chaves pra ajustar sem adivinhar.
+      logger.warn(`[Skribby] GET /bot/${externalId} sem campo status/state — chaves: ${Object.keys(data as object).join(',')}`)
+    }
+    return status
+  }
+
+  /**
    * Busca o objeto do bot e devolve os blocos de transcript. Chamado pelo
    * webhook DEPOIS de new_status='finished' (o transcript não vem no push).
    */

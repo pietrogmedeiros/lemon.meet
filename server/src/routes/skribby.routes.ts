@@ -59,6 +59,7 @@ const FAIL_STATES = new Set<string>([
   'failed',
   'error',
   'crashed',
+  'not_found',             // reconcile: bot sumiu no Skribby (404) após o início
 ])
 
 // Provider instanciado sob demanda (só quando SKRIBBY_ENABLED==='true'), para
@@ -154,6 +155,23 @@ async function handleStatusUpdate(event: any): Promise<void> {
   }
 
   logger.info(`[Skribby webhook] bot=${botId} meeting=${meeting.id} status=${newStatus}`)
+  await applySkribbyStatus(meeting, newStatus, botId, 'webhook')
+}
+
+/**
+ * Máquina de estados Skribby → status interno. Compartilhada pelo webhook e pelo
+ * reconciliador (poll). Idempotente e nunca sobrescreve um estado terminal, então
+ * é seguro chamar com o mesmo status mais de uma vez / fora de ordem.
+ *
+ * `origin` só rotula os logs ('webhook' vs 'reconcile') para depuração.
+ */
+export async function applySkribbyStatus(
+  meeting: MeetingRow,
+  newStatus: string,
+  botId: string,
+  origin: 'webhook' | 'reconcile' = 'webhook',
+): Promise<void> {
+  const tag = `[Skribby ${origin}]`
 
   if (newStatus === 'finished') {
     await finalizeMeeting(meeting, botId)
@@ -170,7 +188,7 @@ async function handleStatusUpdate(event: any): Promise<void> {
       .not('status', 'in', '("failed","completed")')
       .select('id')
     if (updated && updated.length > 0) {
-      logger.warn(`[Skribby webhook] Meeting ${meeting.id} → failed (${newStatus})`)
+      logger.warn(`${tag} Meeting ${meeting.id} → failed (${newStatus})`)
       await notificationService.notifyMeetingNoTranscription(meeting.user_id, meeting.id)
     }
     return
@@ -179,7 +197,7 @@ async function handleStatusUpdate(event: any): Promise<void> {
   const mapped = STATE_MAP[newStatus]
   if (!mapped) {
     // booting/joining e quaisquer estados desconhecidos: ignora sem quebrar.
-    logger.info(`[Skribby webhook] status sem mapeamento (ignorado): ${newStatus}`)
+    logger.info(`${tag} status sem mapeamento (ignorado): ${newStatus}`)
     return
   }
 
@@ -191,6 +209,34 @@ async function handleStatusUpdate(event: any): Promise<void> {
     .update({ status: mapped })
     .eq('id', meeting.id)
     .not('status', 'in', '("failed","completed")')
+}
+
+/** True se o Skribby está ligado e com credenciais — gate do reconciliador. */
+export function isSkribbyEnabled(): boolean {
+  return process.env.SKRIBBY_ENABLED === 'true'
+    && Boolean(process.env.SKRIBBY_API_URL && process.env.SKRIBBY_API_KEY)
+}
+
+/**
+ * Reconcilia UMA reunião Skribby lendo o status REAL do bot (GET /bot/{id}) e
+ * aplicando a mesma máquina de estados do webhook. É a rede de segurança para
+ * quando o webhook de status_update NÃO chega/valida (HMAC, entrega, URL): sem
+ * isso a reunião fica presa em 'requesting' pra sempre. Idempotente.
+ */
+export async function reconcileSkribbyMeeting(meeting: MeetingRow, botId: string): Promise<void> {
+  let status: string | undefined
+  try {
+    status = await skribbyProvider().getBotStatus(botId)
+  } catch (err) {
+    logger.warn(`[Skribby reconcile] Falha ao ler status do bot ${botId} (meeting ${meeting.id}):`, err)
+    return
+  }
+  if (!status) {
+    logger.info(`[Skribby reconcile] bot ${botId} sem campo de status — nada a fazer`)
+    return
+  }
+  logger.info(`[Skribby reconcile] bot=${botId} meeting=${meeting.id} status_real=${status}`)
+  await applySkribbyStatus(meeting, status, botId, 'reconcile')
 }
 
 /** Busca o transcript no Skribby (GET /bot/{id}), normaliza e roda o pipeline. */

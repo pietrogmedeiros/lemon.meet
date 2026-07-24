@@ -16,6 +16,7 @@ import { botRouter, type DispatchResult } from './bots/BotRouter.js'
 import { botIdColumn, type BotProviderName } from './bots/IBotProvider.js'
 import { resolveMeetingTeamId } from '../utils/teamAccess.js'
 import { fanOutFromOwner } from '../routes/meetingbaas.routes.js'
+import { isSkribbyEnabled, reconcileSkribbyMeeting } from '../routes/skribby.routes.js'
 import { notificationService } from './NotificationService.js'
 import { cronMetrics, meetingMetrics } from '../metrics.js'
 import {
@@ -45,6 +46,18 @@ const INTERVAL_MS   = 3  * 60 * 1000
 const STUCK_AFTER_MS        = 12 * 60 * 1000        // início passou há +12min e ainda 'requesting'
 const STUCK_LOOKBACK_MS     = 6  * 60 * 60 * 1000   // não alerta sobre backlog > 6h
 const STUCK_ALERT_THROTTLE_MS = 30 * 60 * 1000      // no máx. 1 alerta a cada 30min
+
+// ── Reconciliador de status do Skribby ─────────────────────────
+// O status de uma reunião Skribby só avança pelo webhook /api/skribby/webhook.
+// Se o webhook não chega/valida (HMAC, entrega, URL errada pós-cutover), a
+// reunião fica presa em 'requesting' pra SEMPRE — foi o que travou o funil.
+// Esta rede de segurança faz POLL do status REAL no Skribby (GET /bot/{id},
+// endpoint confirmado ao vivo) e aplica a MESMA máquina de estados do webhook.
+// Só toca reuniões cujo início já passou de RECONCILE_AFTER_MS (bots agendados
+// legítimos ainda não entraram e não devem ser reconciliados cedo demais).
+const RECONCILE_AFTER_MS    = 3  * 60 * 1000        // início passou há +3min e ainda ativa
+const RECONCILE_LOOKBACK_MS = 6  * 60 * 60 * 1000   // não reconcilia backlog > 6h
+const RECONCILE_ACTIVE_STATUSES = ['requesting', 'recording', 'processing']
 
 export class CalendarCronService {
   private timer: ReturnType<typeof setInterval> | null = null
@@ -116,6 +129,15 @@ export class CalendarCronService {
         }
       }
 
+      // Rede de segurança: reconcilia reuniões Skribby via poll do status real,
+      // destravando as que ficaram presas por webhook não entregue/validado.
+      // Isolado em try/catch — nunca pode derrubar o ciclo do cron.
+      try {
+        await this.reconcileSkribbyStuck()
+      } catch (err) {
+        logger.error('[CalendarCron] Erro ao reconciliar reuniões Skribby:', err)
+      }
+
       // Checagem de saúde: avisa se há reuniões presas em 'requesting' (bot não
       // entrou). Isolado em try/catch — nunca pode derrubar o ciclo do cron.
       try {
@@ -125,6 +147,53 @@ export class CalendarCronService {
       }
     } finally {
       cronMetrics.tick(result, (Date.now() - t0) / 1000)
+    }
+  }
+
+  /**
+   * Reconcilia reuniões Skribby ATIVAS lendo o status real do bot no Skribby e
+   * aplicando a máquina de estados do webhook. Destrava as que ficaram presas
+   * porque o webhook de status_update não chegou/validou. Best-effort por linha:
+   * a falha de uma não impede as outras.
+   */
+  private async reconcileSkribbyStuck(): Promise<void> {
+    if (!isSkribbyEnabled()) return // Skribby desligado: nada a reconciliar
+
+    const now = Date.now()
+    const activeBefore  = new Date(now - RECONCILE_AFTER_MS).toISOString()
+    const lookbackFloor = new Date(now - RECONCILE_LOOKBACK_MS).toISOString()
+
+    // Só reuniões "donas" do bot (linkadas herdam status via fan-out) cujo bot é
+    // do Skribby, que ainda estão ativas e cujo início já passou o limiar.
+    const { data, error } = await supabase
+      .from('meetings')
+      .select('id, user_id, title, status, ended_at, skribby_bot_id')
+      .eq('bot_provider', 'skribby')
+      .in('status', RECONCILE_ACTIVE_STATUSES)
+      .is('bot_owner_meeting_id', null)
+      .not('skribby_bot_id', 'is', null)
+      .lte('started_at', activeBefore)
+      .gte('started_at', lookbackFloor)
+
+    if (error) {
+      logger.warn('[CalendarCron] Falha ao consultar reuniões Skribby p/ reconciliar:', error)
+      return
+    }
+    const rows = data ?? []
+    if (rows.length === 0) return
+
+    logger.info(`[CalendarCron] Reconciliando ${rows.length} reunião(ões) Skribby ativa(s) via poll de status`)
+    for (const m of rows) {
+      const botId = m.skribby_bot_id as string | null
+      if (!botId) continue
+      try {
+        await reconcileSkribbyMeeting(
+          { id: m.id, user_id: m.user_id, title: m.title, status: m.status, ended_at: m.ended_at },
+          botId,
+        )
+      } catch (err) {
+        logger.warn(`[CalendarCron] Falha ao reconciliar meeting ${m.id} (bot ${botId}):`, err)
+      }
     }
   }
 
