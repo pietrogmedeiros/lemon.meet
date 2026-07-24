@@ -60,6 +60,9 @@ const FAIL_STATES = new Set<string>([
   'error',
   'crashed',
   'not_found',             // reconcile: bot sumiu no Skribby (404) após o início
+  'invalid_credentials',   // conta Google autenticada do Skribby expirou/inválida → reconectar no painel Skribby
+  'credentials_invalid',
+  'authentication_failed',
 ])
 
 // Provider instanciado sob demanda (só quando SKRIBBY_ENABLED==='true'), para
