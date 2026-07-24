@@ -6,6 +6,15 @@
     <description>Atualizações do app Lemon para macOS.</description>
     <language>pt-BR</language>
     <item>
+      <title>Versão 0.4.0</title>
+      <pubDate>Fri, 24 Jul 2026 00:35:06 +0000</pubDate>
+      <sparkle:version>11</sparkle:version>
+      <sparkle:shortVersionString>0.4.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+      <description><![CDATA[]]></description>
+      <enclosure url="https://github.com/pietrogmedeiros/lemon.meet/releases/download/desktop-v0.4.0/Lemon-latest.dmg" sparkle:edSignature="f/byf/vuogcX88Wc9jYAmKN9rnrhH1dJ7k8QDoGRZEGo7i2E55cytfBLidBCqkStm3j2xxUQA/WVxV7dHwFpAg==" length="2987408" type="application/octet-stream" />
+    </item>
+    <item>
       <title>Versão 0.2.5</title>
       <pubDate>Thu, 23 Jul 2026 17:42:57 +0000</pubDate>
       <sparkle:version>7</sparkle:version>
