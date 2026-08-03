@@ -193,7 +193,8 @@ export function RelatorioPage() {
       setIsLoading(true);
       try {
         const [meetingsResult, teamsResult] = await Promise.allSettled([
-          fetchMeetingsCache(),
+          // Agrega score/tópicos/action items — precisa do JSONB insights.
+          fetchMeetingsCache(100, { withInsights: true }),
           fetchUserTeams(session.access_token),
         ]);
 

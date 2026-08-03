@@ -145,7 +145,7 @@ router.get('/:id/segments', authMiddleware, async (req: AuthRequest, res: Respon
   try {
     const { id } = req.params
     const userId = req.user!.id
-    const memberIds = await getAccessibleMemberIds(userId)
+    const memberIds = await getAccessibleMemberIds(userId, req.user!.email)
 
     // Verifica acesso (próprio ou admin do time)
     const { data: meeting, error: fetchError } = await supabase
@@ -182,11 +182,18 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.id
     const limit = parseInt(req.query.limit as string ?? '50', 10)
-    const memberIds = await getAccessibleMemberIds(userId)
+    const memberIds = await getAccessibleMemberIds(userId, req.user!.email)
+
+    // `insights` é um JSONB gordo: medido, ele leva a listagem de 14.6KB → 96.9KB
+    // por 100 reuniões. Só as telas agregadas (Insights, Relatório) leem esses
+    // campos da listagem, então elas pedem explicitamente com ?insights=1.
+    // Dashboard/Reuniões/Próximas não usam e não pagam mais por isso.
+    const withInsights = req.query.insights === '1' || req.query.insights === 'true'
+    const baseColumns = 'id, title, platform, status, meet_link, started_at, ended_at, duration_seconds, created_at, user_id, team_id, failure_reason'
 
     const { data, error } = await supabase
       .from('meetings')
-      .select('id, title, platform, status, meet_link, started_at, ended_at, duration_seconds, insights, created_at, user_id, team_id, failure_reason')
+      .select(withInsights ? `${baseColumns}, insights` : baseColumns)
       .in('user_id', memberIds)
       .order('created_at', { ascending: false })
       .limit(limit)
@@ -237,7 +244,7 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params
     const userId = req.user!.id
-    const memberIds = await getAccessibleMemberIds(userId)
+    const memberIds = await getAccessibleMemberIds(userId, req.user!.email)
 
     const { data: meeting, error } = await supabase
       .from('meetings')
@@ -327,7 +334,7 @@ router.post('/:id/follow-up-email', authMiddleware, async (req: AuthRequest, res
   try {
     const { id } = req.params
     const userId = req.user!.id
-    const memberIds = await getAccessibleMemberIds(userId)
+    const memberIds = await getAccessibleMemberIds(userId, req.user!.email)
 
     const { data: meeting, error } = await supabase
       .from('meetings')
@@ -398,7 +405,7 @@ router.get('/:id/briefing', authMiddleware, async (req: AuthRequest, res: Respon
   try {
     const { id } = req.params
     const userId = req.user!.id
-    const memberIds = await getAccessibleMemberIds(userId)
+    const memberIds = await getAccessibleMemberIds(userId, req.user!.email)
 
     // Busca a reunião atual
     const { data: current, error: currentError } = await supabase
@@ -480,7 +487,7 @@ router.get('/:id/action-items', authMiddleware, async (req: AuthRequest, res: Re
   try {
     const { id } = req.params
     const userId = req.user!.id
-    const memberIds = await getAccessibleMemberIds(userId)
+    const memberIds = await getAccessibleMemberIds(userId, req.user!.email)
 
     // Verifica acesso (próprio ou admin do time)
     const { data: meeting, error: meetingError } = await supabase
@@ -621,7 +628,7 @@ router.get('/:id/rapport', authMiddleware, async (req: AuthRequest, res: Respons
   try {
     const { id } = req.params
     const userId = req.user!.id
-    const memberIds = await getAccessibleMemberIds(userId)
+    const memberIds = await getAccessibleMemberIds(userId, req.user!.email)
 
     // Verifica acesso
     const { data: meeting, error: meetingError } = await supabase
@@ -650,7 +657,7 @@ router.post('/:id/rapport/enrich', authMiddleware, async (req: AuthRequest, res:
     const { id } = req.params
     const userId = req.user!.id
 
-    const memberIds = await getAccessibleMemberIds(userId)
+    const memberIds = await getAccessibleMemberIds(userId, req.user!.email)
 
     // Verifica acesso (próprio ou admin do time)
     const { data: meeting, error: meetingError } = await supabase
@@ -702,7 +709,7 @@ router.post('/:id/regenerate-fup', authMiddleware, async (req: AuthRequest, res:
     const { id } = req.params;
     const { originalFup, tone, fupIndex } = req.body;
     const userId = req.user!.id;
-    const memberIds = await getAccessibleMemberIds(userId);
+    const memberIds = await getAccessibleMemberIds(userId, req.user!.email);
 
     // Validações
     if (!originalFup || !tone || fupIndex === undefined) {
@@ -790,7 +797,7 @@ router.get('/:id/fup-versions', authMiddleware, async (req: AuthRequest, res: Re
   try {
     const { id } = req.params;
     const userId = req.user!.id;
-    const memberIds = await getAccessibleMemberIds(userId);
+    const memberIds = await getAccessibleMemberIds(userId, req.user!.email);
 
     // Verifica acesso à reunião
     const { data: meeting, error: meetingError } = await supabase
@@ -979,7 +986,7 @@ router.get('/:id/contact-phone', authMiddleware, async (req: AuthRequest, res: R
   try {
     const { id } = req.params;
     const userId = req.user!.id;
-    const memberIds = await getAccessibleMemberIds(userId);
+    const memberIds = await getAccessibleMemberIds(userId, req.user!.email);
 
     // Busca reunião
     const { data: meeting, error } = await supabase
@@ -1043,7 +1050,7 @@ router.put('/:id/contact-phone', authMiddleware, async (req: AuthRequest, res: R
     const { id } = req.params;
     const { phone } = req.body;
     const userId = req.user!.id;
-    const memberIds = await getAccessibleMemberIds(userId);
+    const memberIds = await getAccessibleMemberIds(userId, req.user!.email);
 
     // Valida formato do telefone (apenas números, 8-20 dígitos)
     if (!phone || typeof phone !== 'string') {

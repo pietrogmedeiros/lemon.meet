@@ -4,18 +4,53 @@ import { supabase } from '../config/supabase.js'
 // ownership/membership pra facilitar debug em produção.
 const DEV_USER_EMAILS = new Set(['pietrogoncalvesmedeiros@gmail.com'])
 
+/** Regra pura: o email é de super-admin/dev? Sem I/O. */
+export function isDevEmail(email?: string | null): boolean {
+  const normalized = email?.toLowerCase().trim()
+  return !!normalized && DEV_USER_EMAILS.has(normalized)
+}
+
 /**
  * Checa se o userId é um super-admin/dev pelo email.
  * Centraliza a regra pra ser usada em todos os endpoints.
+ *
+ * ⚠️ PERF: o `authMiddleware` já resolve o email em TODA request (req.user.email).
+ * Passe-o aqui — a checagem vira comparação em memória e economiza uma ida ao
+ * Supabase (~110ms medidos) por request. A busca por userId só existe pra
+ * callers que genuinamente não têm o email em mãos, e é cacheada por 60s.
  */
-export async function isDevUser(userId: string): Promise<boolean> {
+export async function isDevUser(userId: string, email?: string | null): Promise<boolean> {
+  if (email !== undefined) return isDevEmail(email)
+
+  const cached = devUserCache.get(userId)
+  if (cached && Date.now() < cached.expiresAt) return cached.value
+
   try {
     const { data } = await supabase.auth.admin.getUserById(userId)
-    const email = data?.user?.email?.toLowerCase().trim()
-    return !!email && DEV_USER_EMAILS.has(email)
+    const value = isDevEmail(data?.user?.email)
+    devUserCache.set(userId, { value, expiresAt: Date.now() + DEV_USER_TTL_MS })
+    return value
   } catch {
     return false
   }
+}
+
+const DEV_USER_TTL_MS = 60_000
+const devUserCache = new Map<string, { value: boolean; expiresAt: number }>()
+
+// Lista de TODOS os user ids (só usada no bypass de dev). Era um
+// auth.admin.listUsers({perPage:1000}) por request — 151ms e 24KB medidos.
+const ALL_USER_IDS_TTL_MS = 60_000
+let allUserIdsCache: { ids: string[]; expiresAt: number } | null = null
+
+async function getAllUserIds(): Promise<string[]> {
+  if (allUserIdsCache && Date.now() < allUserIdsCache.expiresAt) return allUserIdsCache.ids
+
+  const { data } = await supabase.auth.admin.listUsers({ perPage: 1000 })
+  const ids = (data?.users ?? []).map(u => u.id)
+  // Só cacheia resultado útil — lista vazia costuma ser falha transitória.
+  if (ids.length > 0) allUserIdsCache = { ids, expiresAt: Date.now() + ALL_USER_IDS_TTL_MS }
+  return ids
 }
 
 export interface UserTeamScope {
@@ -137,11 +172,10 @@ export async function canJoinTeamAsMember(userId: string, targetTeamId: string):
  * - Owner ou admin de um time → retorna todos os membros ativos do time
  * - Caso contrário → retorna apenas o próprio userId
  */
-export async function getAccessibleMemberIds(userId: string): Promise<string[]> {
+export async function getAccessibleMemberIds(userId: string, email?: string | null): Promise<string[]> {
   // Dev/super-admin bypass: enxerga reuniões de todos os usuários
-  if (await isDevUser(userId)) {
-    const { data } = await supabase.auth.admin.listUsers({ perPage: 1000 })
-    const allIds = (data?.users ?? []).map(u => u.id)
+  if (await isDevUser(userId, email)) {
+    const allIds = await getAllUserIds()
     if (allIds.length > 0) return allIds
     // Fallback se algo deu errado na listagem
     return [userId]

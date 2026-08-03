@@ -149,7 +149,7 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
     logger.info(`📋 GET /api/teams - Usuario ${userId} solicitando lista de times`)
 
     // 🔧 DEV USER: retorna TODOS os times (regra centralizada em teamAccess.isDevUser)
-    const isDev = await isDevUser(userId)
+    const isDev = await isDevUser(userId, req.user!.email)
 
     if (isDev) {
       logger.info(`🔧 DEV USER detectado - retornando TODOS os times`)
@@ -644,7 +644,7 @@ router.get('/:id/meetings', authMiddleware, async (req: AuthRequest, res: Respon
     const isAdmin = membership?.role === 'admin'
 
     // Dev user bypass: pode ver qualquer time mesmo sem ownership/membership
-    const isDev = await isDevUser(userId)
+    const isDev = await isDevUser(userId, req.user!.email)
 
     // Precisa ser owner, admin, membro ou dev para ver
     if (!isOwner && !isMember && !isDev) {

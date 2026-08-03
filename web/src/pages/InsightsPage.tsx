@@ -102,7 +102,8 @@ export function InsightsPage() {
       setIsLoading(true);
       try {
         const [meetingsResult, teamsResult] = await Promise.allSettled([
-          fetchMeetingsCache(),
+          // Esta tela agrega commercialQuality/sentiment/keyTopics — precisa do JSONB.
+          fetchMeetingsCache(100, { withInsights: true }),
           fetchUserTeams(session.access_token),
         ]);
 

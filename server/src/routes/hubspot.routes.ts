@@ -202,7 +202,7 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
     // Acesso por time: quem enxerga a reunião (dono ou via time) pode sincronizar.
     // Espelha o GET /api/meetings/:id. Antes filtrava só por user_id e dava 404
     // (PGRST116) ao sincronizar reuniões de colegas de time que o usuário vê na UI.
-    const memberIds = await getAccessibleMemberIds(userId)
+    const memberIds = await getAccessibleMemberIds(userId, req.user!.email)
     const { data: meeting, error: meetingError } = await supabase
       .from('meetings')
       .select('id, title, platform, started_at, ended_at, duration_seconds, insights, meet_link, participant_emails')

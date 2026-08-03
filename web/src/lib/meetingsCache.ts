@@ -33,15 +33,28 @@ export interface Meeting {
   failure_reason?: string | null
 }
 
-let cache: CacheEntry | null = null
+// Duas variantes de payload: 'base' (sem o JSONB insights, que é o grosso do
+// peso) e 'insights' (superset, pedido só por Insights/Relatório). Cacheadas
+// separadamente pra uma tela nunca servir dados incompletos pra outra.
+type CacheVariant = 'base' | 'insights'
+const caches: Record<CacheVariant, CacheEntry | null> = { base: null, insights: null }
 
 export function invalidateMeetingsCache(): void {
   console.log('[MeetingsCache] 🗑️ Cache invalidado')
-  cache = null
+  caches.base = null
+  caches.insights = null
 }
 
-export async function fetchMeetings(limit = 100): Promise<Meeting[]> {
+export interface FetchMeetingsOptions {
+  /** Inclui o JSONB `insights` no payload. Só telas agregadas precisam. */
+  withInsights?: boolean
+}
+
+export async function fetchMeetings(limit = 100, options: FetchMeetingsOptions = {}): Promise<Meeting[]> {
   const now = Date.now()
+  const variant: CacheVariant = options.withInsights ? 'insights' : 'base'
+  let cache = caches[variant]
+  const setCache = (entry: CacheEntry | null) => { cache = entry; caches[variant] = entry }
   
   console.log('[MeetingsCache] 🔍 Iniciando fetchMeetings...')
   console.log('[MeetingsCache] ⏰ Timestamp:', new Date().toISOString())
@@ -76,7 +89,7 @@ export async function fetchMeetings(limit = 100): Promise<Meeting[]> {
       console.error('[MeetingsCache] ❌ Cache userId:', cache.userId)
       console.error('[MeetingsCache] ✅ Current userId:', currentUserId)
       console.error('[MeetingsCache] 🧹 INVALIDANDO IMEDIATAMENTE')
-      cache = null
+      setCache(null)
     }
   } else {
     console.log('[MeetingsCache] 📭 Nenhum cache existente')
@@ -88,9 +101,20 @@ export async function fetchMeetings(limit = 100): Promise<Meeting[]> {
     return cache.data
   }
 
+  // 'insights' é superset de 'base': quem só precisa do básico pode aproveitar
+  // um payload completo já em cache (ex.: Insights → Dashboard). O inverso NÃO
+  // vale, senão a tela de Insights receberia reuniões sem o campo.
+  if (variant === 'base') {
+    const rich = caches.insights
+    if (rich && now < rich.expiresAt && rich.userId === currentUserId) {
+      console.log('[MeetingsCache] ✅ Reaproveitando cache com insights')
+      return rich.data
+    }
+  }
+
   if (cache && now >= cache.expiresAt) {
     console.log('[MeetingsCache] ⏱️ Cache expirado, buscando novamente')
-    cache = null
+    setCache(null)
   }
 
   // Deduplica: se já há um fetch em andamento, aguarda o mesmo
@@ -99,11 +123,12 @@ export async function fetchMeetings(limit = 100): Promise<Meeting[]> {
     return cache.promise
   }
 
+  const url = `${API}/api/meetings?limit=${limit}${options.withInsights ? '&insights=1' : ''}`
   console.log('[MeetingsCache] 🔄 Buscando reuniões do servidor...')
-  console.log('[MeetingsCache] 📡 API URL:', `${API}/api/meetings?limit=${limit}`)
-  
+  console.log('[MeetingsCache] 📡 API URL:', url)
+
   const promise = (async (): Promise<Meeting[]> => {
-    const res = await fetch(`${API}/api/meetings?limit=${limit}`, {
+    const res = await fetch(url, {
       headers: { Authorization: `Bearer ${session?.access_token}` },
     })
     if (!res.ok) throw new Error('Failed to fetch meetings')
@@ -111,17 +136,17 @@ export async function fetchMeetings(limit = 100): Promise<Meeting[]> {
     const meetings: Meeting[] = json.meetings ?? []
 
     console.log('[MeetingsCache] ✅ Reuniões carregadas:', meetings.length)
-    
-    cache = { 
-      data: meetings, 
+
+    setCache({
+      data: meetings,
       expiresAt: Date.now() + TTL_MS,
       userId: currentUserId // Vincula ao usuário
-    }
+    })
     return meetings
   })()
 
   // Armazena a promise para deduplicação
-  if (!cache) cache = { data: [], expiresAt: 0, userId: currentUserId, promise }
+  if (!cache) setCache({ data: [], expiresAt: 0, userId: currentUserId, promise })
   else cache.promise = promise
 
   try {
