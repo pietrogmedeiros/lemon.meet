@@ -40,6 +40,9 @@ const STOP_OPTIONS = {
   empty_meeting_timeout: 60,
 }
 
+// Estados em que o bot já está rodando — nesses, cancelar = POST /stop.
+const ACTIVE_STATES = new Set(['booting', 'joining', 'recording', 'processing', 'transcribing'])
+
 export class SkribbyProvider implements IBotProvider {
   readonly name = 'skribby' as const
 
@@ -135,17 +138,51 @@ export class SkribbyProvider implements IBotProvider {
     return { externalId }
   }
 
+  /**
+   * Cancela um bot. ⚠️ O endpoint depende do estado — não existe um "remove"
+   * único (o antigo `POST /bot/{id}/leave` NÃO existe na API e sempre deu 404,
+   * então todo cancelamento falhava em silêncio):
+   *   - `scheduled`            → DELETE /bot/{id}  (a única forma; ainda não rodou)
+   *   - ativo (booting…transcribing) → POST /bot/{id}/stop  (preserva gravação)
+   *   - terminal               → no-op
+   *
+   * O DELETE apaga TUDO (gravação e transcrição inclusive), por isso ele é
+   * restrito ao caso `scheduled`, onde não existe dado nenhum a perder.
+   */
   async removeBot(externalId: string): Promise<void> {
-    const response = await fetch(`${this.apiUrl}/api/v1/bot/${encodeURIComponent(externalId)}/leave`, {
+    const status = await this.getBotStatus(externalId)
+
+    if (status === 'not_found') {
+      logger.info(`[Skribby] Bot ${externalId} já não existe — nada a cancelar`)
+      return
+    }
+
+    if (status === 'scheduled') {
+      const response = await fetch(`${this.apiUrl}/api/v1/bot/${encodeURIComponent(externalId)}`, {
+        method: 'DELETE',
+        headers: this.headers(),
+      })
+      if (!response.ok) {
+        throw new Error(`Skribby delete bot error ${response.status}: ${await response.text()}`)
+      }
+      logger.info(`[Skribby] Bot agendado ${externalId} deletado`)
+      return
+    }
+
+    if (!ACTIVE_STATES.has(String(status))) {
+      logger.info(`[Skribby] Bot ${externalId} em estado terminal (${status}) — nada a cancelar`)
+      return
+    }
+
+    const response = await fetch(`${this.apiUrl}/api/v1/bot/${encodeURIComponent(externalId)}/stop`, {
       method: 'POST',
       headers: this.headers(),
     })
 
     if (!response.ok) {
-      const body = await response.text()
-      throw new Error(`Skribby remove bot error ${response.status}: ${body}`)
+      throw new Error(`Skribby stop bot error ${response.status}: ${await response.text()}`)
     }
-    logger.info(`[Skribby] Bot ${externalId} removido`)
+    logger.info(`[Skribby] Bot ${externalId} parado (estava ${status})`)
   }
 
   /**

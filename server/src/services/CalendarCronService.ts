@@ -295,10 +295,17 @@ export class CalendarCronService {
       return
     }
 
-    // Busca eventos na janela de tempo
+    // Busca eventos na janela de tempo.
+    // showDeleted: sem isso o Google simplesmente OMITE os eventos cancelados e
+    // o cron nunca fica sabendo — o bot seguia agendado e aparecia numa sala que
+    // ninguém abriu, faturando a espera. Com a flag, o cancelado vem com
+    // status='cancelled' e conseguimos cancelar o bot (ver dispatchBotForEvent).
     const params = new URLSearchParams({
-      maxResults:    '50',
+      // 100 (era 50): showDeleted traz os cancelados junto, e numa agenda cheia
+      // eles poderiam empurrar eventos reais pra fora da página.
+      maxResults:    '100',
       singleEvents:  'true',
+      showDeleted:   'true',
       orderBy:       'startTime',
       timeMin,
       timeMax,
@@ -350,9 +357,16 @@ export class CalendarCronService {
     const startedAt  = item.start?.dateTime ?? item.start?.date
     const meetingUrl = extractMeetingUrl(item)
 
-    // Ignora eventos sem link de vídeo ou cancelados
+    // Cancelado vem ANTES do check de meetingUrl: o Google devolve o evento
+    // cancelado sem location/conferenceData, então extractMeetingUrl dá null e
+    // a gente sairia sem nunca cancelar o bot.
+    if (item.status === 'cancelled') {
+      await this.cancelBotForCancelledEvent(eventId, userId)
+      return
+    }
+
+    // Ignora eventos sem link de vídeo
     if (!meetingUrl) return
-    if (item.status === 'cancelled') return
 
     // Checa duplicata pelo event_id do Google Calendar
     // Usa .limit(1) para evitar erro do maybeSingle() com múltiplas linhas
@@ -371,15 +385,25 @@ export class CalendarCronService {
     if (existingRows && existingRows.length > 0) {
       const existing = existingRows[0] as { id: string; status: string; started_at: string | null; baas_bot_id: string | null; attendee_bot_id: string | null; skribby_bot_id: string | null; bot_provider: string | null }
 
-      // Detecta reagendamento: bot ainda não entrou (status=requesting) e o
-      // horário do evento mudou significativamente (>60s). Necessário porque
-      // bots agendados têm join_at fixo (MeetingBaas e Attendee) — sem reagendar,
-      // o bot entra no horário antigo e fica sozinho até o timeout.
-      if (existing.status === 'requesting' && startedAt && existing.started_at) {
+      // Detecta reagendamento: o bot ainda não gravou nada e o horário do evento
+      // mudou significativamente (>60s). Sem reagendar, o bot entra no horário
+      // antigo e fica sozinho até o timeout.
+      //
+      // 'failed' entra junto com 'requesting' porque a janela do cron é de 30min:
+      // uma reunião movida para horas depois só é revista perto do horário novo,
+      // e até lá o bot velho já expirou na sala de espera e marcou a reunião como
+      // failed. Antes isso caía no "já tem reunião — ignorando" e a reunião
+      // remarcada ficava SEM BOT. Só reaproveita quando não há nada gravado —
+      // reunião que já rendeu transcrição é intocável.
+      const canReschedule =
+        existing.status === 'requesting' ||
+        (existing.status === 'failed' && !(await this.hasRecordedContent(existing.id)))
+
+      if (canReschedule && startedAt && existing.started_at) {
         const newStartMs = new Date(startedAt).getTime()
         const oldStartMs = new Date(existing.started_at).getTime()
         if (Number.isFinite(newStartMs) && Number.isFinite(oldStartMs) && Math.abs(newStartMs - oldStartMs) > 60_000) {
-          logger.info(`[CalendarCron] Evento ${eventId} foi reagendado (${existing.started_at} → ${startedAt}) — reagendando bot`)
+          logger.info(`[CalendarCron] Evento ${eventId} foi reagendado (${existing.started_at} → ${startedAt}, status=${existing.status}) — reagendando bot`)
           await this.rescheduleBot(existing, meetingUrl, startedAt)
           return
         }
@@ -506,6 +530,58 @@ export class CalendarCronService {
     }
   }
 
+  /**
+   * Evento apagado/cancelado no Google Calendar: cancela o bot que ainda não
+   * entrou. Sem isso o bot continuava agendado e aparecia numa sala que ninguém
+   * abriu, esperando (e faturando) até o waiting_room_timeout.
+   *
+   * Mexe SÓ em reunião ainda em 'requesting': se o bot já entrou e gravou, o
+   * cancelamento do evento no calendário não pode apagar o resultado.
+   */
+  private async cancelBotForCancelledEvent(eventId: string, userId: string): Promise<void> {
+    const { data: rows } = await supabase
+      .from('meetings')
+      .select('id, status, bot_provider, baas_bot_id, attendee_bot_id, skribby_bot_id')
+      .eq('user_id', userId)
+      .eq('baas_event_uuid', eventId)
+      .eq('status', 'requesting')
+      .limit(1)
+
+    const meeting = rows?.[0]
+    if (!meeting) return
+
+    const provider = (meeting.bot_provider ?? 'meetingbaas') as BotProviderName
+    const externalId = (meeting as Record<string, string | null>)[botIdColumn(provider)]
+
+    if (externalId) {
+      try {
+        await botRouter.removeBot(provider, externalId)
+        logger.info(`[CalendarCron] 🚫 Evento ${eventId} cancelado — bot ${externalId} (${provider}) cancelado`)
+      } catch (err) {
+        logger.warn(`[CalendarCron] Falha ao cancelar bot ${externalId} de evento cancelado:`, err)
+      }
+    }
+
+    await supabase
+      .from('meetings')
+      .update({ status: 'failed', failure_reason: 'calendar_event_cancelled' })
+      .eq('id', meeting.id)
+      .eq('status', 'requesting')
+  }
+
+  /**
+   * A reunião chegou a produzir conteúdo? Guarda-chuva do reagendamento: uma
+   * reunião com transcrição/gravação nunca deve ser reaproveitada por um bot novo.
+   */
+  private async hasRecordedContent(meetingId: string): Promise<boolean> {
+    const [{ data: meeting }, { data: segments }] = await Promise.all([
+      supabase.from('meetings').select('transcript, recording_url').eq('id', meetingId).maybeSingle(),
+      supabase.from('transcript_segments').select('id').eq('meeting_id', meetingId).limit(1),
+    ])
+    const hasText = typeof meeting?.transcript === 'string' && meeting.transcript.trim().length > 0
+    return hasText || Boolean(meeting?.recording_url) || (segments?.length ?? 0) > 0
+  }
+
   private async rescheduleBot(
     existing: { id: string; bot_provider: string | null; baas_bot_id: string | null; attendee_bot_id: string | null; skribby_bot_id: string | null },
     meetingUrl: string,
@@ -549,6 +625,11 @@ export class CalendarCronService {
         attendee_bot_id: dispatch.provider === 'attendee' ? dispatch.externalId : null,
         skribby_bot_id:  dispatch.provider === 'skribby' ? dispatch.externalId : null,
         started_at:      newStart.toISOString(),
+        // Reabre a reunião: sem isso, uma remarcação em cima de um 'failed'
+        // mantém o estado terminal e o guard `.not(status in failed/completed)`
+        // do webhook descarta TODAS as atualizações do bot novo.
+        status:          'requesting',
+        failure_reason:  null,
       })
       .eq('id', existing.id)
 
