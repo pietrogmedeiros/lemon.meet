@@ -15,8 +15,8 @@
 // ⚠️ FASE 0 (dark): só é instanciado quando SKRIBBY_ENABLED==='true'. Com a flag
 // desligada (default), nada aqui roda e o sistema segue 100% MeetingBaas.
 //
-// TODO(piloto): itens ainda a confirmar ao vivo — campo/suporte de agendamento
-// (join_at), caminho exato do /leave, e nomes na resposta do create.
+// TODO(piloto): confirmar ao vivo o caminho exato do /leave e os nomes na
+// resposta do create. Agendamento: resolvido — é `scheduled_start_time`.
 // ============================================================
 
 import type { IBotProvider, SendBotResult } from './IBotProvider.js'
@@ -26,12 +26,17 @@ import { logger } from '../../utils/logger.js'
 
 const BOT_NAME = 'Lemon Notetaker'
 
-// Timeouts do Skribby — o create rejeita valores > 60 (422). O máximo que a
-// API aceita é 60 (confirmado ao vivo em 2026-07-23). Usamos o teto pra dar a
-// maior folga possível antes de o bot desistir na sala de espera ou por reunião
-// "vazia" (reuniões comerciais começam atrasadas).
+// Timeouts do Skribby, em MINUTOS (não segundos — o comentário antigo estava
+// errado na unidade). O create rejeita valores > 60 (422).
+//
+// waiting_room_timeout=15: o bot só bate na porta no horário da reunião (ver
+// scheduled_start_time abaixo), e quem não foi admitido em 15min não vai ser.
+// Com 60 o bot esperava a reunião INTEIRA e faturava a espera: medido em
+// 2026-08-03, um bot não admitido queimou 51 minutos faturáveis sem nunca
+// entrar. empty_meeting_timeout fica em 60 de propósito — reunião comercial
+// começa atrasada e aí o bot JÁ ESTÁ dentro, é só esperar chegarem.
 const STOP_OPTIONS = {
-  waiting_room_timeout: 60,
+  waiting_room_timeout: 15,
   empty_meeting_timeout: 60,
 }
 
@@ -73,10 +78,7 @@ export class SkribbyProvider implements IBotProvider {
     return this.createBot(meetingUrl, meetingId, dedupKey)
   }
 
-  /**
-   * Agenda o bot para entrar num horário futuro via `join_at` (ISO 8601).
-   * TODO(piloto): confirmar suporte/nome do campo de agendamento no Skribby.
-   */
+  /** Agenda o bot para entrar num horário futuro (`scheduled_start_time`). */
   async scheduleBotAt(meetingUrl: string, meetingId: string, joinAt: Date, dedupKey?: string): Promise<SendBotResult> {
     return this.createBot(meetingUrl, meetingId, dedupKey, joinAt)
   }
@@ -108,7 +110,13 @@ export class SkribbyProvider implements IBotProvider {
     if (this.accountId) {
       body.authentication = { account_id: this.accountId, always_authenticate: true }
     }
-    if (joinAt) body.join_at = joinAt.toISOString()
+    // ⚠️ O campo de agendamento é `scheduled_start_time` (timestamp Unix em
+    // SEGUNDOS). Antes mandávamos `join_at`, que NÃO existe no contrato: o
+    // Skribby ignorava silenciosamente e o bot entrava na sala de espera na
+    // hora do dispatch — que o CalendarCron faz com até 30min de antecedência
+    // (medido: 27-28min). Efeitos: o bot batia na porta antes de ter gente na
+    // sala e faturava a espera inteira.
+    if (joinAt) body.scheduled_start_time = Math.floor(joinAt.getTime() / 1000)
 
     const response = await fetch(`${this.apiUrl}/api/v1/bot`, {
       method: 'POST',
