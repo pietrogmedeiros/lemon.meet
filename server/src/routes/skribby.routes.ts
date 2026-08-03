@@ -65,6 +65,51 @@ const FAIL_STATES = new Set<string>([
   'authentication_failed',
 ])
 
+// Falhas de CREDENCIAL da conta autenticada do Skribby (login Google do bot).
+// Subconjunto de FAIL_STATES que NÃO é problema da reunião: é a conta que parou
+// de logar. Enquanto não for arrumada no painel do Skribby, 100% dos bots morrem
+// em ~30s — por isso vira alerta de admin, não só 'failed' silencioso.
+const CREDENTIAL_FAIL_STATES = new Set<string>([
+  'invalid_credentials',
+  'credentials_invalid',
+  'authentication_failed',
+])
+
+// Alerta de credencial é throttled: 1 a cada 30min (senão um dia de agenda cheia
+// vira dezenas de notificações idênticas).
+const CREDENTIAL_ALERT_THROTTLE_MS = 30 * 60 * 1000
+let lastCredentialAlertAt = 0
+let credentialFailuresSinceAlert = 0
+
+/**
+ * Avisa o admin que a conta autenticada do Skribby parou de logar no Google.
+ * Sem isso o modo de falha é MUDO: cada reunião só avisa o dono dela que "não
+ * houve transcrição", e ninguém percebe que a causa é global (já queimou uma
+ * semana inteira de reuniões em 24/07–31/07).
+ */
+async function alertCredentialFailure(meetingId: string, status: string): Promise<void> {
+  credentialFailuresSinceAlert++
+  const adminUserId = process.env.ALERT_ADMIN_USER_ID
+  if (!adminUserId) return
+
+  const now = Date.now()
+  if (now - lastCredentialAlertAt < CREDENTIAL_ALERT_THROTTLE_MS) return
+  const count = credentialFailuresSinceAlert
+  lastCredentialAlertAt = now
+  credentialFailuresSinceAlert = 0
+
+  await notificationService.notify({
+    user_id: adminUserId,
+    type: 'admin_bot_credentials',
+    title: '🔴 Bots parados — conta autenticada do Skribby recusada pelo Google',
+    message:
+      `${count} bot(s) morreram com "${status}" (última reunião ${meetingId}). ` +
+      'Enquanto isso NENHUMA reunião é gravada. Corrija em platform.skribby.io → ' +
+      'Authenticated Accounts: reveja senha e a chave (setup key) do Authenticator da conta gmeet, ' +
+      'e garanta que a conta Google não exige passkey/chave de segurança nem troca de senha no login.',
+  })
+}
+
 // Provider instanciado sob demanda (só quando SKRIBBY_ENABLED==='true'), para
 // não tocar no BotRouter na Fase 0.
 let providerSingleton: SkribbyProvider | null = null
@@ -193,6 +238,10 @@ export async function applySkribbyStatus(
     if (updated && updated.length > 0) {
       logger.warn(`${tag} Meeting ${meeting.id} → failed (${newStatus})`)
       await notificationService.notifyMeetingNoTranscription(meeting.user_id, meeting.id)
+    }
+    if (CREDENTIAL_FAIL_STATES.has(newStatus)) {
+      logger.error(`${tag} CREDENCIAL INVÁLIDA na conta autenticada do Skribby (bot=${botId}) — todos os bots vão falhar até reconectar a conta`)
+      await alertCredentialFailure(meeting.id, newStatus)
     }
     return
   }
