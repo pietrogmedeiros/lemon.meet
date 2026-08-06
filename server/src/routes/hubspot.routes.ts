@@ -362,16 +362,18 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
                 }
                 logger.info(`[HubSpot] 📊 Contato tem ${dealsData.results.length} deal(s) associado(s)`)
 
-                if (dealsData.results.length > 0) {
-                  // Atualizar o primeiro deal encontrado
-                  dealId = String(dealsData.results[0].toObjectId)
+                const candidateIds = dealsData.results.map(d => String(d.toObjectId))
+                const targetDealId = await pickTargetDeal(token, candidateIds)
+
+                if (targetDealId) {
+                  dealId = targetDealId
                   logger.info(`[HubSpot] 🔄 Atualizando deal existente: ${dealId}`)
-                  
-                  // Ao atualizar, NÃO mudar o nome do deal
-                  // Atualizar apenas descrição, closedate, stage e garantir que o proprietário seja o usuário autenticado
+
+                  // Registro de reunião NÃO mexe no funil: só escreve a descrição.
+                  // Antes mandava dealstage='appointmentscheduled' e closedate, o
+                  // que REABRIA negócio fechado e reescrevia a data de fechamento
+                  // de um deal que não era nosso pra mexer.
                   const updateProperties: Record<string, string> = {
-                    closedate: dealProperties.closedate,
-                    dealstage: dealProperties.dealstage,
                     description: dealProperties.description,
                   }
                   
@@ -404,7 +406,7 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
                     logger.error(`[HubSpot] ❌ Erro ao atualizar deal:`, errText)
                   }
                 } else {
-                  logger.info(`[HubSpot] 🆕 Contato sem deals, será criado novo deal`)
+                  logger.info(`[HubSpot] 🆕 Contato sem deal aberto, será criado novo deal`)
                 }
               } else {
                 const errText = await dealsRes.text()
@@ -709,6 +711,63 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
 })
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
+
+/**
+ * Escolhe em qual deal associado ao contato o registro da reunião deve entrar.
+ *
+ * ⚠️ Antes o código pegava `results[0]` — a API de associações não garante
+ * ordem, e na prática vem o mais ANTIGO. Resultado real (SAKATA, 06/08/2026):
+ * a reunião foi parar num deal `closedlost` criado 10 meses antes, sobrescrevendo
+ * a descrição dele, enquanto o deal ativo daquela negociação ficou vazio.
+ *
+ * Regra: só considera deal ABERTO (`hs_is_closed !== 'true'`) e, entre eles,
+ * o de criação mais recente — que é a negociação em andamento. Se todos
+ * estiverem fechados, devolve null e o caller cria um deal novo, em vez de
+ * ressuscitar um negócio perdido.
+ */
+async function pickTargetDeal(token: string, dealIds: string[]): Promise<string | null> {
+  if (dealIds.length === 0) return null
+
+  const res = await fetch(`${HUBSPOT_API_BASE}/crm/v3/objects/deals/batch/read`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      properties: ['dealname', 'dealstage', 'hs_is_closed', 'createdate'],
+      inputs: dealIds.slice(0, 100).map(id => ({ id })),
+    }),
+  })
+
+  if (!res.ok) {
+    logger.error(`[HubSpot] ❌ Erro no batch/read de deals (${res.status}):`, await res.text())
+    return null
+  }
+
+  const data = await res.json() as {
+    results: Array<{ id: string; properties: Record<string, string | null> }>
+  }
+
+  const open = data.results.filter(d => d.properties.hs_is_closed !== 'true')
+  const closedCount = data.results.length - open.length
+
+  if (open.length === 0) {
+    logger.info(`[HubSpot] 🚫 Os ${data.results.length} deal(s) do contato estão fechados — não vou mexer neles, será criado um novo`)
+    return null
+  }
+
+  open.sort((a, b) => {
+    const ta = new Date(a.properties.createdate ?? 0).getTime()
+    const tb = new Date(b.properties.createdate ?? 0).getTime()
+    return tb - ta
+  })
+
+  const chosen = open[0]
+  logger.info(
+    `[HubSpot] 🎯 Deal escolhido: ${chosen.id} ("${chosen.properties.dealname}", ` +
+    `stage=${chosen.properties.dealstage}, criado ${chosen.properties.createdate}) — ` +
+    `${open.length} aberto(s), ${closedCount} fechado(s) ignorado(s)`
+  )
+  return chosen.id
+}
 
 /**
  * Resolve o hubspot_owner_id casando um email com a lista de owners do HubSpot.
