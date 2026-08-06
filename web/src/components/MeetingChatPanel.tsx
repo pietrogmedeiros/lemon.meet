@@ -1,5 +1,31 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, Send, MessageCircle, Loader, AlertCircle, Sparkles } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
+
+/**
+ * Token SEMPRE fresco. A prop `authToken` é capturada uma única vez na montagem
+ * da página; numa aba aberta por mais de uma hora ela vence e o backend responde
+ * 401 — só neste painel, porque o resto da página busca a sessão a cada request
+ * (e o supabase-js renova sozinho). Mantém a prop como fallback.
+ */
+async function freshToken(fallback: string): Promise<string> {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    return session?.access_token ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+/**
+ * Mensagem de erro legível. O `authMiddleware` responde `{ error }` e as rotas
+ * respondem `{ message }` — ler só um dos dois fazia toda falha de autenticação
+ * virar "Erro ao enviar pergunta", sem o usuário saber que era só relogar.
+ */
+function errorMessage(status: number, body: any, fallback: string): string {
+  if (status === 401) return 'Sua sessão expirou. Recarregue a página e tente novamente.';
+  return body?.message || body?.error || fallback;
+}
 
 interface QuickAction {
   emoji: string;
@@ -105,7 +131,7 @@ export function MeetingChatPanel({ meetingId, isOpen, onClose, apiUrl, authToken
       
       const res = await fetch(url, {
         headers: {
-          Authorization: `Bearer ${authToken}`,
+          Authorization: `Bearer ${await freshToken(authToken)}`,
         },
       });
 
@@ -114,7 +140,7 @@ export function MeetingChatPanel({ meetingId, isOpen, onClose, apiUrl, authToken
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
         console.error('[MeetingChatPanel] Error response:', errorData);
-        throw new Error(errorData.message || 'Erro ao carregar histórico');
+        throw new Error(errorMessage(res.status, errorData, 'Erro ao carregar histórico'));
       }
 
       const data = await res.json();
@@ -155,18 +181,18 @@ export function MeetingChatPanel({ meetingId, isOpen, onClose, apiUrl, authToken
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${authToken}`,
+          Authorization: `Bearer ${await freshToken(authToken)}`,
         },
         body: JSON.stringify({ question: question.trim() }),
       });
 
       console.log('[MeetingChatPanel] Response status:', res.status);
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       console.log('[MeetingChatPanel] Response data:', data);
 
       if (!res.ok) {
-        throw new Error(data.message || 'Erro ao enviar pergunta');
+        throw new Error(errorMessage(res.status, data, 'Erro ao enviar pergunta'));
       }
 
       // Adiciona nova mensagem ao histórico
