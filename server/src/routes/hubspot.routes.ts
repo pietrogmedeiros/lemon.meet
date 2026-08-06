@@ -293,6 +293,32 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
     // Obter emails dos participantes da reunião
     const participantEmails = (meeting.participant_emails as string[] | null) ?? []
     logger.info(`[HubSpot] 📧 Emails dos participantes (${participantEmails.length}):`, participantEmails)
+
+    // ⚠️ Ordem importa: o loop abaixo PARA no primeiro email que tem contato no
+    // HubSpot. Os vendedores da casa também são contatos do próprio CRM e estão
+    // associados aos deals DELES — então, se o e-mail interno vier primeiro na
+    // lista, a reunião é registrada no negócio errado.
+    //
+    // Caso real (06/08/2026): reunião "Apresentação NR1 Starbem - Construtora Uni"
+    // tinha [adriano.palombo@starbem.app, maicon.vilian@starbem.app,
+    // mayra.poleto@somosauni.com.br]. Parou no Adriano e gravou no deal
+    // "Inspirali <> Starbem" (dele), enquanto o deal da cliente Mayra
+    // ("Construtora Uni /Mayra") ficou intocado.
+    //
+    // Interno = mesmo domínio de quem está rodando o sync. Externos primeiro;
+    // internos ficam como fallback, pra reunião 100% interna não deixar de
+    // sincronizar.
+    const internalDomain = (req.user?.email ?? '').split('@')[1]?.toLowerCase() || null
+    const isInternalEmail = (email: string) =>
+      internalDomain !== null && email.toLowerCase().endsWith(`@${internalDomain}`)
+
+    const externalEmails = participantEmails.filter(e => !isInternalEmail(e))
+    const internalEmails = participantEmails.filter(isInternalEmail)
+    const orderedEmails = [...externalEmails, ...internalEmails]
+
+    if (internalDomain && externalEmails.length > 0 && internalEmails.length > 0) {
+      logger.info(`[HubSpot] 🎯 Priorizando ${externalEmails.length} participante(s) externo(s) sobre ${internalEmails.length} do domínio @${internalDomain}`)
+    }
     
     let dealId: string | undefined
     let contactId: string | undefined
@@ -303,9 +329,9 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
     if (participantEmails.length > 0) {
       logger.info(`[HubSpot] 🔍 Buscando contatos para ${participantEmails.length} email(s)...`)
       
-      for (const email of participantEmails) {
+      for (const email of orderedEmails) {
         try {
-          logger.info(`[HubSpot] 🔎 Procurando contato com email: ${email}`)
+          logger.info(`[HubSpot] 🔎 Procurando contato com email: ${email}${isInternalEmail(email) ? ' (interno — fallback)' : ''}`)
           
           // Buscar contato pelo email (incluindo owner)
           const searchRes = await fetch(
