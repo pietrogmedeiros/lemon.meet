@@ -3,6 +3,7 @@ import { authMiddleware, AuthRequest } from '../middleware/auth.middleware.js'
 import { supabase } from '../config/supabase.js'
 import { logger } from '../utils/logger.js'
 import { getAccessibleMemberIds } from '../utils/teamAccess.js'
+import { orderParticipantEmails, isInternalEmail, chooseDealId, type DealCandidate } from '../utils/hubspotMatching.js'
 import { getServerUrl } from '../config/serverUrl.js'
 
 const router: IRouter = Router()
@@ -308,16 +309,12 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
     // Interno = mesmo domínio de quem está rodando o sync. Externos primeiro;
     // internos ficam como fallback, pra reunião 100% interna não deixar de
     // sincronizar.
-    const internalDomain = (req.user?.email ?? '').split('@')[1]?.toLowerCase() || null
-    const isInternalEmail = (email: string) =>
-      internalDomain !== null && email.toLowerCase().endsWith(`@${internalDomain}`)
+    const syncUserEmail = req.user?.email ?? null
+    const orderedEmails = orderParticipantEmails(participantEmails, syncUserEmail)
+    const externalCount = participantEmails.filter(e => !isInternalEmail(e, syncUserEmail)).length
 
-    const externalEmails = participantEmails.filter(e => !isInternalEmail(e))
-    const internalEmails = participantEmails.filter(isInternalEmail)
-    const orderedEmails = [...externalEmails, ...internalEmails]
-
-    if (internalDomain && externalEmails.length > 0 && internalEmails.length > 0) {
-      logger.info(`[HubSpot] 🎯 Priorizando ${externalEmails.length} participante(s) externo(s) sobre ${internalEmails.length} do domínio @${internalDomain}`)
+    if (externalCount > 0 && externalCount < participantEmails.length) {
+      logger.info(`[HubSpot] 🎯 Priorizando ${externalCount} participante(s) externo(s) sobre ${participantEmails.length - externalCount} interno(s)`)
     }
     
     let dealId: string | undefined
@@ -331,7 +328,7 @@ router.post('/sync/:meetingId', authMiddleware, async (req: AuthRequest, res: Re
       
       for (const email of orderedEmails) {
         try {
-          logger.info(`[HubSpot] 🔎 Procurando contato com email: ${email}${isInternalEmail(email) ? ' (interno — fallback)' : ''}`)
+          logger.info(`[HubSpot] 🔎 Procurando contato com email: ${email}${isInternalEmail(email, syncUserEmail) ? ' (interno — fallback)' : ''}`)
           
           // Buscar contato pelo email (incluindo owner)
           const searchRes = await fetch(
@@ -768,31 +765,22 @@ async function pickTargetDeal(token: string, dealIds: string[]): Promise<string 
     return null
   }
 
-  const data = await res.json() as {
-    results: Array<{ id: string; properties: Record<string, string | null> }>
-  }
+  const data = await res.json() as { results: DealCandidate[] }
 
-  const open = data.results.filter(d => d.properties.hs_is_closed !== 'true')
-  const closedCount = data.results.length - open.length
-
-  if (open.length === 0) {
+  const chosenId = chooseDealId(data.results)
+  if (!chosenId) {
     logger.info(`[HubSpot] 🚫 Os ${data.results.length} deal(s) do contato estão fechados — não vou mexer neles, será criado um novo`)
     return null
   }
 
-  open.sort((a, b) => {
-    const ta = new Date(a.properties.createdate ?? 0).getTime()
-    const tb = new Date(b.properties.createdate ?? 0).getTime()
-    return tb - ta
-  })
-
-  const chosen = open[0]
+  const chosen = data.results.find(d => d.id === chosenId)!
+  const closedCount = data.results.filter(d => d.properties.hs_is_closed === 'true').length
   logger.info(
     `[HubSpot] 🎯 Deal escolhido: ${chosen.id} ("${chosen.properties.dealname}", ` +
     `stage=${chosen.properties.dealstage}, criado ${chosen.properties.createdate}) — ` +
-    `${open.length} aberto(s), ${closedCount} fechado(s) ignorado(s)`
+    `${data.results.length - closedCount} aberto(s), ${closedCount} fechado(s) ignorado(s)`
   )
-  return chosen.id
+  return chosenId
 }
 
 /**
