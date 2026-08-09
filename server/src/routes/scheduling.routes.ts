@@ -22,6 +22,17 @@ import { authMiddleware, type AuthRequest } from '../middleware/auth.middleware.
 import { supabase } from '../config/supabase.js'
 import { logger } from '../utils/logger.js'
 import { getValidAccessToken, GCAL_EVENTS_URL } from '../utils/calendarTokens.js'
+import {
+  DEFAULT_TIME_ZONE,
+  DEFAULT_WORKING_HOURS,
+  zonedWallClockToUtc,
+  localDayRangeUtc,
+  generateTimeSlots,
+  membersFreeAt,
+  pickAssignee,
+  type CalendarEventLike,
+  type MemberAvailabilityInput,
+} from '../utils/schedulingAvailability.js'
 import multer from 'multer'
 import { nanoid } from 'nanoid'
 
@@ -155,6 +166,24 @@ router.post('/teams/:teamId/config', authMiddleware, requireTeamAdmin, async (re
       return res.status(409).json({ success: false, message: 'Este slug já está em uso' })
     }
 
+    // working_hours: NÃO pode ser sobrescrito por {} quando a request não manda o
+    // campo. A tela de config envia só slug/title/description/duração/is_active,
+    // então cada save zerava o horário de funcionamento — e sem ele o endpoint de
+    // disponibilidade devolve ZERO slot pra qualquer data. Era por isso que a
+    // página pública não mostrava horário nenhum (verificado em prod: a config
+    // starbem-comercial estava com working_hours = {}).
+    const { data: currentConfig } = await supabase
+      .from('team_scheduling_config')
+      .select('working_hours')
+      .eq('team_id', teamId)
+      .maybeSingle()
+
+    const hasIncomingHours = working_hours && Object.keys(working_hours).length > 0
+    const hasStoredHours = currentConfig?.working_hours && Object.keys(currentConfig.working_hours).length > 0
+    const effectiveWorkingHours = hasIncomingHours
+      ? working_hours
+      : (hasStoredHours ? currentConfig!.working_hours : DEFAULT_WORKING_HOURS)
+
     // Upsert configuração
     const { data: config, error } = await supabase
       .from('team_scheduling_config')
@@ -165,7 +194,7 @@ router.post('/teams/:teamId/config', authMiddleware, requireTeamAdmin, async (re
           title: title || 'Agendar reunião',
           description,
           meeting_duration_minutes: meeting_duration_minutes || 30,
-          working_hours: working_hours || {},
+          working_hours: effectiveWorkingHours,
           buffer_before_minutes: buffer_before_minutes || 0,
           buffer_after_minutes: buffer_after_minutes || 0,
           min_notice_hours: min_notice_hours || 2,
@@ -630,123 +659,108 @@ router.get('/public/:slug/availability', async (req, res) => {
     const duration = config.meeting_duration_minutes
     const bufferBefore = config.buffer_before_minutes
     const bufferAfter = config.buffer_after_minutes
+    const timeZone = config.timezone || DEFAULT_TIME_ZONE
 
     const allSlots = generateTimeSlots(startTime, endTime, duration + bufferBefore + bufferAfter)
 
+    // Janela = o DIA LOCAL do time convertido pra UTC. Usar T00:00:00Z–T23:59:59Z
+    // pegava parte do dia anterior e perdia o fim do dia em fusos negativos.
+    const { startUtc, endUtc } = localDayRangeUtc(date, timeZone)
+
     // Busca agendamentos existentes no sistema para essa data
-    const dateStart = `${date}T00:00:00Z`
-    const dateEnd = `${date}T23:59:59Z`
     const { data: existingBookings } = await supabase
       .from('team_bookings')
       .select('scheduled_start, scheduled_end, assigned_to_user_id')
       .eq('config_id', config.id)
-      .gte('scheduled_start', dateStart)
-      .lte('scheduled_start', dateEnd)
+      .gte('scheduled_start', startUtc.toISOString())
+      .lt('scheduled_start', endUtc.toISOString())
       .neq('status', 'cancelled')
 
-    // Busca eventos do calendário de cada membro
-    const memberEvents: Record<string, any[]> = {}
-    
-    for (const member of members) {
-      // Busca integração do calendário
-      const { data: integration } = await supabase
-        .from('calendar_integrations')
-        .select('refresh_token, access_token, token_expires_at')
-        .eq('user_id', member.user_id)
-        .eq('status', 'active')
-        .maybeSingle()
+    const memberAvailability = await loadMemberAvailability(
+      members.map(m => m.user_id),
+      startUtc,
+      endUtc,
+    )
 
-      if (!integration || !integration.refresh_token) {
-        // Membro sem calendário - considera todos os horários como ocupados
-        memberEvents[member.user_id] = []
-        continue
-      }
-
-      // Busca eventos do Google Calendar
-      try {
-        const accessToken = await getValidAccessToken(member.user_id, integration as any)
-        const timeMin = `${date}T00:00:00Z`
-        const timeMax = `${date}T23:59:59Z`
-        
-        const gcalRes = await fetch(
-          `${GCAL_EVENTS_URL}?timeMin=${timeMin}&timeMax=${timeMax}&singleEvents=true`,
-          { headers: { Authorization: `Bearer ${accessToken}` } }
-        )
-
-        if (gcalRes.ok) {
-          const gcalData = await gcalRes.json() as any
-          memberEvents[member.user_id] = gcalData.items ?? []
-        } else {
-          memberEvents[member.user_id] = []
+    // Slot disponível = pelo menos um membro livre. Guarda TAMBÉM quem está
+    // livre em cada um: a reserva usa isso pra não atribuir a quem está ocupado.
+    const slotsWithMembers = allSlots
+      .map(slotLabel => {
+        const slotStart = zonedWallClockToUtc(date, slotLabel, timeZone)
+        const slotEnd = new Date(slotStart.getTime() + duration * 60000)
+        return {
+          slot: slotLabel,
+          freeUserIds: membersFreeAt(memberAvailability, slotStart, slotEnd, existingBookings ?? [], timeZone),
         }
-      } catch (err) {
-        logger.warn(`[Availability] Erro ao buscar calendário de ${member.user_id}:`, err)
-        memberEvents[member.user_id] = []
-      }
-    }
-
-    // Filtra slots onde pelo menos UM membro está disponível
-    const availableSlots = allSlots.filter((slotStart) => {
-      const slotStartDate = new Date(`${date}T${slotStart}:00`)
-      const slotEndDate = new Date(slotStartDate.getTime() + duration * 60000)
-
-      // Verifica se algum membro está disponível neste horário
-      return members.some((member) => {
-        // Verifica agendamentos existentes
-        const hasBooking = existingBookings?.some((booking) =>
-          booking.assigned_to_user_id === member.user_id &&
-          doTimesOverlap(
-            slotStartDate,
-            slotEndDate,
-            new Date(booking.scheduled_start),
-            new Date(booking.scheduled_end)
-          )
-        )
-        if (hasBooking) return false
-
-        // Verifica eventos do calendário
-        const events = memberEvents[member.user_id] ?? []
-        const hasCalendarEvent = events.some((event: any) => {
-          if (!event.start || !event.end) return false
-          const eventStart = new Date(event.start.dateTime || event.start.date)
-          const eventEnd = new Date(event.end.dateTime || event.end.date)
-          return doTimesOverlap(slotStartDate, slotEndDate, eventStart, eventEnd)
-        })
-        if (hasCalendarEvent) return false
-
-        return true // Membro disponível
       })
-    })
+      .filter(s => s.freeUserIds.length > 0)
 
-    return res.json({ success: true, slots: availableSlots })
+    return res.json({
+      success: true,
+      slots: slotsWithMembers.map(s => s.slot),
+      timezone: timeZone,
+      // Compatível com o front atual (que só lê `slots`); quem quiser mostrar
+      // quem atende cada horário já tem o dado.
+      availability: slotsWithMembers,
+    })
   } catch (err) {
     logger.error('Error fetching availability:', err)
     return res.status(500).json({ success: false, message: 'Erro ao buscar disponibilidade' })
   }
 })
 
-// Helper: gera lista de horários (HH:MM) entre start e end, com intervalo de minutes
-function generateTimeSlots(start: string, end: string, intervalMinutes: number): string[] {
-  const slots: string[] = []
-  const [startHour, startMin] = start.split(':').map(Number)
-  const [endHour, endMin] = end.split(':').map(Number)
-  
-  let currentMinutes = startHour * 60 + startMin
-  const endMinutes = endHour * 60 + endMin
-  
-  while (currentMinutes + intervalMinutes <= endMinutes) {
-    const h = Math.floor(currentMinutes / 60)
-    const m = currentMinutes % 60
-    slots.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`)
-    currentMinutes += intervalMinutes
-  }
-  
-  return slots
-}
+/**
+ * Carrega a agenda de cada membro na janela pedida.
+ *
+ * ⚠️ FAIL-CLOSED: sem calendário conectado, ou se a chamada ao Google falhar,
+ * o membro volta com `calendarUsable: false` e é tratado como INDISPONÍVEL.
+ * Antes esses casos viravam `events: []` — "nenhum compromisso", ou seja, livre
+ * o dia inteiro. Oferecer horário sem saber a agenda gera reunião em cima de
+ * outra; na dúvida, não oferece.
+ */
+async function loadMemberAvailability(
+  userIds: string[],
+  startUtc: Date,
+  endUtc: Date,
+): Promise<MemberAvailabilityInput[]> {
+  return Promise.all(userIds.map(async (userId): Promise<MemberAvailabilityInput> => {
+    const { data: integration } = await supabase
+      .from('calendar_integrations')
+      .select('refresh_token, access_token, token_expires_at')
+      .eq('user_id', userId)
+      .eq('status', 'active')
+      .maybeSingle()
 
-// Helper: verifica se dois intervalos de tempo se sobrepõem
-function doTimesOverlap(start1: Date, end1: Date, start2: Date, end2: Date): boolean {
-  return start1 < end2 && end1 > start2
+    if (!integration?.refresh_token) {
+      logger.info(`[Availability] ${userId} sem calendário conectado — tratado como indisponível`)
+      return { userId, calendarUsable: false, events: [] }
+    }
+
+    try {
+      const accessToken = await getValidAccessToken(userId, integration as any)
+      const params = new URLSearchParams({
+        timeMin: startUtc.toISOString(),
+        timeMax: endUtc.toISOString(),
+        singleEvents: 'true',
+        maxResults: '250',
+      })
+
+      const gcalRes = await fetch(`${GCAL_EVENTS_URL}?${params}`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      })
+
+      if (!gcalRes.ok) {
+        logger.warn(`[Availability] Google devolveu ${gcalRes.status} para ${userId} — tratado como indisponível`)
+        return { userId, calendarUsable: false, events: [] }
+      }
+
+      const gcalData = await gcalRes.json() as { items?: CalendarEventLike[] }
+      return { userId, calendarUsable: true, events: gcalData.items ?? [] }
+    } catch (err) {
+      logger.warn(`[Availability] Erro ao buscar calendário de ${userId} — tratado como indisponível:`, err)
+      return { userId, calendarUsable: false, events: [] }
+    }
+  }))
 }
 
 // ── POST /api/scheduling/public/:slug/book ────────────────────
@@ -793,13 +807,47 @@ router.post('/public/:slug/book', async (req, res) => {
       })
     }
 
-    // 🔄 Algoritmo Round Robin: usa current_rotation_index
-    const currentIndex = config.current_rotation_index % members.length
-    const assignedMember = members[currentIndex]
-
     // Calcula scheduled_end
     const scheduledEnd = new Date(scheduled_start)
     scheduledEnd.setMinutes(scheduledEnd.getMinutes() + config.meeting_duration_minutes)
+
+    // 🔄 Round Robin com CONFERÊNCIA DE AGENDA.
+    // Antes era `members[current_rotation_index % members.length]` direto: o
+    // horário aparecia porque ALGUÉM estava livre, mas o convite ia pro próximo
+    // da fila, que podia estar em reunião. Agora a rotação é só a ordem de
+    // preferência — quem atende sai de quem está de fato livre AGORA (o slot
+    // pode ter sido ocupado entre a listagem e o clique).
+    const slotStart = new Date(scheduled_start)
+    const { data: bookingsAtSlot } = await supabase
+      .from('team_bookings')
+      .select('scheduled_start, scheduled_end, assigned_to_user_id')
+      .eq('config_id', config.id)
+      .lt('scheduled_start', scheduledEnd.toISOString())
+      .gt('scheduled_end', slotStart.toISOString())
+      .neq('status', 'cancelled')
+
+    const availability = await loadMemberAvailability(
+      members.map(m => m.user_id),
+      slotStart,
+      scheduledEnd,
+    )
+    const freeUserIds = membersFreeAt(
+      availability,
+      slotStart,
+      scheduledEnd,
+      bookingsAtSlot ?? [],
+      config.timezone || DEFAULT_TIME_ZONE,
+    )
+
+    const assignedMember = pickAssignee(members, freeUserIds, config.current_rotation_index)
+
+    if (!assignedMember) {
+      logger.info(`[Booking] Slot ${scheduled_start} sem membro livre (config ${config.id}) — recusando`)
+      return res.status(409).json({
+        success: false,
+        message: 'Esse horário acabou de ficar indisponível. Escolha outro, por favor.',
+      })
+    }
 
     // Cria booking
     const { data: booking, error: bookingError } = await supabase
@@ -820,8 +868,11 @@ router.post('/public/:slug/book', async (req, res) => {
 
     if (bookingError) throw bookingError
 
-    // Atualiza rotation_index (avança para o próximo membro)
-    const nextIndex = (currentIndex + 1) % members.length
+    // Avança a rotação a partir de QUEM ATENDEU, não do índice anterior. Se a
+    // vez era do Bruno mas ele estava ocupado e caiu na Caio, a próxima reserva
+    // começa depois da Caio — senão o Bruno seria pulado ou repetido.
+    const assignedIndex = members.findIndex(m => m.user_id === assignedMember.user_id)
+    const nextIndex = (assignedIndex + 1) % members.length
     await supabase
       .from('team_scheduling_config')
       .update({ current_rotation_index: nextIndex })

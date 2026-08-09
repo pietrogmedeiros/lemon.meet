@@ -1,7 +1,12 @@
 # Plano — Round Robin não reflete as agendas reais
 
-**Status:** diagnosticado, NÃO implementado. Agente sugerido: **Alicerce (Integration Architect)**.
+**Status:** Fases 1 e 3 IMPLEMENTADAS em 2026-08-09 (+ um 7º defeito descoberto
+na hora, ver abaixo). Falta a Fase 2 (working_hours por membro) e o **deploy**.
 **Levantado em:** 2026-08-09 · **Arquivo-alvo:** `server/src/routes/scheduling.routes.ts`
+
+> ⚠️ **Ainda não está em produção.** O deploy do backend está travado desde
+> 03/08 (o GitHub Actions parou de criar runs). Rodar a migration
+> `scripts/migration-scheduling-timezone.sql` no Supabase e implantar no EasyPanel.
 
 **Sintoma relatado:** a página pública de agendamento não reflete os horários/dias
 realmente livres dos membros do time configurados no round-robin.
@@ -58,6 +63,21 @@ porque a Ana estava livre e o convite cair para o Bruno, que está ocupado.
 
 Sem filtro por `transparency: 'transparent'` nem por `responseStatus: 'declined'`.
 Um bloco informativo marcado como *Livre* no Google derruba o horário.
+
+### 7. `working_hours` era ZERADO a cada save — o sintoma real em produção
+
+Descoberto ao conferir os dados reais: a única config existente
+(`starbem-comercial`, ativa) estava com `working_hours = {}`, e a API pública
+devolvia `{"slots":[]}` para **toda** data — a página não mostrava horário nenhum.
+
+Cadeia: a tela de config (`web/src/pages/TeamSchedulingPage.tsx`) envia só
+`slug/title/description/meeting_duration_minutes/is_active` — nunca
+`working_hours`. O upsert fazia `working_hours: working_hours || {}`, então cada
+save zerava o campo. Sem horário de funcionamento, zero slot.
+
+**Corrigido:** o upsert preserva o valor salvo quando a request não manda o campo,
+e semeia `DEFAULT_WORKING_HOURS` (seg–sex 09:00–18:00) quando o time nunca definiu.
+Falta ainda a UI de edição (Fase 2).
 
 ### 6. `working_hours` é do time, não por pessoa
 
