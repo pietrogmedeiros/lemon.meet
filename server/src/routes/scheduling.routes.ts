@@ -593,7 +593,13 @@ router.get('/public/:slug', async (req, res) => {
       description: config.description,
       meeting_duration_minutes: config.meeting_duration_minutes,
       team_name: config.teams.name,
-      working_hours: config.working_hours,
+      // Mesmo fallback do endpoint de disponibilidade: com `{}` o front não tem
+      // como saber quais dias existem e acabava listando sábado e domingo, que
+      // sempre voltavam sem horário nenhum.
+      working_hours: config.working_hours && Object.keys(config.working_hours).length > 0
+        ? config.working_hours
+        : DEFAULT_WORKING_HOURS,
+      timezone: config.timezone || DEFAULT_TIME_ZONE,
       logo_url: config.logo_url ? config.logo_url.replace('host.docker.internal', 'localhost') : null
     }
 

@@ -173,12 +173,27 @@ export function PublicSchedulingPage() {
     '17:00'
   ]
 
-  // Próximos 7 dias
-  const availableDates = Array.from({ length: 7 }, (_, i) => {
+  // Próximos 7 dias ÚTEIS segundo o working_hours da config.
+  //
+  // Antes eram os 7 próximos dias corridos, sem filtro: sábado e domingo
+  // apareciam na lista e, ao clicar, não havia horário nenhum — o backend já
+  // devolvia slots:[] pra dia desabilitado. Agora só entram dias habilitados.
+  //
+  // A data é montada com getFullYear/getMonth/getDate (hora local), não com
+  // toISOString(), que converte pra UTC: à noite no Brasil o ISO já virou o dia
+  // seguinte e a lista pulava um dia.
+  const DAY_KEYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
+  const availableDates: string[] = []
+  for (let offset = 1; availableDates.length < 7 && offset <= 30; offset++) {
     const date = new Date()
-    date.setDate(date.getDate() + i + 1)
-    return date.toISOString().split('T')[0]
-  })
+    date.setDate(date.getDate() + offset)
+    const dayKey = DAY_KEYS[date.getDay()]
+    if (config?.working_hours?.[dayKey]?.enabled === false) continue
+    if (config?.working_hours && !config.working_hours[dayKey]) continue
+
+    const iso = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+    availableDates.push(iso)
+  }
 
   return (
     <div className="min-h-screen bg-neutral-lighter flex items-center justify-center p-8">
