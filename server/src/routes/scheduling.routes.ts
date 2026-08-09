@@ -643,11 +643,22 @@ router.get('/public/:slug/availability', async (req, res) => {
       return res.json({ success: true, slots: [] })
     }
 
-    // Determina working hours do dia da semana
-    const dayOfWeek = new Date(date).getDay() // 0=domingo, 1=segunda, etc
+    // Determina working hours do dia da semana.
+    // getUTCDay (não getDay): "2026-08-10" é parseado como meia-noite UTC, e
+    // getDay leria isso no fuso do processo — num container a oeste, cairia no
+    // dia anterior.
+    const dayOfWeek = new Date(`${date}T00:00:00Z`).getUTCDay() // 0=domingo
     const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
     const dayKey = dayNames[dayOfWeek]
-    const workingHours = config.working_hours?.[dayKey]
+
+    // `working_hours = {}` significa "nunca configurado" (a tela de config não
+    // envia o campo). Sem esse fallback a página pública fica permanentemente
+    // sem horário — foi o que aconteceu em prod. Um time que desabilita todos os
+    // dias de propósito grava cada dia com enabled:false, então é distinguível.
+    const storedHours = config.working_hours && Object.keys(config.working_hours).length > 0
+      ? config.working_hours
+      : DEFAULT_WORKING_HOURS
+    const workingHours = storedHours[dayKey]
 
     if (!workingHours || !workingHours.enabled) {
       return res.json({ success: true, slots: [] })
