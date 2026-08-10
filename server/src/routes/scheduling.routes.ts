@@ -969,13 +969,28 @@ router.post('/public/:slug/book', async (req, res) => {
     // TODO: Enviar e-mail de confirmação
     // TODO: Enviar notificação para o membro
 
+    // Nome de quem vai atender, pra tela de confirmação dizer COM QUEM é a call.
+    // Best-effort: se a busca falhar, o agendamento já está criado e não pode
+    // ser derrubado por causa do rótulo.
+    let hostName: string | null = null
+    try {
+      const { data: hostUser } = await supabase.auth.admin.getUserById(assignedMember.user_id)
+      hostName = hostUser.user?.user_metadata?.full_name
+        ?? hostUser.user?.user_metadata?.name
+        ?? hostUser.user?.email
+        ?? null
+    } catch (err) {
+      logger.warn(`[Booking] Não consegui resolver o nome de ${assignedMember.user_id}:`, err)
+    }
+
     logger.info(`✅ Created booking ${booking.id} for ${guest_email} assigned to ${assignedMember.user_id}`)
     return res.json({
       success: true,
       booking: {
         id: booking.id,
         scheduled_start,
-        scheduled_end: scheduledEnd.toISOString()
+        scheduled_end: scheduledEnd.toISOString(),
+        host_name: hostName,
       }
     })
   } catch (err) {

@@ -6,7 +6,7 @@
 
 import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
-import { Calendar, Clock, CheckCircle, Loader, ChevronLeft } from 'lucide-react'
+import { Calendar, Clock, CheckCircle, Loader, ChevronLeft, User } from 'lucide-react'
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:3000'
 
@@ -34,6 +34,7 @@ export function PublicSchedulingPage() {
   const [selectedTime, setSelectedTime] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)
+  const [hostName, setHostName] = useState<string | null>(null)
 
   useEffect(() => {
     loadConfig()
@@ -92,6 +93,10 @@ export function PublicSchedulingPage() {
         throw new Error(error.message || 'Erro ao criar agendamento')
       }
 
+      // Quem vai atender — o round-robin decide no servidor, então só dá pra
+      // saber depois de confirmar.
+      const result = await response.json().catch(() => null)
+      setHostName(result?.booking?.host_name ?? null)
       setSuccess(true)
     } catch (err: any) {
       alert('❌ ' + err.message)
@@ -135,9 +140,17 @@ export function PublicSchedulingPage() {
             Agendamento Confirmado!
           </h1>
           <p className="text-secondary mb-8">
-            Seu agendamento foi confirmado com sucesso
+            {hostName
+              ? <>Sua reunião com <span className="font-semibold text-primary">{hostName}</span> está confirmada</>
+              : 'Seu agendamento foi confirmado com sucesso'}
           </p>
           <div className="p-6 bg-background rounded-xl text-left space-y-3">
+            {hostName && (
+              <div className="flex items-center gap-3 text-sm">
+                <User size={18} className="text-brand" />
+                <span className="text-primary font-medium">{hostName}</span>
+              </div>
+            )}
             <div className="flex items-center gap-3 text-sm">
               <Calendar size={18} className="text-brand" />
               <span className="text-primary font-medium">
