@@ -73,9 +73,10 @@ export function PublicSchedulingPage() {
     setSubmitting(true)
 
     try {
-      // Monta ISO string do horário selecionado
-      const scheduledStart = `${selectedDate}T${selectedTime}:00.000Z`
-
+      // Manda a hora de PAREDE que o visitante viu; o servidor converte usando o
+      // fuso do time. Antes montávamos `${data}T${hora}:00.000Z`, o que declarava
+      // o rótulo do slot como UTC: "15:00" chegava como 12:00 em Brasília, a
+      // reserva batia num horário diferente do escolhido e voltava 409.
       const response = await fetch(`${API}/api/scheduling/public/${slug}/book`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -84,7 +85,8 @@ export function PublicSchedulingPage() {
           guest_email: guestEmail,
           guest_phone: guestPhone || null,
           guest_notes: guestNotes || null,
-          scheduled_start: scheduledStart
+          scheduled_date: selectedDate,
+          scheduled_time: selectedTime
         })
       })
 

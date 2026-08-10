@@ -784,13 +784,24 @@ async function loadMemberAvailability(
 router.post('/public/:slug/book', async (req, res) => {
   try {
     const { slug } = req.params
-    const { guest_name, guest_email, guest_phone, guest_notes, scheduled_start } = req.body
+    const {
+      guest_name, guest_email, guest_phone, guest_notes,
+      scheduled_start,
+      // Forma preferida: hora de PAREDE + data, como o visitante viu na tela. A
+      // conversão pro instante UTC é feita aqui, onde o fuso do time é conhecido.
+      // O front mandava `${date}T${time}:00.000Z`, tratando o rótulo do slot como
+      // UTC — "15:00" virava 12:00 em Brasília, e a reserva batia num horário
+      // diferente do escolhido. Antes isso passava despercebido porque o backend
+      // também lia os slots como UTC e os dois erros se anulavam.
+      scheduled_date, scheduled_time,
+    } = req.body
 
     // Validações
-    if (!guest_name || !guest_email || !scheduled_start) {
+    const hasWallClock = typeof scheduled_date === 'string' && typeof scheduled_time === 'string'
+    if (!guest_name || !guest_email || (!scheduled_start && !hasWallClock)) {
       return res.status(400).json({
         success: false,
-        message: 'Campos obrigatórios: guest_name, guest_email, scheduled_start'
+        message: 'Campos obrigatórios: guest_name, guest_email, e (scheduled_date + scheduled_time) ou scheduled_start'
       })
     }
 
@@ -824,9 +835,17 @@ router.post('/public/:slug/book', async (req, res) => {
       })
     }
 
-    // Calcula scheduled_end
-    const scheduledEnd = new Date(scheduled_start)
-    scheduledEnd.setMinutes(scheduledEnd.getMinutes() + config.meeting_duration_minutes)
+    // Instante real do slot: da hora de parede + fuso do time quando disponível.
+    const bookingTimeZone = config.timezone || DEFAULT_TIME_ZONE
+    const slotStartUtc = hasWallClock
+      ? zonedWallClockToUtc(scheduled_date, scheduled_time, bookingTimeZone)
+      : new Date(scheduled_start)
+
+    if (Number.isNaN(slotStartUtc.getTime())) {
+      return res.status(400).json({ success: false, message: 'Horário inválido' })
+    }
+
+    const scheduledEnd = new Date(slotStartUtc.getTime() + config.meeting_duration_minutes * 60000)
 
     // 🔄 Round Robin com CONFERÊNCIA DE AGENDA.
     // Antes era `members[current_rotation_index % members.length]` direto: o
@@ -834,7 +853,7 @@ router.post('/public/:slug/book', async (req, res) => {
     // da fila, que podia estar em reunião. Agora a rotação é só a ordem de
     // preferência — quem atende sai de quem está de fato livre AGORA (o slot
     // pode ter sido ocupado entre a listagem e o clique).
-    const slotStart = new Date(scheduled_start)
+    const slotStart = slotStartUtc
     const { data: bookingsAtSlot } = await supabase
       .from('team_bookings')
       .select('scheduled_start, scheduled_end, assigned_to_user_id')
@@ -859,7 +878,7 @@ router.post('/public/:slug/book', async (req, res) => {
     const assignedMember = pickAssignee(members, freeUserIds, config.current_rotation_index)
 
     if (!assignedMember) {
-      logger.info(`[Booking] Slot ${scheduled_start} sem membro livre (config ${config.id}) — recusando`)
+      logger.info(`[Booking] Slot ${slotStartUtc.toISOString()} sem membro livre (config ${config.id}) — recusando`)
       return res.status(409).json({
         success: false,
         message: 'Esse horário acabou de ficar indisponível. Escolha outro, por favor.',
@@ -876,7 +895,7 @@ router.post('/public/:slug/book', async (req, res) => {
         guest_email,
         guest_phone,
         guest_notes,
-        scheduled_start,
+        scheduled_start: slotStartUtc.toISOString(),
         scheduled_end: scheduledEnd.toISOString(),
         status: 'confirmed'
       })
@@ -924,12 +943,12 @@ router.post('/public/:slug/book', async (req, res) => {
           summary: eventTitle,
           description: guest_notes || `Agendamento via ${config.title}`,
           start: {
-            dateTime: scheduled_start,
-            timeZone: 'America/Sao_Paulo'
+            dateTime: slotStartUtc.toISOString(),
+            timeZone: bookingTimeZone
           },
           end: {
             dateTime: scheduledEnd.toISOString(),
-            timeZone: 'America/Sao_Paulo'
+            timeZone: bookingTimeZone
           },
           attendees: [
             { email: guest_email, displayName: guest_name }
@@ -988,7 +1007,7 @@ router.post('/public/:slug/book', async (req, res) => {
       success: true,
       booking: {
         id: booking.id,
-        scheduled_start,
+        scheduled_start: slotStartUtc.toISOString(),
         scheduled_end: scheduledEnd.toISOString(),
         host_name: hostName,
       }
