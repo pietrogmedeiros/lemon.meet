@@ -201,6 +201,33 @@ export function TeamSchedulingPage() {
     }
   }, [session, teamId])
 
+  /**
+   * Cancela o agendamento. O backend também remove o evento da agenda do
+   * atendente — sem isso o horário ficava bloqueado pra sempre, porque o evento
+   * no Google continuava lá mesmo com a reserva cancelada.
+   */
+  const cancelBooking = async (bookingId: string) => {
+    if (!session) return
+    try {
+      const response = await fetch(`${API}/api/scheduling/bookings/${bookingId}`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status: 'cancelled' }),
+      })
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}))
+        throw new Error(err.message || 'Erro ao cancelar agendamento')
+      }
+      await loadBookings()
+    } catch (err) {
+      console.error(err)
+      alert(err instanceof Error ? err.message : 'Erro ao cancelar agendamento')
+    }
+  }
+
   const loadBookings = useCallback(async () => {
     if (!session || !teamId) return
 
@@ -861,6 +888,18 @@ export function TeamSchedulingPage() {
                         <Users size={14} />
                         {booking.assigned_to_name}
                       </span>
+                      {booking.status !== 'cancelled' && (
+                        <button
+                          type="button"
+                          onClick={() => setConfirmModal({
+                            message: `Cancelar o agendamento de ${booking.guest_name}? O evento também será removido da agenda de ${booking.assigned_to_name}.`,
+                            onConfirm: () => cancelBooking(booking.id),
+                          })}
+                          className="ml-auto text-red-600 hover:text-red-700 font-medium"
+                        >
+                          Cancelar agendamento
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}
