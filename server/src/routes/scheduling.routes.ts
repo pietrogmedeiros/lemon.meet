@@ -556,6 +556,19 @@ router.patch('/bookings/:id', authMiddleware, async (req: AuthRequest, res: Resp
 
     if (error) throw error
 
+    // Cancelar a linha no banco NÃO liberava a agenda: o evento seguia na agenda
+    // do atendente e continuava bloqueando o horário pra sempre. Best-effort — o
+    // cancelamento já está gravado e não pode falhar por causa do Google.
+    if (status === 'cancelled') {
+      const removed = await deleteHostCalendarEvent(
+        booking.assigned_to_user_id,
+        new Date(booking.scheduled_start),
+        new Date(booking.scheduled_end),
+        booking.guest_email,
+      )
+      logger.info(`[Booking] cancelamento ${id}: evento no Google ${removed ? 'removido' : 'não encontrado/não removido'}`)
+    }
+
     logger.info(`✅ Updated booking ${id} status=${status}`)
     return res.json({ success: true })
   } catch (err) {
@@ -725,6 +738,68 @@ router.get('/public/:slug/availability', async (req, res) => {
     return res.status(500).json({ success: false, message: 'Erro ao buscar disponibilidade' })
   }
 })
+
+/**
+ * Remove da agenda do atendente o evento criado por um agendamento.
+ *
+ * O id do evento não é guardado no banco (não existe coluna), então localizamos
+ * pela janela + e-mail do convidado. Isso também alcança agendamentos antigos,
+ * criados antes desta correção. Devolve `true` se apagou algo.
+ */
+async function deleteHostCalendarEvent(
+  hostUserId: string,
+  startUtc: Date,
+  endUtc: Date,
+  guestEmail: string | null,
+): Promise<boolean> {
+  try {
+    const { data: integration } = await supabase
+      .from('calendar_integrations')
+      .select('refresh_token, access_token, token_expires_at')
+      .eq('user_id', hostUserId)
+      .eq('status', 'active')
+      .maybeSingle()
+
+    if (!integration?.refresh_token) return false
+
+    const accessToken = await getValidAccessToken(hostUserId, integration as any)
+    const params = new URLSearchParams({
+      timeMin: startUtc.toISOString(),
+      timeMax: endUtc.toISOString(),
+      singleEvents: 'true',
+      maxResults: '50',
+    })
+
+    const listRes = await fetch(`${GCAL_EVENTS_URL}?${params}`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+    if (!listRes.ok) return false
+
+    const { items = [] } = await listRes.json() as { items?: any[] }
+
+    // Só apaga evento que É deste agendamento: mesmo início e o convidado na
+    // lista de participantes. Sem isso um compromisso pessoal do atendente que
+    // caia na mesma janela seria apagado junto.
+    const target = items.find(ev => {
+      const evStart = ev.start?.dateTime ? new Date(ev.start.dateTime).getTime() : null
+      if (evStart !== startUtc.getTime()) return false
+      if (!guestEmail) return true
+      return (ev.attendees ?? []).some((a: any) => a.email?.toLowerCase() === guestEmail.toLowerCase())
+    })
+
+    if (!target?.id) return false
+
+    const delRes = await fetch(
+      `${GCAL_EVENTS_URL}/${encodeURIComponent(target.id)}?sendUpdates=all`,
+      { method: 'DELETE', headers: { Authorization: `Bearer ${accessToken}` } },
+    )
+    // 410 = já removido antes; conta como sucesso.
+    return delRes.ok || delRes.status === 410
+  } catch (err) {
+    logger.warn(`[Booking] Falha ao remover evento do Google de ${hostUserId}:`, err)
+    return false
+  }
+}
 
 /**
  * Carrega a agenda de cada membro na janela pedida.
