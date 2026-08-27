@@ -140,14 +140,11 @@ export function PrivacyPolicyPage() {
 
           {/* DECISÃO JURÍDICA PENDENTE — seção 7.
               Os fatos estão verificados: banco Supabase em sa-east-1 (São Paulo), servidor de
-              aplicação na Contabo (IP de api.lemon-meet.com em bloco RIPE = Europa), áudio para
+              aplicação na Contabo, na Alemanha (confirmado no painel da Contabo), áudio para
               Groq/EUA e transcrição para DeepSeek/China.
               Falta decidir com apoio jurídico a BASE LEGAL declarada para a transferência
               internacional (art. 33 da LGPD): execução de contrato, consentimento ou cláusulas
               contratuais padrão. O texto abaixo descreve a finalidade sem nomear a hipótese. */}
-          {/* CONFIRMAR ANTES DE PUBLICAR — país exato do servidor da Contabo.
-              O bloco de IP é administrado pelo RIPE (Europa), mas a Contabo tem datacenter em
-              vários países. Até a confirmação no painel da Contabo, o texto diz apenas "Europa". */}
           <section>
             <h2 className="text-lg font-semibold text-primary dark:text-white mb-3">7. Onde seus dados ficam e para onde são enviados</h2>
             <p>
@@ -160,7 +157,7 @@ export function PrivacyPolicyPage() {
             <h3 className="text-base font-semibold text-primary dark:text-white mt-5 mb-2">Onde seus dados ficam guardados</h3>
             <ul className="list-disc pl-5 space-y-1">
               <li><strong>Banco de dados — Supabase, na região de São Paulo, no Brasil.</strong> É onde ficam a sua conta, as transcrições, os insights e os metadados das suas reuniões. Os seus dados repousam em território brasileiro.</li>
-              <li><strong>Servidor de aplicação — Contabo, na Europa.</strong> É o servidor que recebe os envios, executa o processamento e responde ao app. Os dados passam por ele, mas não é ali que ficam guardados: o áudio de uma reunião presencial fica nesse servidor apenas durante o processamento e é apagado logo em seguida (item 3).</li>
+              <li><strong>Servidor de aplicação — Contabo, na Alemanha.</strong> É o servidor que recebe os envios, executa o processamento e responde ao app. Os dados passam por ele, mas não é ali que ficam guardados: o áudio de uma reunião presencial fica nesse servidor apenas durante o processamento e é apagado logo em seguida (item 3).</li>
               <li><strong>Site e app web — Firebase (Google).</strong> Hospedam as páginas do produto.</li>
             </ul>
 
