@@ -142,7 +142,7 @@ export function MainLayout({ children }: MainLayoutProps) {
 
                 <p className="text-xs text-[#BBBBBB]">
                   Dúvidas?{' '}
-                  <a href="mailto:contato@lemon.meet" className="underline text-tertiary hover:text-secondary">
+                  <a href="mailto:contato@lemon-meet.com" className="underline text-tertiary hover:text-secondary">
                     Fale conosco
                   </a>
                 </p>
