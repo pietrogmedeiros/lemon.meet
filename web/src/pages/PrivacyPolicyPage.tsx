@@ -129,31 +129,54 @@ export function PrivacyPolicyPage() {
               <li><strong>MeetingBaas e Skribby</strong> — bots que entram nas reuniões online para gravar e transcrever. Esses fornecedores podem usar subcontratados próprios para a transcrição.</li>
               <li><strong>Groq</strong> — transcrição automática de áudio (modelo Whisper). É por onde passa o áudio das reuniões presenciais gravadas pelo app.</li>
               <li><strong>DeepSeek</strong> — geração de insights, resumos e respostas do chat a partir do texto da transcrição.</li>
-              <li><strong>Firebase (Google)</strong> e provedor de infraestrutura em nuvem — hospedagem da aplicação.</li>
+              <li><strong>Contabo</strong> — servidor onde a aplicação roda.</li>
+              <li><strong>Firebase (Google)</strong> — hospedagem do site e do app web.</li>
             </ul>
             <p className="mt-3">
               Além disso, se você ativar uma integração (HubSpot, Pipedrive, Google Drive ou webhook próprio), enviamos os dados e insights das suas reuniões para o destino que você conectou. Isso só acontece por ação sua e pode ser desligado nas configurações.
             </p>
-            <p className="mt-3">Todos os fornecedores operam sob seus próprios termos e políticas de privacidade, e são contratualmente obrigados a tratar os dados apenas para os fins do serviço.</p>
+            <p className="mt-3">Todos os fornecedores operam sob seus próprios termos e políticas de privacidade, e são contratualmente obrigados a tratar os dados apenas para os fins do serviço. O item 7 explica em que país cada um deles está.</p>
           </section>
 
           {/* DECISÃO JURÍDICA PENDENTE — seção 7.
-              O fato (áudio → Groq/EUA, transcrição → DeepSeek/China) está verificado no código.
-              O que falta decidir com apoio jurídico é a BASE LEGAL declarada para a transferência
+              Os fatos estão verificados: banco Supabase em sa-east-1 (São Paulo), servidor de
+              aplicação na Contabo (IP de api.lemon-meet.com em bloco RIPE = Europa), áudio para
+              Groq/EUA e transcrição para DeepSeek/China.
+              Falta decidir com apoio jurídico a BASE LEGAL declarada para a transferência
               internacional (art. 33 da LGPD): execução de contrato, consentimento ou cláusulas
-              contratuais padrão. O texto abaixo descreve a finalidade sem nomear a hipótese legal. */}
+              contratuais padrão. O texto abaixo descreve a finalidade sem nomear a hipótese. */}
+          {/* CONFIRMAR ANTES DE PUBLICAR — país exato do servidor da Contabo.
+              O bloco de IP é administrado pelo RIPE (Europa), mas a Contabo tem datacenter em
+              vários países. Até a confirmação no painel da Contabo, o texto diz apenas "Europa". */}
           <section>
-            <h2 className="text-lg font-semibold text-primary dark:text-white mb-3">7. Transferência internacional de dados</h2>
+            <h2 className="text-lg font-semibold text-primary dark:text-white mb-3">7. Onde seus dados ficam e para onde são enviados</h2>
             <p>
-              Parte do processamento acontece fora do Brasil. Isso vale tanto para as reuniões online quanto para as gravações presenciais feitas pelo app do celular:
+              Este item vale para o produto inteiro — site, app para Mac e app para iPhone, reuniões online e presenciais.
+            </p>
+            <p className="mt-3">
+              São duas coisas diferentes, e vale separá-las: <strong>onde seus dados ficam guardados</strong> e <strong>para onde eles são enviados durante o processamento</strong>.
+            </p>
+
+            <h3 className="text-base font-semibold text-primary dark:text-white mt-5 mb-2">Onde seus dados ficam guardados</h3>
+            <ul className="list-disc pl-5 space-y-1">
+              <li><strong>Banco de dados — Supabase, na região de São Paulo, no Brasil.</strong> É onde ficam a sua conta, as transcrições, os insights e os metadados das suas reuniões. Os seus dados repousam em território brasileiro.</li>
+              <li><strong>Servidor de aplicação — Contabo, na Europa.</strong> É o servidor que recebe os envios, executa o processamento e responde ao app. Os dados passam por ele, mas não é ali que ficam guardados: o áudio de uma reunião presencial fica nesse servidor apenas durante o processamento e é apagado logo em seguida (item 3).</li>
+              <li><strong>Site e app web — Firebase (Google).</strong> Hospedam as páginas do produto.</li>
+            </ul>
+
+            <h3 className="text-base font-semibold text-primary dark:text-white mt-5 mb-2">Para onde seus dados são enviados durante o processamento</h3>
+            <p>
+              Cada reunião passa por dois fornecedores fora do Brasil. É um envio para processamento — os dados vão, são processados e voltam:
             </p>
             <ul className="list-disc pl-5 space-y-1 mt-2">
-              <li><strong>Transcrição do áudio — Groq, nos Estados Unidos.</strong> O arquivo de áudio é enviado para lá e volta convertido em texto.</li>
-              <li><strong>Insights e chat sobre a reunião — DeepSeek, na China.</strong> O texto da transcrição é enviado para lá e volta em forma de resumo, objeções, próximos passos e respostas às suas perguntas.</li>
-              <li><strong>Hospedagem e banco de dados</strong> podem estar em servidores fora do Brasil, conforme a infraestrutura dos fornecedores do item 6.</li>
+              <li><strong>Transcrição do áudio — Groq, nos Estados Unidos.</strong> O arquivo de áudio é enviado e volta convertido em texto.</li>
+              <li><strong>Insights e chat sobre a reunião — DeepSeek, na China.</strong> O texto da transcrição é enviado e volta em forma de resumo, objeções, próximos passos e respostas às suas perguntas.</li>
             </ul>
             <p className="mt-3">
-              Fazemos essas transferências porque elas são necessárias para executar o serviço que você contratou: sem esses fornecedores não existe transcrição nem insights. Ao usar o Lemon.meet, você fica ciente de que o áudio e as transcrições das suas reuniões saem do Brasil para esse processamento.
+              Terminado esse caminho, <strong>o áudio da reunião presencial é descartado</strong> e o que permanece guardado — no banco em São Paulo — é a transcrição e os insights.
+            </p>
+            <p className="mt-3">
+              Fazemos esses envios porque eles são necessários para executar o serviço que você contratou: sem esses fornecedores não existe transcrição nem insights. Ao usar o Lemon.meet, você fica ciente de que o áudio e as transcrições das suas reuniões saem do Brasil para esse processamento.
             </p>
             <p className="mt-3">
               Se o conteúdo das suas reuniões for sensível a ponto de isso ser um problema — por política da sua empresa, por sigilo contratual ou por qualquer outro motivo —, não use o serviço para gravá-las.
