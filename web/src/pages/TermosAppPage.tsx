@@ -21,7 +21,7 @@ export function TermosAppPage() {
         </div>
 
         <h1 className="text-3xl font-bold text-primary dark:text-white mb-2">Termos de Uso</h1>
-        <p className="text-body-small text-secondary mb-10">Última atualização: abril de 2026</p>
+        <p className="text-body-small text-secondary mb-10">Última atualização: agosto de 2026</p>
 
         <div className="prose prose-sm max-w-none text-secondary  space-y-8">
 
@@ -35,7 +35,14 @@ export function TermosAppPage() {
           <section>
             <h2 className="text-lg font-semibold text-primary dark:text-white mb-3">2. Descrição do serviço</h2>
             <p>
-              O Lemon.meet oferece um serviço de transcrição automática, análise e geração de insights de reuniões online (Google Meet, Zoom, Microsoft Teams). O serviço opera por meio de um bot que ingressa nas reuniões mediante autorização do usuário.
+              O Lemon.meet oferece um serviço de transcrição automática, análise e geração de insights de reuniões. Ele funciona de duas formas:
+            </p>
+            <ul className="list-disc pl-5 space-y-1 mt-2">
+              <li><strong>Reuniões online</strong> (Google Meet, Zoom, Microsoft Teams) — um bot ingressa na reunião mediante autorização do usuário.</li>
+              <li><strong>Reuniões presenciais</strong> — o app do Lemon.meet para iPhone grava o áudio pelo microfone do aparelho, sempre por ação explícita do usuário, e envia para processamento.</li>
+            </ul>
+            <p className="mt-3">
+              O serviço é acessado pelo site, pelo app para Mac e pelo app para iPhone, todos ligados à mesma conta. O tratamento dos dados de cada um desses caminhos está descrito na <strong>Política de Privacidade</strong>.
             </p>
           </section>
 
@@ -54,7 +61,10 @@ export function TermosAppPage() {
           <section>
             <h2 className="text-lg font-semibold text-primary dark:text-white mb-3">4. Consentimento dos participantes</h2>
             <p>
-              É de <strong>exclusiva responsabilidade do usuário</strong> informar e obter consentimento expresso de todos os participantes antes de iniciar a gravação de qualquer reunião. O Lemon.meet não se responsabiliza por gravações realizadas sem o devido consentimento.
+              É de <strong>exclusiva responsabilidade do usuário</strong> informar e obter consentimento expresso de todos os participantes antes de iniciar a gravação de qualquer reunião, online ou presencial. O Lemon.meet não se responsabiliza por gravações realizadas sem o devido consentimento.
+            </p>
+            <p className="mt-3">
+              Isso vale especialmente para as reuniões presenciais gravadas pelo app do celular: os presentes não são usuários do Lemon.meet e não têm como aceitar nada dentro do nosso produto. Cabe a você avisá-los antes de começar, respeitar quem não concordar e observar a legislação aplicável ao local — em várias situações, gravar sem o consentimento de todos é proibido.
             </p>
           </section>
 
