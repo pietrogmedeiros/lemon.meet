@@ -4,6 +4,7 @@ import { useSearchParams, useNavigate, Link } from 'react-router-dom'
 import { Button } from '@/components/ui'
 import { Mail, Lock } from 'lucide-react'
 import { useAuth } from '@/contexts'
+import { supabase } from '@/lib/supabase'
 
 export function LoginPage() {
   const { t } = useTranslation()
@@ -23,6 +24,32 @@ export function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Recuperação de senha. Antes disto, o ÚNICO botão de redefinir senha ficava
+  // dentro de Configurações — ou seja, atrás do login. Quem esquecia a senha
+  // não tinha caminho nenhum de volta.
+  const [recoverySent, setRecoverySent] = useState(false)
+  const [recoveryLoading, setRecoveryLoading] = useState(false)
+
+  const handleForgotPassword = async () => {
+    setError(null)
+    if (!email.trim()) {
+      setError('Digite seu e-mail acima para receber o link de redefinição.')
+      return
+    }
+    setRecoveryLoading(true)
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: `${window.location.origin}/settings`,
+      })
+      if (error) throw error
+      setRecoverySent(true)
+    } catch (err: any) {
+      setError(err?.message ?? 'Não foi possível enviar o e-mail de redefinição.')
+    } finally {
+      setRecoveryLoading(false)
+    }
+  }
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -110,6 +137,19 @@ export function LoginPage() {
                 placeholder="••••••••"
                 className="input"
               />
+              <button
+                type="button"
+                onClick={handleForgotPassword}
+                disabled={recoveryLoading}
+                className="mt-2 text-xs text-secondary hover:text-brand underline disabled:opacity-50"
+              >
+                {recoveryLoading ? 'Enviando…' : 'Esqueci minha senha'}
+              </button>
+              {recoverySent && (
+                <p className="mt-2 text-xs text-brand">
+                  Se existir uma conta com esse e-mail, o link de redefinição chegou na caixa de entrada.
+                </p>
+              )}
             </div>
 
             <Button

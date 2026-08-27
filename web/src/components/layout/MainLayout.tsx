@@ -1,7 +1,9 @@
-import { ReactNode } from 'react'
+import { ReactNode, useState } from 'react'
 import { Sidebar, TopNavBar } from '@/components/layout'
-import { useSubscription } from '@/contexts'
+import { useSubscription, useAuth } from '@/contexts'
 import { Clock, Lock, Zap, AlertTriangle } from 'lucide-react'
+
+const API = import.meta.env.VITE_API_URL || 'http://localhost:3000'
 
 interface MainLayoutProps {
   children: ReactNode
@@ -15,6 +17,31 @@ const PLAN_LABELS: Record<string, string> = {
 
 export function MainLayout({ children }: MainLayoutProps) {
   const { isTrial, isExpired, daysLeft, loading, subscription } = useSubscription()
+  const { session } = useAuth()
+  const [checkoutLoading, setCheckoutLoading] = useState<'starter' | 'professional' | null>(null)
+
+  // ⚠️ Estes dois botões chamavam alert('Em breve!'). Esta é a tela do trial
+  // EXPIRADO: a pessoa perdia o acesso, via o preço, clicava para pagar e
+  // recebia um aviso de "em breve" — com o checkout já funcionando na tela de
+  // Configurações desde sempre. Mesma chamada de lá, nada novo inventado aqui.
+  const handleCheckout = async (plan: 'starter' | 'professional') => {
+    if (!session?.access_token) return
+    setCheckoutLoading(plan)
+    try {
+      const res = await fetch(`${API}/api/subscription/checkout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ plan }),
+      })
+      const data = await res.json()
+      if (data.url) window.location.href = data.url
+      else alert(data.error ?? 'Erro ao iniciar pagamento.')
+    } catch {
+      alert('Erro ao conectar com o servidor.')
+    } finally {
+      setCheckoutLoading(null)
+    }
+  }
 
   // Configuração do banner de trial
   const getBanner = () => {
@@ -99,7 +126,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                       <p className="text-xs text-tertiary mt-0.5">Para indivíduos e freelancers</p>
                     </div>
                     <p className="text-3xl font-bold text-brand">
-                      R$ 29<span className="text-sm font-normal text-secondary">/mês</span>
+                      R$ 89,90<span className="text-sm font-normal text-secondary">/mês</span>
                     </p>
                     <ul className="text-xs text-secondary space-y-1.5">
                       <li className="flex items-center gap-1.5">✓ Transcrições ilimitadas</li>
@@ -107,10 +134,11 @@ export function MainLayout({ children }: MainLayoutProps) {
                       <li className="flex items-center gap-1.5">✓ Histórico de reuniões</li>
                     </ul>
                     <button
-                      onClick={() => alert('Em breve!')}
-                      className="w-full py-2.5 rounded-xl border-2 border-[#2D5A27] text-brand text-sm font-semibold hover:bg-[#2D5A27]/5 transition"
+                      onClick={() => handleCheckout('starter')}
+                      disabled={checkoutLoading === 'starter'}
+                      className="w-full py-2.5 rounded-xl border-2 border-[#2D5A27] text-brand text-sm font-semibold hover:bg-[#2D5A27]/5 transition disabled:opacity-50"
                     >
-                      Assinar Starter
+                      {checkoutLoading === 'starter' ? 'Abrindo…' : 'Assinar Starter'}
                     </button>
                   </div>
 
@@ -124,7 +152,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                       <p className="text-xs text-tertiary mt-0.5">Para equipes e empresas</p>
                     </div>
                     <p className="text-3xl font-bold text-brand">
-                      R$ 79<span className="text-sm font-normal text-secondary">/mês</span>
+                      R$ 119,90<span className="text-sm font-normal text-secondary">/mês</span>
                     </p>
                     <ul className="text-xs text-secondary space-y-1.5">
                       <li className="flex items-center gap-1.5">✓ Tudo do Starter</li>
@@ -132,10 +160,11 @@ export function MainLayout({ children }: MainLayoutProps) {
                       <li className="flex items-center gap-1.5">✓ Reuniões do time</li>
                     </ul>
                     <button
-                      onClick={() => alert('Em breve!')}
-                      className="w-full py-2.5 rounded-xl bg-[#2D5A27] text-white text-sm font-semibold hover:bg-[#1E3D1A] transition shadow-sm"
+                      onClick={() => handleCheckout('professional')}
+                      disabled={checkoutLoading === 'professional'}
+                      className="w-full py-2.5 rounded-xl bg-[#2D5A27] text-white text-sm font-semibold hover:bg-[#1E3D1A] transition shadow-sm disabled:opacity-50"
                     >
-                      Assinar Professional
+                      {checkoutLoading === 'professional' ? 'Abrindo…' : 'Assinar Professional'}
                     </button>
                   </div>
                 </div>

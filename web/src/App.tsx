@@ -1,9 +1,38 @@
-import { lazy, Suspense } from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { lazy, Suspense, useEffect } from 'react'
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
+import { supabase } from '@/lib/supabase'
 import { ThemeProvider, AuthProvider, SubscriptionProvider } from '@/contexts'
 import { ProtectedRoute } from '@/components/auth'
 import { FeedbackSurveyModal } from '@/components/FeedbackSurveyModal'
 import { useFeedbackSurvey } from '@/hooks/useFeedbackSurvey'
+
+
+/**
+ * O link de "redefinir senha" do e-mail cria uma sessão e dispara
+ * PASSWORD_RECOVERY. O formulário de nova senha vive na SettingsPage — mas o
+ * Supabase só respeita o redirectTo se a URL estiver na allowlist do projeto;
+ * fora dela, ele manda para a Site URL, que aqui cai em /dashboard. Resultado
+ * relatado pelo Pietro: clicava no link e chegava no Lemon logado, sem
+ * formulário nenhum, sem entender por quê.
+ *
+ * Escutando aqui em cima, o destino do link deixa de importar: onde quer que
+ * ele caia, levamos a pessoa ao formulário. A flag em sessionStorage existe
+ * porque o evento pode disparar ANTES de a SettingsPage montar — sem ela, a
+ * navegação acontece e o formulário não aparece.
+ */
+function PasswordRecoveryRedirect() {
+  const navigate = useNavigate()
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        sessionStorage.setItem('lemon_password_recovery', '1')
+        navigate('/settings', { replace: true })
+      }
+    })
+    return () => subscription.unsubscribe()
+  }, [navigate])
+  return null
+}
 
 // Eager — carregam no bundle inicial (login + dashboard são as primeiras telas)
 import { LoginPage, DashboardPage } from '@/pages'
@@ -44,6 +73,7 @@ function App() {
             <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-[#2D5A27] border-r-transparent" />
           </div>
         }>
+        <PasswordRecoveryRedirect />
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/join/:token" element={<JoinTeamPage />} />

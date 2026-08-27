@@ -61,6 +61,13 @@ export function SettingsPage() {
   const [recoveryError, setRecoveryError] = useState('')
 
   useEffect(() => {
+    // A flag é posta pelo listener global do App (PasswordRecoveryRedirect).
+    // Sem ela, o evento PASSWORD_RECOVERY dispara antes desta tela montar e o
+    // formulário nunca aparece — foi exatamente o sintoma relatado.
+    if (sessionStorage.getItem('lemon_password_recovery') === '1') {
+      sessionStorage.removeItem('lemon_password_recovery')
+      setIsRecovery(true)
+    }
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'PASSWORD_RECOVERY') setIsRecovery(true)
     })
