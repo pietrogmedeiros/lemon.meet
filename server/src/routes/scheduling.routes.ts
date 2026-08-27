@@ -30,6 +30,9 @@ import {
   generateTimeSlots,
   membersFreeAt,
   pickAssignee,
+  checkBookingWindow,
+  bookingWindowFromConfig,
+  selectAvailableSlots,
   type CalendarEventLike,
   type MemberAvailabilityInput,
 } from '../utils/schedulingAvailability.js'
@@ -712,18 +715,19 @@ router.get('/public/:slug/availability', async (req, res) => {
       endUtc,
     )
 
-    // Slot disponível = pelo menos um membro livre. Guarda TAMBÉM quem está
-    // livre em cada um: a reserva usa isso pra não atribuir a quem está ocupado.
-    const slotsWithMembers = allSlots
-      .map(slotLabel => {
-        const slotStart = zonedWallClockToUtc(date, slotLabel, timeZone)
-        const slotEnd = new Date(slotStart.getTime() + duration * 60000)
-        return {
-          slot: slotLabel,
-          freeUserIds: membersFreeAt(memberAvailability, slotStart, slotEnd, existingBookings ?? [], timeZone),
-        }
-      })
-      .filter(s => s.freeUserIds.length > 0)
+    // Slot oferecível = dentro da janela de reserva E com pelo menos um membro
+    // livre. Guarda TAMBÉM quem está livre em cada um: a reserva usa isso pra
+    // não atribuir a quem está ocupado.
+    const slotsWithMembers = selectAvailableSlots({
+      slotLabels: allSlots,
+      date,
+      timeZone,
+      durationMinutes: duration,
+      now: new Date(),
+      window: bookingWindowFromConfig(config),
+      members: memberAvailability,
+      bookings: existingBookings ?? [],
+    })
 
     return res.json({
       success: true,
@@ -921,6 +925,29 @@ router.post('/public/:slug/book', async (req, res) => {
     }
 
     const scheduledEnd = new Date(slotStartUtc.getTime() + config.meeting_duration_minutes * 60000)
+
+    // A MESMA janela da listagem, pelo mesmo helper. Valer só num lado é o
+    // defeito que estamos consertando, invertido: só na listagem, um POST
+    // forjado passa; só na reserva, o convidado vê horário que será recusado.
+    const windowViolation = checkBookingWindow(slotStartUtc, new Date(), bookingWindowFromConfig(config))
+    if (windowViolation === 'too_soon') {
+      // 409, não 400: o horário era válido quando a página carregou e venceu
+      // enquanto o convidado preenchia o formulário — mesma natureza do slot
+      // que acabou de ser ocupado.
+      const horas = config.min_notice_hours
+      logger.info(`[Booking] Slot ${slotStartUtc.toISOString()} viola min_notice de ${horas}h (config ${config.id}) — recusando`)
+      return res.status(409).json({
+        success: false,
+        message: `Esse horário exige pelo menos ${horas}h de antecedência. Escolha outro, por favor.`,
+      })
+    }
+    if (windowViolation === 'too_far') {
+      logger.info(`[Booking] Slot ${slotStartUtc.toISOString()} além de max_days_advance (config ${config.id}) — recusando`)
+      return res.status(400).json({
+        success: false,
+        message: `Só é possível agendar com até ${config.max_days_advance} dias de antecedência.`,
+      })
+    }
 
     // 🔄 Round Robin com CONFERÊNCIA DE AGENDA.
     // Antes era `members[current_rotation_index % members.length]` direto: o

@@ -7,6 +7,9 @@ import {
   eventBusyRange,
   membersFreeAt,
   pickAssignee,
+  checkBookingWindow,
+  bookingWindowFromConfig,
+  selectAvailableSlots,
   DEFAULT_TIME_ZONE,
 } from './schedulingAvailability.js'
 
@@ -212,5 +215,173 @@ describe('pickAssignee', () => {
 
   it('não quebra sem membros', () => {
     expect(pickAssignee([], [], 0)).toBeNull()
+  })
+})
+
+describe('checkBookingWindow', () => {
+  // Config real de produção (starbem-comercial): 2h de antecedência, 30 dias.
+  const JANELA = { minNoticeHours: 2, maxDaysAdvance: 30 }
+  const AGORA = new Date('2026-08-27T18:00:00.000Z') // 15:00 BRT
+
+  const emHoras = (h: number) => new Date(AGORA.getTime() + h * 60 * 60 * 1000)
+  const emDias = (d: number) => new Date(AGORA.getTime() + d * 24 * 60 * 60 * 1000)
+
+  it('aceita um slot bem depois da antecedência mínima', () => {
+    expect(checkBookingWindow(emHoras(5), AGORA, JANELA)).toBeNull()
+  })
+
+  it('recusa um slot que está a menos de 2h', () => {
+    // 16:00 BRT com 15:00 agora: aparece na tela hoje, mas viola o min_notice.
+    expect(checkBookingWindow(emHoras(1), AGORA, JANELA)).toBe('too_soon')
+  })
+
+  it('recusa um slot no passado', () => {
+    expect(checkBookingWindow(emHoras(-1), AGORA, JANELA)).toBe('too_soon')
+  })
+
+  it('aceita exatamente na fronteira da antecedência', () => {
+    // A regra é "pelo menos 2h", então 2h cravadas passa.
+    expect(checkBookingWindow(emHoras(2), AGORA, JANELA)).toBeNull()
+  })
+
+  it('recusa um minuto antes da fronteira', () => {
+    expect(checkBookingWindow(new Date(emHoras(2).getTime() - 60000), AGORA, JANELA))
+      .toBe('too_soon')
+  })
+
+  it('aceita exatamente no limite de dias no futuro', () => {
+    expect(checkBookingWindow(emDias(30), AGORA, JANELA)).toBeNull()
+  })
+
+  it('recusa além do limite de dias', () => {
+    expect(checkBookingWindow(emDias(31), AGORA, JANELA)).toBe('too_far')
+  })
+
+  it('sem antecedência configurada, aceita o horário seguinte', () => {
+    const semNotice = { minNoticeHours: 0, maxDaysAdvance: 30 }
+    expect(checkBookingWindow(emHoras(0.25), AGORA, semNotice)).toBeNull()
+  })
+
+  it('sem limite de dias configurado, aceita o futuro distante', () => {
+    const semTeto = { minNoticeHours: 2, maxDaysAdvance: 0 }
+    expect(checkBookingWindow(emDias(365), AGORA, semTeto)).toBeNull()
+  })
+
+  it('a janela é uma duração real, não hora de parede', () => {
+    // O mesmo instante avaliado com o fuso do time em UTC-3 e em UTC+2 tem que
+    // dar o mesmo veredito: comparar rótulo de horário reintroduziria o bug de
+    // fuso de agosto.
+    const slotSP = zonedWallClockToUtc('2026-08-27', '16:00', SP)          // 19:00Z
+    const slotParis = zonedWallClockToUtc('2026-08-27', '21:00', 'Europe/Paris') // 19:00Z
+    expect(slotSP.getTime()).toBe(slotParis.getTime())
+    expect(checkBookingWindow(slotSP, AGORA, JANELA))
+      .toBe(checkBookingWindow(slotParis, AGORA, JANELA))
+  })
+})
+
+describe('bookingWindowFromConfig', () => {
+  it('lê a config de produção', () => {
+    expect(bookingWindowFromConfig({ min_notice_hours: 2, max_days_advance: 30 }))
+      .toEqual({ minNoticeHours: 2, maxDaysAdvance: 30 })
+  })
+
+  it('tolera coluna nula sem virar NaN', () => {
+    // `null * 3600000` é 0, mas `undefined` viraria NaN e toda comparação daria
+    // false — a janela sumiria em silêncio em vez de falhar visível.
+    expect(bookingWindowFromConfig({ min_notice_hours: null, max_days_advance: null }))
+      .toEqual({ minNoticeHours: 0, maxDaysAdvance: 0 })
+    expect(bookingWindowFromConfig({})).toEqual({ minNoticeHours: 0, maxDaysAdvance: 0 })
+  })
+})
+
+describe('selectAvailableSlots', () => {
+  // Formato real de produção (starbem-comercial): seg–sex 09:00–18:00, reunião
+  // de 30min, buffers zerados, um único membro no rodízio.
+  const DEIVE = '07147e88-bb65-4bfb-be29-1bef3e569df2'
+  const GRADE = generateTimeSlots('09:00', '18:00', 30) // 09:00 … 17:30
+  const JANELA = { minNoticeHours: 2, maxDaysAdvance: 30 }
+  const DIA = '2026-08-28'
+
+  const membroLivre = [{ userId: DEIVE, calendarUsable: true, events: [] }]
+  const evento = (inicio: string, fim: string) => ({
+    start: { dateTime: zonedWallClockToUtc(DIA, inicio, SP).toISOString() },
+    end: { dateTime: zonedWallClockToUtc(DIA, fim, SP).toISOString() },
+  })
+
+  const rodar = (over: Partial<Parameters<typeof selectAvailableSlots>[0]> = {}) =>
+    selectAvailableSlots({
+      slotLabels: GRADE,
+      date: DIA,
+      timeZone: SP,
+      durationMinutes: 30,
+      now: zonedWallClockToUtc('2026-08-20', '09:00', SP), // bem antes: janela não morde
+      window: JANELA,
+      members: membroLivre,
+      bookings: [],
+      ...over,
+    }).map(s => s.slot)
+
+  it('agenda vazia devolve a grade inteira', () => {
+    expect(rodar()).toHaveLength(18)
+    expect(rodar()[0]).toBe('09:00')
+    expect(rodar()[17]).toBe('17:30')
+  })
+
+  it('reproduz 28/08 em produção: um único horário livre, e ele é 13:30', () => {
+    // O relato do usuário. A página fixa mostrava 7 horas cheias, nenhuma
+    // reservável; o único slot real era 13:30, que ela nem exibia.
+    const agendaCheia = [{
+      userId: DEIVE,
+      calendarUsable: true,
+      events: [evento('09:00', '13:30'), evento('14:00', '18:00')],
+    }]
+    expect(rodar({ members: agendaCheia })).toEqual(['13:30'])
+  })
+
+  it('a antecedência mínima corta os horários cedo demais do dia de hoje', () => {
+    // 12:00 BRT com min_notice de 2h: nada antes das 14:00 pode ser oferecido.
+    const agora = zonedWallClockToUtc(DIA, '12:00', SP)
+    const oferecidos = rodar({ now: agora })
+    expect(oferecidos).not.toContain('13:30')
+    expect(oferecidos[0]).toBe('14:00')
+    expect(oferecidos).toHaveLength(8)
+  })
+
+  it('a fronteira de 2h é inclusiva e o minuto seguinte não é', () => {
+    expect(rodar({ now: zonedWallClockToUtc(DIA, '11:30', SP) })).toContain('13:30')
+    const umMinutoDepois = new Date(zonedWallClockToUtc(DIA, '11:30', SP).getTime() + 60000)
+    expect(rodar({ now: umMinutoDepois })).not.toContain('13:30')
+  })
+
+  it('horário já passado não é oferecido', () => {
+    expect(rodar({ now: zonedWallClockToUtc(DIA, '23:00', SP) })).toEqual([])
+  })
+
+  it('a janela é avaliada ANTES da agenda: livre mas cedo demais não aparece', () => {
+    // Se a ordem invertesse, o slot passaria por estar livre na agenda.
+    const oferecidos = rodar({ now: zonedWallClockToUtc(DIA, '09:15', SP), members: membroLivre })
+    expect(oferecidos).not.toContain('10:00') // livre, mas a menos de 2h
+    expect(oferecidos).toContain('11:30')
+  })
+
+  it('além do teto de dias, o dia inteiro some', () => {
+    // 28/08 visto de 60 dias antes: dentro da agenda, fora da janela de 30 dias.
+    const muitoAntes = zonedWallClockToUtc('2026-06-29', '09:00', SP)
+    expect(rodar({ now: muitoAntes })).toEqual([])
+  })
+
+  it('membro sem calendário utilizável não gera horário (fail-closed)', () => {
+    const semAgenda = [{ userId: DEIVE, calendarUsable: false, events: [] }]
+    expect(rodar({ members: semAgenda })).toEqual([])
+  })
+
+  it('agendamento já existente na Lemon bloqueia o horário', () => {
+    const bookings = [{
+      assigned_to_user_id: DEIVE,
+      scheduled_start: zonedWallClockToUtc(DIA, '10:00', SP).toISOString(),
+      scheduled_end: zonedWallClockToUtc(DIA, '10:30', SP).toISOString(),
+    }]
+    expect(rodar({ bookings })).not.toContain('10:00')
+    expect(rodar({ bookings })).toContain('10:30')
   })
 })

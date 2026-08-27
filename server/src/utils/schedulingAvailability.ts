@@ -232,3 +232,105 @@ export function pickAssignee<T extends { user_id: string }>(
   }
   return null
 }
+
+/**
+ * Janela em que a reserva é permitida, vinda da config do time.
+ *
+ * `min_notice_hours` e `max_days_advance` existem na tabela desde a criação da
+ * feature e nunca foram lidos: nem a listagem nem a reserva os consultavam, então
+ * dava para reservar um horário daqui a 10 minutos ou daqui a seis meses.
+ */
+export interface BookingWindow {
+  /** Antecedência mínima, em horas. <= 0 ou não-finito = sem limite inferior. */
+  minNoticeHours: number
+  /** Quantos dias no futuro no máximo. <= 0 ou não-finito = sem limite superior. */
+  maxDaysAdvance: number
+}
+
+/** `null` = dentro da janela. */
+export type BookingWindowViolation = 'too_soon' | 'too_far' | null
+
+/**
+ * O slot cabe na janela de reserva?
+ *
+ * Compara INSTANTES (UTC), nunca hora de parede: a antecedência é uma duração
+ * real, e comparar rótulo de horário reintroduziria exatamente o erro de fuso
+ * que derrubou essa feature em agosto (ver PLANO-ROUND-ROBIN-AGENDAS.md).
+ *
+ * Precisa valer nos DOIS caminhos — listagem e reserva. Só na listagem, um POST
+ * forjado passa; só na reserva, o convidado vê horário que será recusado. É o
+ * mesmo defeito que estamos consertando, invertido.
+ */
+export function checkBookingWindow(
+  slotStartUtc: Date,
+  now: Date,
+  window: BookingWindow,
+): BookingWindowViolation {
+  const { minNoticeHours, maxDaysAdvance } = window
+
+  if (Number.isFinite(minNoticeHours) && minNoticeHours > 0) {
+    const earliest = now.getTime() + minNoticeHours * 60 * 60 * 1000
+    if (slotStartUtc.getTime() < earliest) return 'too_soon'
+  }
+
+  if (Number.isFinite(maxDaysAdvance) && maxDaysAdvance > 0) {
+    const latest = now.getTime() + maxDaysAdvance * 24 * 60 * 60 * 1000
+    if (slotStartUtc.getTime() > latest) return 'too_far'
+  }
+
+  return null
+}
+
+/** Lê a janela da linha de config, tolerando coluna nula. */
+export function bookingWindowFromConfig(config: {
+  min_notice_hours?: number | null
+  max_days_advance?: number | null
+}): BookingWindow {
+  return {
+    minNoticeHours: config.min_notice_hours ?? 0,
+    maxDaysAdvance: config.max_days_advance ?? 0,
+  }
+}
+
+export interface SlotWithMembers {
+  slot: string
+  freeUserIds: string[]
+}
+
+/**
+ * Os horários realmente oferecíveis num dia — a listagem inteira, sem rede.
+ *
+ * Extraído do handler pra ser testável com relógio injetado: enquanto isso
+ * morava dentro da rota, a única forma de conferir a antecedência mínima era
+ * esperar o relógio passar por cima de um horário livre na agenda real.
+ *
+ * Ordem importa: a janela é avaliada ANTES da agenda, porque slot fora da
+ * janela não precisa de conferência nenhuma.
+ */
+export function selectAvailableSlots(input: {
+  slotLabels: string[]
+  date: string
+  timeZone: string
+  durationMinutes: number
+  now: Date
+  window: BookingWindow
+  members: MemberAvailabilityInput[]
+  bookings: BookingLike[]
+}): SlotWithMembers[] {
+  const { slotLabels, date, timeZone, durationMinutes, now, window, members, bookings } = input
+
+  return slotLabels
+    .map(slot => ({ slot, slotStart: zonedWallClockToUtc(date, slot, timeZone) }))
+    .filter(s => checkBookingWindow(s.slotStart, now, window) === null)
+    .map(({ slot, slotStart }) => ({
+      slot,
+      freeUserIds: membersFreeAt(
+        members,
+        slotStart,
+        new Date(slotStart.getTime() + durationMinutes * 60000),
+        bookings,
+        timeZone,
+      ),
+    }))
+    .filter(s => s.freeUserIds.length > 0)
+}

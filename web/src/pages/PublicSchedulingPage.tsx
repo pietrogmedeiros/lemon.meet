@@ -16,6 +16,7 @@ interface PublicConfig {
   meeting_duration_minutes: number
   team_name: string
   working_hours: Record<string, any>
+  timezone?: string
   logo_url: string | null
 }
 
@@ -36,9 +37,59 @@ export function PublicSchedulingPage() {
   const [success, setSuccess] = useState(false)
   const [hostName, setHostName] = useState<string | null>(null)
 
+  // Disponibilidade REAL do dia escolhido, vinda do backend.
+  const [slots, setSlots] = useState<string[]>([])
+  const [slotsLoading, setSlotsLoading] = useState(false)
+  const [slotsError, setSlotsError] = useState<string | null>(null)
+  // Contador só pra re-disparar o efeito no "Tentar de novo": regravar
+  // selectedDate com o mesmo valor é no-op no React e não refaria o fetch.
+  const [slotsRetry, setSlotsRetry] = useState(0)
+
   useEffect(() => {
     loadConfig()
   }, [slug])
+
+  // Antes daqui existia uma lista fixa de 7 horários ('09:00','10:00',...,'17:00'),
+  // marcada no código como "placeholder", igual para todo dia e para todo time.
+  // Ela não consultava agenda nenhuma: o convidado via horário ocupado, clicava,
+  // e o POST — que sempre revalidou de verdade — devolvia 409. Em 28/08/2026 os
+  // 7 horários oferecidos tinham 0 reserváveis, e o único slot livre (13:30) nem
+  // aparecia, porque a lista fixa só tinha horas cheias.
+  useEffect(() => {
+    if (!selectedDate) {
+      setSlots([])
+      setSlotsError(null)
+      return
+    }
+
+    // O visitante pode trocar de data antes da resposta chegar; sem isso, uma
+    // resposta atrasada do dia anterior sobrescreve a lista do dia novo.
+    let cancelled = false
+    setSlotsLoading(true)
+    setSlotsError(null)
+
+    fetch(`${API}/api/scheduling/public/${slug}/availability?date=${selectedDate}`)
+      .then(async (response) => {
+        if (!response.ok) throw new Error('availability')
+        return response.json()
+      })
+      .then((data) => {
+        if (cancelled) return
+        setSlots(Array.isArray(data.slots) ? data.slots : [])
+      })
+      .catch(() => {
+        if (cancelled) return
+        // Fail-closed: sem resposta confiável não inventamos horário. Melhor
+        // pedir pra tentar de novo do que oferecer um slot que vai dar erro.
+        setSlots([])
+        setSlotsError('Não foi possível carregar os horários. Tente de novo.')
+      })
+      .finally(() => {
+        if (!cancelled) setSlotsLoading(false)
+      })
+
+    return () => { cancelled = true }
+  }, [selectedDate, slug, slotsRetry])
 
   const loadConfig = async () => {
     try {
@@ -177,17 +228,6 @@ export function PublicSchedulingPage() {
     )
   }
 
-  // Gera slots de horário (placeholder - backend deveria retornar disponibilidade real)
-  const timeSlots = [
-    '09:00',
-    '10:00',
-    '11:00',
-    '14:00',
-    '15:00',
-    '16:00',
-    '17:00'
-  ]
-
   // Próximos 7 dias ÚTEIS segundo o working_hours da config.
   //
   // Antes eram os 7 próximos dias corridos, sem filtro: sábado e domingo
@@ -292,20 +332,59 @@ export function PublicSchedulingPage() {
                     month: 'long'
                   })}
                 </h2>
-                <p className="text-sm text-secondary mb-6">Escolha um horário disponível</p>
-                
-                <div className="grid grid-cols-2 gap-3 max-w-md">
-                  {timeSlots.map((time) => (
+                <p className="text-sm text-secondary mb-6">
+                  Escolha um horário disponível
+                  {config.timezone && (
+                    // Os rótulos são hora de parede no fuso do TIME, não no do
+                    // visitante. Sem dizer isso, quem está fora do Brasil agenda
+                    // três horas fora do que imaginava.
+                    <span className="text-tertiary"> · horários em {config.timezone.replace('_', ' ')}</span>
+                  )}
+                </p>
+
+                {slotsLoading ? (
+                  <div className="flex items-center gap-3 text-secondary py-8">
+                    <Loader className="animate-spin text-brand" size={20} />
+                    <span>Carregando horários...</span>
+                  </div>
+                ) : slotsError ? (
+                  <div className="py-8">
+                    <p className="text-secondary mb-4">{slotsError}</p>
                     <button
-                      key={time}
                       type="button"
-                      onClick={() => setSelectedTime(time)}
-                      className="px-6 py-3 border-2 border-neutral-light rounded-xl hover:border-[#2D5A27] hover:bg-[#2D5A27]/5 transition-all font-medium text-primary"
+                      onClick={() => setSlotsRetry((n) => n + 1)}
+                      className="px-6 py-3 border-2 border-neutral-light rounded-xl hover:border-[#2D5A27] font-medium text-primary"
                     >
-                      {time}
+                      Tentar de novo
                     </button>
-                  ))}
-                </div>
+                  </div>
+                ) : slots.length === 0 ? (
+                  <div className="py-8">
+                    <p className="text-secondary mb-4">
+                      Nenhum horário livre nesta data.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedDate('')}
+                      className="px-6 py-3 border-2 border-neutral-light rounded-xl hover:border-[#2D5A27] font-medium text-primary"
+                    >
+                      Escolher outra data
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-3 max-w-md">
+                    {slots.map((time) => (
+                      <button
+                        key={time}
+                        type="button"
+                        onClick={() => setSelectedTime(time)}
+                        className="px-6 py-3 border-2 border-neutral-light rounded-xl hover:border-[#2D5A27] hover:bg-[#2D5A27]/5 transition-all font-medium text-primary"
+                      >
+                        {time}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             ) : (
               // Step 3: Fill Form
