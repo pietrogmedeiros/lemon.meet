@@ -106,7 +106,7 @@ export function PrivacyPolicyPage() {
               O Lemon.meet fornece a ferramenta; a decisão de gravar, e a responsabilidade por ela, são de quem inicia a gravação. Não conseguimos verificar se o aviso foi dado.
             </p>
             <p className="mt-3">
-              Se você participou de uma reunião gravada por um usuário do Lemon.meet e quer saber o que foi registrado, pedir correção ou exclusão, escreva para <strong>contato@lemon.meet</strong>. Vamos avaliar o pedido junto com o usuário responsável pela gravação, que é quem controla esse conteúdo na conta dele.
+              Se você participou de uma reunião gravada por um usuário do Lemon.meet e quer saber o que foi registrado, pedir correção ou exclusão, escreva para <strong>contato@lemon-meet.com</strong>. Vamos avaliar o pedido junto com o usuário responsável pela gravação, que é quem controla esse conteúdo na conta dele.
             </p>
           </section>
 
@@ -186,7 +186,7 @@ export function PrivacyPolicyPage() {
               Seus dados são mantidos enquanto sua conta estiver ativa. O áudio das reuniões presenciais é a exceção: ele é apagado do servidor logo após o processamento, como descrito no item 3.
             </p>
             <p className="mt-3">
-              Ao solicitar a exclusão da conta, todos os dados pessoais, transcrições e insights associados são removidos permanentemente em até 30 dias. O pedido pode ser feito pelo e-mail <strong>contato@lemon.meet</strong>.
+              Ao solicitar a exclusão da conta, todos os dados pessoais, transcrições e insights associados são removidos permanentemente em até 30 dias. O pedido pode ser feito pelo e-mail <strong>contato@lemon-meet.com</strong>.
             </p>
           </section>
 
@@ -208,7 +208,7 @@ export function PrivacyPolicyPage() {
               <li>Obter informação sobre com quem compartilhamos seus dados, inclusive no exterior.</li>
               <li>Revogar o consentimento dado a qualquer momento.</li>
             </ul>
-            <p className="mt-3">Para exercer esses direitos, entre em contato: <strong>contato@lemon.meet</strong></p>
+            <p className="mt-3">Para exercer esses direitos, entre em contato: <strong>contato@lemon-meet.com</strong></p>
           </section>
 
           <section>
@@ -229,7 +229,7 @@ export function PrivacyPolicyPage() {
             <h2 className="text-lg font-semibold text-primary dark:text-white mb-3">13. Contato</h2>
             <p>
               Dúvidas sobre esta política? Fale conosco:<br />
-              <strong>contato@lemon.meet</strong>
+              <strong>contato@lemon-meet.com</strong>
             </p>
           </section>
         </div>

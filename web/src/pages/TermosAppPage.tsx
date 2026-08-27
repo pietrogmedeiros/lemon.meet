@@ -95,7 +95,10 @@ export function TermosAppPage() {
           <section>
             <h2 className="text-lg font-semibold text-primary dark:text-white mb-3">8. Suspensão e encerramento</h2>
             <p>
-              Reservamo-nos o direito de suspender ou encerrar contas que violem estes termos, sem aviso prévio em casos de uso indevido grave. O usuário pode cancelar sua conta a qualquer momento nas configurações da plataforma.
+              Reservamo-nos o direito de suspender ou encerrar contas que violem estes termos, sem aviso prévio em casos de uso indevido grave.
+            </p>
+            <p className="mt-3">
+              Você pode <strong>cancelar sua assinatura</strong> a qualquer momento na página de assinatura, dentro da plataforma. Para <strong>encerrar a conta e apagar seus dados</strong>, o pedido é feito pelo e-mail <strong>contato@lemon-meet.com</strong> e atendido em até 30 dias, como descrito na Política de Privacidade.
             </p>
           </section>
 
@@ -117,7 +120,7 @@ export function TermosAppPage() {
             <h2 className="text-lg font-semibold text-primary dark:text-white mb-3">11. Contato</h2>
             <p>
               Dúvidas sobre estes termos?<br />
-              <strong>contato@lemon.meet</strong>
+              <strong>contato@lemon-meet.com</strong>
             </p>
           </section>
         </div>
