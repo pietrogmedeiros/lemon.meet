@@ -42,7 +42,7 @@ export function SettingsPage() {
       })
       const data = await res.json()
       if (data.url) window.location.href = data.url
-      else alert(data.error ?? 'Erro ao iniciar pagamento.')
+      else alert([data.error ?? 'Erro ao iniciar pagamento.', data.detail].filter(Boolean).join('\n\n'))
     } catch {
       alert('Erro ao conectar com o servidor.')
     } finally {

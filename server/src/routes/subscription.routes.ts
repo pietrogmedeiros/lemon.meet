@@ -1,6 +1,7 @@
 import { Router, type RequestHandler, type Request, type Response } from 'express'
 import { authMiddleware } from '../middleware/auth.middleware.js'
 import { supabase } from '../config/supabase.js'
+import { logger } from '../utils/logger.js'
 import type { AuthRequest } from '../middleware/auth.middleware.js'
 import {
   createCustomer,
@@ -236,8 +237,19 @@ router.post('/checkout', authMiddleware as RequestHandler, async (req: AuthReque
 
     return res.json({ url: checkout.url })
   } catch (err: any) {
-    console.error('[subscription/checkout]', err)
-    return res.status(500).json({ error: 'Erro ao criar sessão de pagamento.' })
+    // ⚠️ Antes isto devolvia só "Erro ao criar sessão de pagamento." e jogava o
+    // motivo real num console que ninguém lê. Resultado: a integração ficou mais
+    // de um mês quebrada (ZERO pagamentos concluídos no banco, 20 contas
+    // expiradas sem conseguir pagar) e o sintoma era sempre a mesma frase.
+    // As mensagens da AbacatePay são do tipo "Invalid or inactive API key" —
+    // dizem o que houve sem expor a chave. Devolver isso é o que transforma
+    // "não funciona" em algo diagnosticável por quem está na tela.
+    const detail = err instanceof Error ? err.message : String(err)
+    logger.error(`[subscription/checkout] user=${userId} plan=${plan}: ${detail}`)
+    return res.status(500).json({
+      error: 'Erro ao criar sessão de pagamento.',
+      detail: detail.slice(0, 300),
+    })
   }
 })
 
