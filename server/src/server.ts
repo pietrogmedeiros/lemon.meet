@@ -23,6 +23,7 @@ import hubspotRouter from './routes/hubspot.routes.js'
 import gdriveRouter from './routes/gdrive.routes.js'
 import notificationsRouter from './routes/notifications.routes.js'
 import feedbackRouter from './routes/feedback.routes.js'
+import accountRouter from './routes/account.routes.js'
 import schedulingRouter from './routes/scheduling.routes.js'
 import featureRequestsRouter from './routes/feature-requests.routes.js'
 import adminMetricsRouter from './routes/admin-metrics.routes.js'
@@ -154,6 +155,7 @@ app.use('/api/hubspot', hubspotRouter)
 app.use('/api/gdrive', gdriveRouter)
 app.use('/api/notifications', notificationsRouter)
 app.use('/api/feedback', feedbackRouter)
+app.use('/api/account', accountRouter)
 app.use('/api/scheduling', schedulingRouter)
 app.use('/api/feature-requests', featureRequestsRouter)
 app.use('/api/admin/metrics', adminMetricsRouter)
