@@ -268,6 +268,75 @@ router.post('/active', authMiddleware, async (req: AuthRequest, res: Response) =
 
 // ── GET /api/teams/:id ─────────────────────────────────────────
 // Busca um time específico com seus membros
+// ⚠️ ORDEM IMPORTA: '/my' tem que vir ANTES de '/:id'. O Express casa na ordem
+// de registro — com '/:id' na frente, GET /api/teams/my caía nele com id='my',
+// não achava time algum e devolvia 404 "Time não encontrado", enquanto este
+// handler aqui virava código morto. Não mova para baixo.
+router.get('/my', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id
+
+    // Tenta como owner primeiro
+    let { data: team } = await supabase
+      .from('teams')
+      .select('*')
+      .eq('owner_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    // Se não é owner, tenta como membro
+    if (!team) {
+      const { data: membership } = await supabase
+        .from('team_members')
+        .select('team_id')
+        .eq('user_id', userId)
+        .eq('status', 'active')
+        .not('team_id', 'is', null)
+        .maybeSingle()
+
+      if (membership) {
+        const { data: t } = await supabase
+          .from('teams')
+          .select('*')
+          .eq('id', membership.team_id)
+          .single()
+        team = t
+      }
+    }
+
+    if (!team) {
+      return res.json({ success: true, team: null, members: [] })
+    }
+
+    // Busca membros com dados do usuário
+    const { data: members } = await supabase
+      .from('team_members')
+      .select('id, user_id, invited_email, role, status, created_at')
+      .eq('team_id', team.id)
+      .order('created_at', { ascending: true })
+
+    // Enriquece com nome do usuário
+    const enriched = await Promise.all(
+      (members ?? []).map(async (m) => {
+        if (m.user_id) {
+          const { data } = await supabase.auth.admin.getUserById(m.user_id)
+          return {
+            ...m,
+            name: data.user?.user_metadata?.full_name ?? data.user?.user_metadata?.name ?? null,
+          }
+        }
+        return { ...m, name: null }
+      })
+    )
+
+    return res.json({ success: true, team, members: enriched, isOwner: team.owner_id === userId })
+  } catch (err) {
+    logger.error('Error fetching team:', err)
+    return res.status(500).json({ success: false, message: 'Internal server error' })
+  }
+})
+
 router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.id
@@ -416,71 +485,6 @@ router.patch('/:id/evaluation-config', authMiddleware, async (req: AuthRequest, 
 
 // ── GET /api/teams/my ─────────────────────────────────────────
 // Mantido para compatibilidade - retorna o primeiro time do usuário
-router.get('/my', authMiddleware, async (req: AuthRequest, res: Response) => {
-  try {
-    const userId = req.user!.id
-
-    // Tenta como owner primeiro
-    let { data: team } = await supabase
-      .from('teams')
-      .select('*')
-      .eq('owner_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-
-    // Se não é owner, tenta como membro
-    if (!team) {
-      const { data: membership } = await supabase
-        .from('team_members')
-        .select('team_id')
-        .eq('user_id', userId)
-        .eq('status', 'active')
-        .not('team_id', 'is', null)
-        .maybeSingle()
-
-      if (membership) {
-        const { data: t } = await supabase
-          .from('teams')
-          .select('*')
-          .eq('id', membership.team_id)
-          .single()
-        team = t
-      }
-    }
-
-    if (!team) {
-      return res.json({ success: true, team: null, members: [] })
-    }
-
-    // Busca membros com dados do usuário
-    const { data: members } = await supabase
-      .from('team_members')
-      .select('id, user_id, invited_email, role, status, created_at')
-      .eq('team_id', team.id)
-      .order('created_at', { ascending: true })
-
-    // Enriquece com nome do usuário
-    const enriched = await Promise.all(
-      (members ?? []).map(async (m) => {
-        if (m.user_id) {
-          const { data } = await supabase.auth.admin.getUserById(m.user_id)
-          return {
-            ...m,
-            name: data.user?.user_metadata?.full_name ?? data.user?.user_metadata?.name ?? null,
-          }
-        }
-        return { ...m, name: null }
-      })
-    )
-
-    return res.json({ success: true, team, members: enriched, isOwner: team.owner_id === userId })
-  } catch (err) {
-    logger.error('Error fetching team:', err)
-    return res.status(500).json({ success: false, message: 'Internal server error' })
-  }
-})
-
 // ── POST /api/teams/:id/invite ────────────────────────────────
 router.post('/:id/invite', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {

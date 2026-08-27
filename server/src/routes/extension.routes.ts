@@ -208,21 +208,61 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
     const meetingIds = (data ?? []).map((m: any) => m.id)
     const hasTranscriptSet = new Set<string>()
 
-    if (meetingIds.length > 0) {
-      const [{ data: withText }, { data: withSegments }] = await Promise.all([
+    // ⚠️ Estes dois filtros iam com a página INTEIRA de ids num único `.in()`.
+    // Medido em produção (2026-08-26): a partir de 397 ids a query de texto
+    // parava de responder e o has_transcript virava `false` para TODAS as
+    // reuniões — de um limit pro outro, como um interruptor. E o front força
+    // `limit=9999` para o dev user (web/src/lib/meetingsCache.ts), então essa
+    // conta vivia do lado ruim do corte. Em lotes a URL nunca cresce.
+    const ID_BATCH = 150
+    const idBatches: string[][] = []
+    for (let i = 0; i < meetingIds.length; i += ID_BATCH) {
+      idBatches.push(meetingIds.slice(i, i + ID_BATCH))
+    }
+
+    // Os lotes vão em PARALELO de propósito. Sequencial, uma listagem de 1000
+    // reuniões (teto do PostgREST) viraria 7 idas e voltas em série só para
+    // montar um booleano — ou seja, o fix do bug viraria uma regressão de
+    // latência na mesma rota que já foi otimizada no commit 8f025f4.
+    const batchResults = await Promise.all(idBatches.map(async (batch) => {
+      const [textRes, segRes] = await Promise.all([
         supabase
           .from('meetings')
           .select('id')
-          .in('id', meetingIds)
+          .in('id', batch)
           .not('transcript', 'is', null)
           .neq('transcript', ''),
-        supabase
-          .from('transcript_segments')
-          .select('meeting_id')
-          .in('meeting_id', meetingIds),
+        // ⚠️ NÃO trocar por .from('transcript_segments').in('meeting_id', batch):
+        // aquilo devolve UMA LINHA POR SEGMENTO e o PostgREST corta em 1000 —
+        // medido: 300 reuniões viravam 1000 linhas cobrindo só 4 delas, o resto
+        // saía como "sem transcrição". A função faz `select distinct` no banco,
+        // então volta no máximo 1 linha por reunião.
+        // Migration: server/scripts/migration-meetings-with-segments.sql
+        supabase.rpc('meetings_with_segments', { p_ids: batch }),
       ])
-      ;(withText ?? []).forEach((r: any) => hasTranscriptSet.add(r.id))
-      ;(withSegments ?? []).forEach((r: any) => hasTranscriptSet.add(r.meeting_id))
+
+      // ⚠️ Antes era `(withText ?? []).forEach(...)`: o `error` era DESCARTADO,
+      // então a falha acima virava "nenhuma reunião tem transcrição" em vez de
+      // um erro visível. Foi o que escondeu o bug. Nunca engolir estes dois.
+      if (textRes.error) {
+        logger.error('[meetings] has_transcript: falha ao checar meetings.transcript:', textRes.error)
+      }
+      if (segRes.error) {
+        logger.error(
+          '[meetings] has_transcript: RPC meetings_with_segments falhou — se a mensagem for ' +
+          '"function does not exist", rode server/scripts/migration-meetings-with-segments.sql ' +
+          'no SQL Editor do Supabase. Até lá, reunião que só tem segmento (sem meetings.transcript) ' +
+          'aparece como "sem transcrição".',
+          segRes.error,
+        )
+      }
+
+      return { textRes, segRes }
+    }))
+
+    for (const { textRes, segRes } of batchResults) {
+      ;(textRes.data ?? []).forEach((r: any) => hasTranscriptSet.add(r.id))
+      ;(segRes.data ?? []).forEach((r: any) => hasTranscriptSet.add(r.meeting_id))
     }
 
     const meetings = (data ?? []).map((m: any) => ({
