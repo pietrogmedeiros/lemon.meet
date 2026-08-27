@@ -74,7 +74,14 @@ export function createSubscriptionCheckout(input: {
   return call<AbacateSubscriptionCheckout>('/subscriptions/create', {
     items: [{ id: input.productId, quantity: 1 }],
     customerId: input.customerId,
-    methods: ['CARD'],
+    // ⚠️ A doc da AbacatePay diz que assinatura suporta APENAS CARD e que PIX
+    // serve para cobrança avulsa. Mas a loja não tem cartão habilitado
+    // ("CARD is not available for this store"), então CARD era 100% de falha.
+    // Decisão do Pietro em 2026-08-27: tentar PIX.
+    // O QUE VIGIAR: se o pagamento passar mas a RENOVAÇÃO não acontecer, ou se
+    // o webhook subscription.completed não chegar e o plano não ativar depois
+    // de pago. É falha silenciosa — pior que o erro que isto substitui.
+    methods: ['PIX'],
     returnUrl: input.returnUrl,
     completionUrl: input.completionUrl,
     externalId: input.externalId,
