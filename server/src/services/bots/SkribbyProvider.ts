@@ -53,6 +53,10 @@ export class SkribbyProvider implements IBotProvider {
   /** Conta autenticada do Skribby (Authenticated Accounts) — sem isso o bot
    *  entra como guest anônimo e o Google Meet BARRA (not_admitted). */
   private readonly accountId?: string
+  /** Ver o comentário longo no ponto de uso, em `authentication`. Padrão FALSE
+   *  de propósito. Existe como variável para poder voltar atrás em produção
+   *  mexendo no EasyPanel, sem depender de um deploy. */
+  private readonly alwaysAuthenticate: boolean
 
   constructor() {
     const apiUrl = process.env.SKRIBBY_API_URL
@@ -64,6 +68,7 @@ export class SkribbyProvider implements IBotProvider {
     this.webhookUrl = `${getServerUrl()}/api/skribby/webhook`
     this.language = process.env.SKRIBBY_LANGUAGE ?? 'pt-BR'
     this.accountId = process.env.SKRIBBY_ACCOUNT_ID?.trim() || undefined
+    this.alwaysAuthenticate = process.env.SKRIBBY_ALWAYS_AUTHENTICATE === 'true'
     if (!this.accountId) {
       logger.warn('[Skribby] SKRIBBY_ACCOUNT_ID não definido — bots entram como guest anônimo e podem ser BARRADOS pelo Google Meet (not_admitted).')
     }
@@ -107,11 +112,31 @@ export class SkribbyProvider implements IBotProvider {
       // Modelo default (groq/whisper-large-v3-turbo) NÃO diariza (speaker=null).
       // TODO(piloto): para ter speaker, setar transcription_model p/ Deepgram/AssemblyAI.
     }
-    // Conta autenticada: o bot faz login (Google) em vez de entrar anônimo —
-    // resolve o `not_admitted` quando o organizador tranca a sala.
-    // `always_authenticate` força o login já no join (não espera ser barrado).
+    // Conta autenticada: o bot pode fazer login (Google) em vez de entrar como
+    // convidado — é o que resolve o `not_admitted` quando a sala exige conta
+    // conectada.
+    //
+    // ⚠️ `always_authenticate` FOI true e isso custou caro. Com true, o bot
+    // pula a tentativa de convidado e vai DIRETO para o login do Google em
+    // TODA reunião. Consequência: quando o Google barra o login da conta do
+    // Skribby por suspeita — quarta vez em cinco semanas, com o intervalo
+    // caindo de 21 dias para 4 — 100% das capturas morrem de uma vez, mesmo as
+    // salas abertas que nunca precisaram de login nenhum.
+    //
+    // O padrão do Skribby é false: entra como convidado (usando o `bot_name`) e
+    // só faz login se a sala exigir. Assim um bloqueio derruba apenas as salas
+    // que exigem conta conectada; o resto segue gravando. Não sabemos a fração
+    // exata de cada tipo — sabemos que com true era 100% por construção.
+    //
+    // Contrapartidas reais, para quem for reverter com consciência: em sala que
+    // exige login há uma tentativa a mais antes do acerto, e quando autentica o
+    // Skribby ignora o `bot_name` e mostra o nome da conta. Reverter é setar
+    // SKRIBBY_ALWAYS_AUTHENTICATE=true no EasyPanel — não precisa de deploy.
     if (this.accountId) {
-      body.authentication = { account_id: this.accountId, always_authenticate: true }
+      body.authentication = {
+        account_id: this.accountId,
+        always_authenticate: this.alwaysAuthenticate,
+      }
     }
     // ⚠️ O campo de agendamento é `scheduled_start_time` (timestamp Unix em
     // SEGUNDOS). Antes mandávamos `join_at`, que NÃO existe no contrato: o
