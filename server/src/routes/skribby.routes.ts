@@ -33,6 +33,7 @@ import { runTranscriptPipeline } from '../services/TranscriptPipeline.js'
 import { normalizeSkribbyTranscript } from '../services/bots/skribbyTranscript.js'
 import { SkribbyProvider } from '../services/bots/SkribbyProvider.js'
 import { notificationService } from '../services/NotificationService.js'
+import { sendAlertEmail } from '../utils/alertEmail.js'
 import { fanOutFromOwner } from './meetingbaas.routes.js'
 
 // Status do Skribby → status interno da reunião. 'finished' é terminal e
@@ -98,16 +99,32 @@ async function alertCredentialFailure(meetingId: string, status: string): Promis
   lastCredentialAlertAt = now
   credentialFailuresSinceAlert = 0
 
+  const titulo = '🔴 Bots parados — conta do Skribby recusada pelo Google'
+  const corpo =
+    `${count} bot(s) morreram com "${status}" (última reunião ${meetingId}).\n\n` +
+    'ENQUANTO ISSO NENHUMA REUNIÃO ESTÁ SENDO GRAVADA.\n\n' +
+    'CONSERTO (leva ~2 minutos):\n' +
+    '1. admin.google.com → Diretório → Usuários → clique no NOME "Lemon Contato"\n' +
+    '2. Card Segurança → "Desativar o desafio de login" (vale ~10 minutos)\n' +
+    '3. Crie um evento de teste no Google Agenda começando em MENOS de 2 minutos,\n' +
+    '   com link do Meet. Acima disso o bot fica agendado e tenta fora da janela.\n\n' +
+    'Se o desbloqueio não resolver, confira em platform.skribby.io → Authenticated\n' +
+    'Accounts se a senha da conta gmeet continua válida.\n\n' +
+    'Diagnóstico por velocidade: invalid_credentials em ~40s = login recusado.\n' +
+    'not_admitted no fim do timeout = login OK, ninguém admitiu o bot na sala.'
+
   await notificationService.notify({
     user_id: adminUserId,
     type: 'admin_bot_credentials',
-    title: '🔴 Bots parados — conta autenticada do Skribby recusada pelo Google',
-    message:
-      `${count} bot(s) morreram com "${status}" (última reunião ${meetingId}). ` +
-      'Enquanto isso NENHUMA reunião é gravada. Corrija em platform.skribby.io → ' +
-      'Authenticated Accounts: reveja senha e a chave (setup key) do Authenticator da conta gmeet, ' +
-      'e garanta que a conta Google não exige passkey/chave de segurança nem troca de senha no login.',
+    title: titulo,
+    message: corpo,
   })
+
+  // ⚠️ O alerta in-app existia e NÃO bastou: em 28/08 ele saiu 29 minutos depois
+  // da primeira falha e o Pietro só soube quando alguém foi olhar o banco — uma
+  // reunião de cliente já tinha morrido. Notificação que exige a pessoa abrir o
+  // produto não serve para avisar que o produto parou.
+  await sendAlertEmail({ subject: titulo, body: corpo })
 }
 
 // Provider instanciado sob demanda (só quando SKRIBBY_ENABLED==='true'), para
