@@ -63,6 +63,17 @@ export function PrivacyPolicyPage() {
               Na primeira gravação, o iPhone pergunta se o Lemon.meet pode usar o microfone. Sem essa autorização, o app não grava. Você pode revogá-la quando quiser em <strong>Ajustes › Lemon.meet › Microfone</strong>; a partir daí, novas gravações ficam bloqueadas até você conceder a permissão de novo.
             </p>
 
+            <h3 className="text-base font-semibold text-primary dark:text-white mt-5 mb-2">Autorização para envio a serviços de inteligência artificial</h3>
+            <p>
+              Antes de qualquer envio, o app mostra uma tela dizendo <strong>o que é enviado</strong> — o áudio da reunião, a transcrição gerada a partir dele e o título que você dá à reunião — e <strong>para quem</strong>: Groq, nos Estados Unidos, que transcreve o áudio, e DeepSeek, na China, que gera os resumos, os insights e as respostas do chat. Nada sai do aparelho antes de você autorizar.
+            </p>
+            <p className="mt-3">
+              Seus dados de cadastro (nome, e-mail e senha) e os e-mails de participantes que você digita não são enviados a esses fornecedores.
+            </p>
+            <p className="mt-3">
+              A autorização pode ser revista e revogada a qualquer momento no app, em <strong>Perfil › Dados e IA</strong>. Sem ela você continua usando o app normalmente, mas a gravação de reuniões presenciais fica bloqueada — é o caminho que envia dados a esses serviços.
+            </p>
+
             <h3 className="text-base font-semibold text-primary dark:text-white mt-5 mb-2">Para onde o áudio vai</h3>
             <p>
               Quando você encerra a gravação, o arquivo de áudio é enviado para o servidor do Lemon.meet. Lá ele é transcrito automaticamente e, em seguida, a transcrição é usada para gerar os insights. Esses dois passos são feitos por fornecedores fora do Brasil — veja o item 7.
@@ -135,7 +146,7 @@ export function PrivacyPolicyPage() {
             <p className="mt-3">
               Além disso, se você ativar uma integração (HubSpot, Pipedrive, Google Drive ou webhook próprio), enviamos os dados e insights das suas reuniões para o destino que você conectou. Isso só acontece por ação sua e pode ser desligado nas configurações.
             </p>
-            <p className="mt-3">Todos os fornecedores operam sob seus próprios termos e políticas de privacidade, e são contratualmente obrigados a tratar os dados apenas para os fins do serviço. O item 7 explica em que país cada um deles está.</p>
+            <p className="mt-3">Todos os fornecedores operam sob seus próprios termos e políticas de privacidade, e são contratualmente obrigados a tratar os dados apenas para os fins do serviço — exigimos deles proteção equivalente à que descrevemos aqui, e nenhum deles está autorizado a usar o conteúdo das suas reuniões para publicidade ou para vendê-lo a outros. O item 7 explica em que país cada um deles está.</p>
           </section>
 
           {/* DECISÃO JURÍDICA PENDENTE — seção 7.
