@@ -16,6 +16,12 @@ export interface GoogleEventLike {
 }
 
 export type InviteDecision =
+  /**
+   * `attendees` é a lista ORIGINAL e completa — salas e recursos incluídos.
+   * O PATCH do Google substitui a lista inteira, então devolver só as pessoas
+   * apagaria a sala reservada do evento. Recursos são ignorados na DECISÃO,
+   * nunca no que é reenviado.
+   */
   | { invite: true; attendees: GoogleAttendee[] }
   | { invite: false; reason: 'nao_organizador' | 'ja_convidado' | 'tem_externo' }
 
@@ -51,5 +57,5 @@ export function decideBotInvite(
   if (!emails.every((e) => e.split('@')[1] === domain)) {
     return { invite: false, reason: 'tem_externo' }
   }
-  return { invite: true, attendees }
+  return { invite: true, attendees: event.attendees ?? [] }
 }

@@ -55,6 +55,15 @@ describe('decideBotInvite', () => {
     expect(d.invite).toBe(true)
   })
 
+  it('devolve a lista COMPLETA para o PATCH, com a sala preservada', () => {
+    // Regressão séria: o PATCH do Google troca a lista inteira de convidados.
+    // Se devolvêssemos só as pessoas, convidar o bot CANCELARIA a sala
+    // reservada da reunião.
+    const sala = { email: 'sala1@resource.calendar.google.com', resource: true }
+    const d = decideBotInvite({ organizer: org, attendees: [{ email: 'pietro@starbem.app' }, sala] }, BOT)
+    expect(d.invite && d.attendees).toEqual([{ email: 'pietro@starbem.app' }, sala])
+  })
+
   it('evento sem convidados → convida (reunião interna sozinha)', () => {
     const d = decideBotInvite({ organizer: org, attendees: [] }, BOT)
     expect(d.invite).toBe(true)
