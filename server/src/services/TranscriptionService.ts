@@ -66,10 +66,18 @@ export class TranscriptionService {
 
   /**
    * Transcreve lidando com áudios grandes (reuniões longas do app desktop).
+   *
    * Arquivo dentro do limite do Groq → caminho normal (IDÊNTICO ao mobile).
-   * Acima do limite → divide em segmentos via ffmpeg, transcreve cada um e
-   * mescla com offset de tempo. Qualquer falha no split cai no caminho normal
-   * (sem regressão pro fluxo existente).
+   * Acima do limite, em ordem:
+   *   1. comprime o áudio inteiro (16kHz mono opus 16kbps) — 1h vira ~7MB, e
+   *      uma reunião de 3h ainda cabe numa requisição só;
+   *   2. se mesmo comprimido passar do limite, segmenta o comprimido;
+   *   3. se o ffmpeg não existir ou falhar, FALHA COM ERRO CLARO.
+   *
+   * ⚠️ O passo 3 já foi "mandar o arquivo inteiro mesmo assim". Isso é 413
+   * garantido — foi o que perdeu a reunião de 01/09/2026, porque o áudio é
+   * apagado depois do processamento e não existe do que reprocessar. Cair no
+   * caminho que não pode funcionar é pior do que falhar dizendo o porquê.
    */
   async transcribeAudioSmart(audioFilePath: string): Promise<TranscriptChunk[]> {
     let sizeBytes = 0;
@@ -83,15 +91,64 @@ export class TranscriptionService {
       return this.transcribeAudio(audioFilePath); // caminho atual, inalterado
     }
 
-    logger.info(
-      `[Transcription] Áudio grande (${(sizeBytes / 1024 / 1024).toFixed(1)}MB) — dividindo em segmentos de ${SEGMENT_SECONDS}s`,
-    );
+    const sizeMb = (sizeBytes / 1024 / 1024).toFixed(1);
+    logger.info(`[Transcription] Áudio grande (${sizeMb}MB) — comprimindo antes de transcrever`);
+
+    let compressedPath: string | null = null;
     try {
-      return await this.splitAndTranscribe(audioFilePath);
-    } catch (err) {
-      logger.error('[Transcription] Falha no split — fallback pro arquivo inteiro:', err);
-      return this.transcribeAudio(audioFilePath);
+      compressedPath = await this.compressForWhisper(audioFilePath);
+      const compressedBytes = fs.statSync(compressedPath).size;
+      logger.info(
+        `[Transcription] Comprimido: ${sizeMb}MB → ${(compressedBytes / 1024 / 1024).toFixed(1)}MB`,
+      );
+
+      if (compressedBytes <= GROQ_MAX_BYTES) {
+        const buf = fs.readFileSync(compressedPath);
+        return await this.transcribeAudioBuffer(buf, 'audio.ogg');
+      }
+
+      logger.info(`[Transcription] Ainda acima do limite — segmentando em ${SEGMENT_SECONDS}s`);
+      return await this.splitAndTranscribe(compressedPath);
+    } catch (err: any) {
+      logger.error('[Transcription] Não foi possível preparar o áudio grande:', err);
+      throw new Error(
+        `audio_too_large: ${sizeMb}MB acima do limite de ${(GROQ_MAX_BYTES / 1024 / 1024).toFixed(0)}MB do Whisper e a compressão falhou (${err?.message ?? err})`,
+      );
+    } finally {
+      if (compressedPath) {
+        try { fs.rmSync(compressedPath, { force: true }); } catch { /* ignore */ }
+      }
     }
+  }
+
+  /** Reduz o áudio para 16kHz mono opus 16kbps — ~7MB por hora de reunião. */
+  private async compressForWhisper(audioFilePath: string): Promise<string> {
+    const outDir = path.join(process.cwd(), 'temp', 'compressed');
+    fs.mkdirSync(outDir, { recursive: true });
+    const outPath = path.join(outDir, `${Date.now()}-${Math.round(Math.random() * 1e6)}.ogg`);
+
+    await this.runFfmpeg([
+      '-hide_banner', '-loglevel', 'error', '-y',
+      '-i', audioFilePath,
+      '-ar', '16000', '-ac', '1', '-c:a', 'libopus', '-b:a', '16k',
+      outPath,
+    ]);
+
+    if (!fs.existsSync(outPath) || fs.statSync(outPath).size === 0) {
+      throw new Error('ffmpeg não gerou o áudio comprimido');
+    }
+    return outPath;
+  }
+
+  /** ffmpeg está instalado e executável? Usado pelo /health. */
+  static async ffmpegAvailable(): Promise<boolean> {
+    return new Promise((resolve) => {
+      const proc = spawn('ffmpeg', ['-hide_banner', '-version']);
+      proc.on('error', () => resolve(false));
+      proc.on('close', (code) => resolve(code === 0));
+      proc.stdout?.resume();
+      proc.stderr?.resume();
+    });
   }
 
   /** Divide o áudio em segmentos (ffmpeg → 16kHz mono opus) e transcreve cada. */

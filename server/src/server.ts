@@ -18,6 +18,7 @@ import meetingBaasRouter from './routes/meetingbaas.routes.js'
 import { attendeeWebhookHandler } from './routes/attendee.routes.js'
 import { skribbyWebhookHandler } from './routes/skribby.routes.js'
 import calendarRouter from './routes/calendar.routes.js'
+import { TranscriptionService } from './services/TranscriptionService.js'
 import pipedriveRouter from './routes/pipedrive.routes.js'
 import hubspotRouter from './routes/hubspot.routes.js'
 import gdriveRouter from './routes/gdrive.routes.js'
@@ -125,11 +126,21 @@ const limiter = rateLimit({
 app.use('/api', limiter)
 
 // Health check endpoint
+// `ffmpeg` entra aqui porque a transcrição de reunião longa DEPENDE dele: sem
+// ffmpeg no container, todo áudio acima do limite do Whisper falha. Sondado uma
+// vez no boot para não pagar um spawn por requisição.
+let ffmpegReady: boolean | null = null
+void TranscriptionService.ffmpegAvailable().then((ok) => {
+  ffmpegReady = ok
+  if (!ok) console.error('[boot] ffmpeg NÃO está disponível — reuniões longas vão falhar')
+})
+
 app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
+    ffmpeg: ffmpegReady,
   })
 })
 
