@@ -64,6 +64,23 @@ describe('decideBotInvite', () => {
     expect(d.invite && d.attendees).toEqual([{ email: 'pietro@starbem.app' }, sala])
   })
 
+  it('agenda pessoal em domínio público → NUNCA convida', () => {
+    // Dado real (01/09): a agenda conectada é @gmail.com e os convidados de uma
+    // reunião externa também. Sem esta regra, o bot entraria na frente de gente
+    // de fora achando que era reunião interna.
+    const d = decideBotInvite(
+      {
+        organizer: { email: 'pietrogoncalvesmedeiros@gmail.com', self: true },
+        attendees: [
+          { email: 'pietrogoncalvesmedeiros@gmail.com' },
+          { email: 'alexandrelassancesoares@gmail.com' },
+        ],
+      },
+      BOT,
+    )
+    expect(d).toEqual({ invite: false, reason: 'dominio_publico' })
+  })
+
   it('evento sem convidados → convida (reunião interna sozinha)', () => {
     const d = decideBotInvite({ organizer: org, attendees: [] }, BOT)
     expect(d.invite).toBe(true)

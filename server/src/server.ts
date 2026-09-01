@@ -134,7 +134,7 @@ app.use('/api', limiter)
  * o build falha e o contêiner ANTIGO continua no ar — sem isso, "está no ar" é
  * palpite por uptime. Trocar a cada mudança que precise ser confirmada.
  */
-const BUILD_TAG = 'bot-guest-invite-2'
+const BUILD_TAG = 'bot-guest-invite-3'
 
 let ffmpegReady: boolean | null = null
 let audioCodec: string | null = null

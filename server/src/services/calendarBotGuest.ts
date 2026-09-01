@@ -15,6 +15,19 @@ export interface GoogleEventLike {
   attendees?: GoogleAttendee[]
 }
 
+/**
+ * Domínios de e-mail público. Duas pessoas no gmail.com não são "a mesma
+ * empresa" — e foi o que os dados reais mostraram: a agenda conectada do Pietro
+ * é pessoal (@gmail.com) e as reuniões dele com gente de fora também são
+ * @gmail.com. Sem esta lista, a regra chamaria isso de reunião interna e
+ * convidaria o bot na frente de terceiros.
+ */
+const DOMINIOS_PUBLICOS = new Set([
+  'gmail.com', 'googlemail.com', 'hotmail.com', 'outlook.com', 'live.com',
+  'msn.com', 'yahoo.com', 'yahoo.com.br', 'icloud.com', 'me.com', 'aol.com',
+  'proton.me', 'protonmail.com', 'bol.com.br', 'uol.com.br', 'terra.com.br',
+])
+
 export type InviteDecision =
   /**
    * `attendees` é a lista ORIGINAL e completa — salas e recursos incluídos.
@@ -23,7 +36,10 @@ export type InviteDecision =
    * nunca no que é reenviado.
    */
   | { invite: true; attendees: GoogleAttendee[] }
-  | { invite: false; reason: 'nao_organizador' | 'ja_convidado' | 'tem_externo' }
+  | {
+      invite: false
+      reason: 'nao_organizador' | 'ja_convidado' | 'tem_externo' | 'dominio_publico'
+    }
 
 /**
  * Só convida quando o evento é nosso E interno:
@@ -44,6 +60,12 @@ export function decideBotInvite(
   const domain = organizerEmail?.split('@')[1]
   if (event.organizer?.self !== true || !organizerEmail || !domain) {
     return { invite: false, reason: 'nao_organizador' }
+  }
+
+  // Domínio público não é organização: não dá para inferir "reunião interna"
+  // de duas contas gmail.com.
+  if (DOMINIOS_PUBLICOS.has(domain)) {
+    return { invite: false, reason: 'dominio_publico' }
   }
 
   const attendees = (event.attendees ?? []).filter((a) => !a.resource)
