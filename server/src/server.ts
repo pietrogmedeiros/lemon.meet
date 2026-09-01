@@ -130,9 +130,17 @@ app.use('/api', limiter)
 // ffmpeg no container, todo áudio acima do limite do Whisper falha. Sondado uma
 // vez no boot para não pagar um spawn por requisição.
 let ffmpegReady: boolean | null = null
-void TranscriptionService.ffmpegAvailable().then((ok) => {
+let audioCodec: string | null = null
+void TranscriptionService.ffmpegAvailable().then(async (ok) => {
   ffmpegReady = ok
-  if (!ok) console.error('[boot] ffmpeg NÃO está disponível — reuniões longas vão falhar')
+  if (!ok) {
+    console.error('[boot] ffmpeg NÃO está disponível — reuniões longas vão falhar')
+    return
+  }
+  // Qual encoder o ffmpeg deste contêiner tem de fato. `libopus` é biblioteca
+  // externa e pode faltar; sem saber disso, uma falha de encoder vira "413" no
+  // fim da linha, que foi o que aconteceu em 01/09.
+  audioCodec = (await TranscriptionService.audioEncoder()).codec
 })
 
 app.get('/health', (req, res) => {
@@ -141,6 +149,7 @@ app.get('/health', (req, res) => {
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     ffmpeg: ffmpegReady,
+    audioCodec,
   })
 })
 

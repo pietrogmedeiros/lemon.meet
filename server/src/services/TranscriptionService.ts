@@ -15,6 +15,9 @@ const groq = new Groq({
 const GROQ_MAX_BYTES = 24 * 1024 * 1024; // 24MB (margem de segurança)
 const SEGMENT_SECONDS = 900;             // 15min por segmento
 
+/** Resultado da sondagem de encoders — feita uma vez por processo. */
+let encoderProbe: Promise<{ codec: string; ext: string; bitrate: string }> | null = null;
+
 export interface TranscriptChunk {
   text: string;
   timestamp: Date;
@@ -104,7 +107,7 @@ export class TranscriptionService {
 
       if (compressedBytes <= GROQ_MAX_BYTES) {
         const buf = fs.readFileSync(compressedPath);
-        return await this.transcribeAudioBuffer(buf, 'audio.ogg');
+        return await this.transcribeAudioBuffer(buf, path.basename(compressedPath));
       }
 
       logger.info(`[Transcription] Ainda acima do limite — segmentando em ${SEGMENT_SECONDS}s`);
@@ -125,12 +128,13 @@ export class TranscriptionService {
   private async compressForWhisper(audioFilePath: string): Promise<string> {
     const outDir = path.join(process.cwd(), 'temp', 'compressed');
     fs.mkdirSync(outDir, { recursive: true });
-    const outPath = path.join(outDir, `${Date.now()}-${Math.round(Math.random() * 1e6)}.ogg`);
+    const enc = await TranscriptionService.audioEncoder();
+    const outPath = path.join(outDir, `${Date.now()}-${Math.round(Math.random() * 1e6)}.${enc.ext}`);
 
     await this.runFfmpeg([
       '-hide_banner', '-loglevel', 'error', '-y',
       '-i', audioFilePath,
-      '-ar', '16000', '-ac', '1', '-c:a', 'libopus', '-b:a', '16k',
+      '-ar', '16000', '-ac', '1', '-c:a', enc.codec, '-b:a', enc.bitrate,
       outPath,
     ]);
 
@@ -151,22 +155,59 @@ export class TranscriptionService {
     });
   }
 
-  /** Divide o áudio em segmentos (ffmpeg → 16kHz mono opus) e transcreve cada. */
+  /**
+   * Escolhe o encoder de áudio pelo que o ffmpeg do ambiente REALMENTE tem.
+   *
+   * `libopus` é biblioteca externa e não está em toda build de ffmpeg; `aac` é
+   * nativo e existe sempre. Assumir libopus é o que provavelmente derrubou a
+   * reunião de 01/09: o ffmpeg estava lá (`/health` confirma), mas a etapa de
+   * fatiar falhou e o código caía no envio do arquivo inteiro. Sondado uma vez
+   * e memorizado.
+   */
+  static audioEncoder(): Promise<{ codec: string; ext: string; bitrate: string }> {
+    encoderProbe ??= (async () => {
+      try {
+        const encoders = await TranscriptionService.runFfmpegCapture(['-hide_banner', '-encoders']);
+        if (/\slibopus\s/.test(encoders)) {
+          return { codec: 'libopus', ext: 'ogg', bitrate: '16k' };
+        }
+        logger.warn('[Transcription] ffmpeg sem libopus — usando o encoder aac nativo');
+      } catch (err) {
+        logger.warn(`[Transcription] não consegui listar encoders do ffmpeg (${err}) — assumindo aac`);
+      }
+      return { codec: 'aac', ext: 'm4a', bitrate: '24k' };
+    })();
+    return encoderProbe;
+  }
+
+  private static runFfmpegCapture(args: string[]): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const proc = spawn('ffmpeg', args);
+      let out = '';
+      proc.stdout.on('data', (d) => { out += d.toString(); });
+      proc.stderr.on('data', () => { /* ffmpeg escreve banner no stderr */ });
+      proc.on('error', (err) => reject(new Error(`ffmpeg indisponível: ${err.message}`)));
+      proc.on('close', () => resolve(out));
+    });
+  }
+
+  /** Divide o áudio em segmentos (ffmpeg → 16kHz mono) e transcreve cada. */
   private async splitAndTranscribe(audioFilePath: string): Promise<TranscriptChunk[]> {
     const segDir = path.join(process.cwd(), 'temp', 'segments', `${Date.now()}-${Math.round(Math.random() * 1e6)}`);
     fs.mkdirSync(segDir, { recursive: true });
 
     try {
+      const enc = await TranscriptionService.audioEncoder();
       await this.runFfmpeg([
         '-hide_banner', '-loglevel', 'error', '-y',
         '-i', audioFilePath,
-        '-ar', '16000', '-ac', '1', '-c:a', 'libopus', '-b:a', '16k',
+        '-ar', '16000', '-ac', '1', '-c:a', enc.codec, '-b:a', enc.bitrate,
         '-f', 'segment', '-segment_time', String(SEGMENT_SECONDS),
-        path.join(segDir, 'seg%03d.ogg'),
+        path.join(segDir, `seg%03d.${enc.ext}`),
       ]);
 
       const segFiles = fs.readdirSync(segDir)
-        .filter((f) => f.startsWith('seg') && f.endsWith('.ogg'))
+        .filter((f) => f.startsWith('seg') && f.endsWith(`.${enc.ext}`))
         .sort();
 
       if (segFiles.length === 0) throw new Error('ffmpeg não gerou segmentos');
