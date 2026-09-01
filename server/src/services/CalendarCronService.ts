@@ -13,6 +13,15 @@ import { randomUUID } from 'crypto'
 import { supabase } from '../config/supabase.js'
 import { logger } from '../utils/logger.js'
 import { botRouter, type DispatchResult } from './bots/BotRouter.js'
+import { decideBotInvite } from './calendarBotGuest.js'
+
+/**
+ * Conta Google que o bot usa para entrar na reunião (a mesma que o Skribby
+ * autentica). Convidada nos eventos INTERNOS para o Meet admitir sozinho, em
+ * vez de depender de alguém clicar em "admitir" — em 01/09 três bots esperaram
+ * os 44 minutos inteiros na sala de espera e nenhuma reunião foi gravada.
+ */
+const BOT_GUEST_EMAIL = (process.env.BOT_GUEST_EMAIL?.trim() || 'contato@lemon-meet.com').toLowerCase()
 import { botIdColumn, type BotProviderName } from './bots/IBotProvider.js'
 import { resolveMeetingTeamId } from '../utils/teamAccess.js'
 import { fanOutFromOwner } from '../routes/meetingbaas.routes.js'
@@ -344,14 +353,50 @@ export class CalendarCronService {
 
     for (const item of filtered) {
       try {
-        await this.dispatchBotForEvent(item, user_id)
+        await this.dispatchBotForEvent(item, user_id, accessToken)
       } catch (err) {
         logger.error(`[CalendarCron] Erro ao despachar bot para evento ${item.id}:`, err)
       }
     }
   }
 
-  private async dispatchBotForEvent(item: any, userId: string): Promise<void> {
+  /**
+   * Adiciona a conta do bot como convidado do evento, para o Meet admiti-lo
+   * sozinho. A regra de QUANDO fazer isso é pura e testada em
+   * `calendarBotGuest.ts`; aqui fica só a chamada ao Google.
+   *
+   * Vai com `sendUpdates=none`: ninguém recebe e-mail de atualização.
+   */
+  private async inviteBotGuest(item: any, accessToken: string): Promise<void> {
+    const decision = decideBotInvite(item, BOT_GUEST_EMAIL)
+    if (!decision.invite) {
+      if (decision.reason === 'tem_externo') {
+        logger.info(`[CalendarCron] Evento ${item.id} tem convidado externo — não convido o bot`)
+      }
+      return
+    }
+
+    // PATCH substitui a lista inteira: reenvia os convidados atuais + o bot.
+    const res = await fetch(
+      `${GCAL_EVENTS_URL}/${encodeURIComponent(item.id)}?sendUpdates=none`,
+      {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ attendees: [...decision.attendees, { email: BOT_GUEST_EMAIL }] }),
+      },
+    )
+
+    if (!res.ok) {
+      const detail = (await res.text()).slice(0, 200)
+      throw new Error(`Google respondeu ${res.status}: ${detail}`)
+    }
+    logger.info(`[CalendarCron] 🤖 Bot convidado no evento interno ${item.id}`)
+  }
+
+  private async dispatchBotForEvent(item: any, userId: string, accessToken?: string): Promise<void> {
     const eventId    = item.id as string
     const title      = item.summary ?? 'Reunião do Calendário'
     const startedAt  = item.start?.dateTime ?? item.start?.date
@@ -463,6 +508,16 @@ export class CalendarCronService {
         try { await fanOutFromOwner(owner.id) } catch (e) { logger.warn(`[CalendarCron] fanOut pós-link falhou:`, e) }
       }
       return
+    }
+
+    // Convida o bot ANTES de despachar, para ele já estar na lista de
+    // convidados quando pedir entrada. Nunca derruba o dispatch.
+    if (accessToken) {
+      try {
+        await this.inviteBotGuest(item, accessToken)
+      } catch (err) {
+        logger.warn(`[CalendarCron] Não consegui convidar o bot no evento ${eventId}:`, err)
+      }
     }
 
     // Roteador híbrido capacity-first (MeetingBaas/Attendee), tanto para
