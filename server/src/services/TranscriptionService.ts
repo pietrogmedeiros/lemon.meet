@@ -3,6 +3,7 @@ import { logger } from '../utils/logger.js';
 import { transcriptionMetrics } from '../metrics.js';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as os from 'os';
 import { spawn } from 'node:child_process';
 
 const groq = new Groq({
@@ -124,10 +125,9 @@ export class TranscriptionService {
     }
   }
 
-  /** Reduz o áudio para 16kHz mono opus 16kbps — ~7MB por hora de reunião. */
+  /** Reduz o áudio para 16kHz mono — ~7MB por hora de reunião. */
   private async compressForWhisper(audioFilePath: string): Promise<string> {
-    const outDir = path.join(process.cwd(), 'temp', 'compressed');
-    fs.mkdirSync(outDir, { recursive: true });
+    const outDir = TranscriptionService.workDir(audioFilePath);
     const enc = await TranscriptionService.audioEncoder();
     const outPath = path.join(outDir, `${Date.now()}-${Math.round(Math.random() * 1e6)}.${enc.ext}`);
 
@@ -180,6 +180,28 @@ export class TranscriptionService {
     return encoderProbe;
   }
 
+  /**
+   * Onde escrever os arquivos intermediários: AO LADO do áudio de entrada.
+   *
+   * O diretório do upload é comprovadamente gravável — o multer acabou de
+   * escrever ali. Um caminho novo (`temp/segments`, `temp/compressed`) não tem
+   * essa garantia: em contêiner com volume montado só no caminho do upload, o
+   * mkdir falha, e antes essa falha virava "manda o arquivo inteiro" → 413.
+   * Se nem isso funcionar, cai no temporário do sistema.
+   */
+  private static workDir(inputPath: string): string {
+    const preferred = path.dirname(inputPath);
+    try {
+      fs.accessSync(preferred, fs.constants.W_OK);
+      return preferred;
+    } catch {
+      const fallback = path.join(os.tmpdir(), 'lemon-audio');
+      fs.mkdirSync(fallback, { recursive: true });
+      logger.warn(`[Transcription] ${preferred} não é gravável — usando ${fallback}`);
+      return fallback;
+    }
+  }
+
   private static runFfmpegCapture(args: string[]): Promise<string> {
     return new Promise((resolve, reject) => {
       const proc = spawn('ffmpeg', args);
@@ -193,7 +215,10 @@ export class TranscriptionService {
 
   /** Divide o áudio em segmentos (ffmpeg → 16kHz mono) e transcreve cada. */
   private async splitAndTranscribe(audioFilePath: string): Promise<TranscriptChunk[]> {
-    const segDir = path.join(process.cwd(), 'temp', 'segments', `${Date.now()}-${Math.round(Math.random() * 1e6)}`);
+    const segDir = path.join(
+      TranscriptionService.workDir(audioFilePath),
+      `seg-${Date.now()}-${Math.round(Math.random() * 1e6)}`,
+    );
     fs.mkdirSync(segDir, { recursive: true });
 
     try {
