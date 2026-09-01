@@ -129,6 +129,13 @@ app.use('/api', limiter)
 // `ffmpeg` entra aqui porque a transcrição de reunião longa DEPENDE dele: sem
 // ffmpeg no container, todo áudio acima do limite do Whisper falha. Sondado uma
 // vez no boot para não pagar um spawn por requisição.
+/**
+ * Etiqueta do que está rodando. O webhook do EasyPanel fica verde mesmo quando
+ * o build falha e o contêiner ANTIGO continua no ar — sem isso, "está no ar" é
+ * palpite por uptime. Trocar a cada mudança que precise ser confirmada.
+ */
+const BUILD_TAG = 'bot-guest-invite-2'
+
 let ffmpegReady: boolean | null = null
 let audioCodec: string | null = null
 void TranscriptionService.ffmpegAvailable().then(async (ok) => {
@@ -148,6 +155,7 @@ app.get('/health', (req, res) => {
     status: 'ok',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
+    build: BUILD_TAG,
     ffmpeg: ffmpegReady,
     audioCodec,
   })
