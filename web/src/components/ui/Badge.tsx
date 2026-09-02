@@ -4,7 +4,7 @@ import { ReactNode } from 'react'
 
 export interface BadgeProps {
   status?: 'recording' | 'processing' | 'completed' | 'failed'
-  variant?: 'primary' | 'secondary' | 'success' | 'danger'
+  variant?: 'primary' | 'secondary' | 'success' | 'danger' | 'info'
   children?: ReactNode
   className?: string
 }
@@ -59,6 +59,9 @@ export function Badge({ status, variant, children, className }: BadgeProps) {
     secondary: 'bg-neutral-lighter  text-neutral-mid  border-neutral-light ',
     success: 'bg-green-50 dark:bg-green-950/40 dark:bg-green-900/30 text-green-700 dark:text-green-300 dark:text-green-400 border-green-200 dark:border-green-900/50 dark:border-green-700',
     danger: 'bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 border-red-200 dark:border-red-900/50',
+    // Azul: informativo, não é defeito. Reunião que não foi gravada porque
+    // ninguém admitiu o bot ou o evento foi cancelado não é falha da plataforma.
+    info: 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-900/50',
   }
 
   const baseStyle = variant ? variantStyles[variant] : variantStyles.secondary

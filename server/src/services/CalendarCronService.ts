@@ -413,6 +413,23 @@ export class CalendarCronService {
     // Ignora eventos sem link de vídeo
     if (!meetingUrl) return
 
+    // Convida o bot AQUI, antes de qualquer dedup.
+    //
+    // ⚠️ Estava depois, junto do dispatch, e por isso NUNCA rodou: quem cria o
+    // bot é o primeiro membro processado, não o organizador. Na Daily Comercial
+    // de 02/09 o dono foi o Kledson (11:32:48) — e na agenda dele o organizador
+    // é o Deive, então a regra dizia "não sou organizador"; três segundos
+    // depois vinha o Deive, que É o organizador, e o dedup já tinha retornado
+    // antes de chegar aqui. Convite é sobre a AGENDA de quem organiza, não
+    // sobre quem ganhou a corrida do bot.
+    if (accessToken) {
+      try {
+        await this.inviteBotGuest(item, accessToken)
+      } catch (err) {
+        logger.warn(`[CalendarCron] Não consegui convidar o bot no evento ${eventId}:`, err)
+      }
+    }
+
     // Checa duplicata pelo event_id do Google Calendar
     // Usa .limit(1) para evitar erro do maybeSingle() com múltiplas linhas
     const { data: existingRows, error: checkError } = await supabase
@@ -508,16 +525,6 @@ export class CalendarCronService {
         try { await fanOutFromOwner(owner.id) } catch (e) { logger.warn(`[CalendarCron] fanOut pós-link falhou:`, e) }
       }
       return
-    }
-
-    // Convida o bot ANTES de despachar, para ele já estar na lista de
-    // convidados quando pedir entrada. Nunca derruba o dispatch.
-    if (accessToken) {
-      try {
-        await this.inviteBotGuest(item, accessToken)
-      } catch (err) {
-        logger.warn(`[CalendarCron] Não consegui convidar o bot no evento ${eventId}:`, err)
-      }
     }
 
     // Roteador híbrido capacity-first (MeetingBaas/Attendee), tanto para

@@ -6,7 +6,7 @@ import { Card } from '../components/ui/Card';
 import { DecisionSummaryCard, type DecisionSummary } from '../components/ui/DecisionSummaryCard';
 import { DecisionInsightsAnnounceModal } from '../components/DecisionInsightsAnnounceModal';
 import { Badge } from '../components/ui/Badge';
-import { ArrowLeft, Clock, Calendar, Mic, Target, CheckCircle, Mail, BookOpen, Sparkles, X, Copy, Check, Trash2, Lock, Users, RefreshCw, Download, Phone, Edit2, Save, MessageCircle, Heart, AlertTriangle, Smile, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Clock, Calendar, Mic, Target, CheckCircle, Mail, BookOpen, Sparkles, X, Copy, Check, Trash2, Lock, Users, RefreshCw, Download, Phone, Edit2, Save, MessageCircle, Heart, AlertTriangle, Smile, ExternalLink, Info } from 'lucide-react';
 import { RapportSection } from '../components/ui/RapportSection';
 import { MeetingChatPanel } from '../components/MeetingChatPanel';
 import { supabase } from '../lib/supabase';
@@ -109,9 +109,11 @@ interface Meeting {
 
 // Traduz códigos de failure_reason em mensagens amigáveis pro usuário.
 // O mapeamento PT/BR vive em lib/failureReason (compartilhado com a lista).
-function describeFailureReason(reason: string | null | undefined): { title: string; detail: string } | null {
+function describeFailureReason(
+  reason: string | null | undefined
+): { title: string; detail: string; kind: 'erro' | 'nao_gravada' } | null {
   const d = describeFailure(reason);
-  return d ? { title: d.title, detail: d.detail } : null;
+  return d ? { title: d.title, detail: d.detail, kind: d.kind } : null;
 }
 
 interface ActionItem {
@@ -1171,14 +1173,19 @@ export function TranscricaoDetalhesPage() {
         {(() => {
           const info = describeFailureReason(meeting.failure_reason);
           if (!info) return null;
+          // Azul quando nada quebrou (bot não admitido, evento cancelado):
+          // vermelho aqui fazia o usuário achar que a plataforma falhou.
+          const aviso = info.kind === 'nao_gravada';
           return (
-            <Card className="p-4 border-l-4 border-l-red-500 bg-red-50/40">
+            <Card className={aviso ? 'p-4 border-l-4 border-l-blue-500 bg-blue-50/40' : 'p-4 border-l-4 border-l-red-500 bg-red-50/40'}>
               <div className="flex items-start gap-3">
-                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-red-100 flex items-center justify-center mt-0.5">
-                  <X className="h-4 w-4 text-red-600" />
+                <div className={'flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center mt-0.5 ' + (aviso ? 'bg-blue-100' : 'bg-red-100')}>
+                  {aviso
+                    ? <Info className="h-4 w-4 text-blue-600" />
+                    : <X className="h-4 w-4 text-red-600" />}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-red-700 dark:text-red-300">{info.title}</p>
+                  <p className={'text-sm font-semibold ' + (aviso ? 'text-blue-700 dark:text-blue-300' : 'text-red-700 dark:text-red-300')}>{info.title}</p>
                   <p className="text-sm text-secondary mt-1 leading-relaxed">{info.detail}</p>
                   <p className="text-xs text-secondary/60 mt-2 font-mono">
                     código: {meeting.failure_reason}

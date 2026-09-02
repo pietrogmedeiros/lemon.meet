@@ -152,11 +152,19 @@ export function MeetingsPage() {
     load();
   }, [currentUserId, selectedTeamId, teams, viewMode]);
 
-  const getStatusBadge = (status: string | null) => {
+  // Vermelho só para o que quebrou de verdade. "Ninguém admitiu o bot" e
+  // "evento cancelado" viram azul e deixam de se chamar "Falhou" — pintar isso
+  // de vermelho fazia parecer que a plataforma estava fora do ar.
+  const getStatusBadge = (status: string | null, failureReason?: string | null) => {
     if (status === 'completed') return <Badge variant="success">Concluída</Badge>;
     if (status === 'recording') return <Badge variant="danger">Gravando</Badge>;
     if (status === 'processing') return <Badge variant="secondary">Processando</Badge>;
-    if (status === 'failed') return <Badge variant="danger">Falhou</Badge>;
+    if (status === 'failed') {
+      const naoGravada = describeFailure(failureReason)?.kind === 'nao_gravada';
+      return naoGravada
+        ? <Badge variant="info">Não gravada</Badge>
+        : <Badge variant="danger">Falhou</Badge>;
+    }
     return <Badge variant="secondary">{status ?? 'Desconhecido'}</Badge>;
   };
 
@@ -413,11 +421,16 @@ export function MeetingsPage() {
                 </div>
 
                 <div className="mb-3 flex items-center gap-2 flex-wrap">
-                  {getStatusBadge(meeting.status)}
+                  {getStatusBadge(meeting.status, meeting.failure_reason)}
                   {meeting.failure_reason && (
                     <span
-                      title={describeFailureShort(meeting.failure_reason) ?? meeting.failure_reason ?? ''}
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-900/50 cursor-help"
+                      title={describeFailure(meeting.failure_reason)?.detail ?? meeting.failure_reason ?? ''}
+                      className={
+                        'inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium border cursor-help ' +
+                        (describeFailure(meeting.failure_reason)?.kind === 'nao_gravada'
+                          ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-900/50'
+                          : 'bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 border-red-200 dark:border-red-900/50')
+                      }
                     >
                       {describeFailureShort(meeting.failure_reason)}
                     </span>
