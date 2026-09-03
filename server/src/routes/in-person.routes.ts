@@ -23,6 +23,7 @@ import { insightsService } from '../services/InsightsService.js'
 import { fireWebhookForMeeting } from './integrations.routes.js'
 import { gdriveService } from '../services/GDriveService.js'
 import { notificationService } from '../services/NotificationService.js'
+import { avaliarTranscricao } from '../services/transcriptUsable.js'
 
 const router: express.Router = Router()
 
@@ -182,6 +183,17 @@ async function processInPersonRecording(params: {
     logger.info(
       `[InPerson] Meeting ${meetingId}: ${chunks.length} segmentos, ${fullTranscript.length} chars`,
     )
+
+    // Mesma trava do pipeline dos bots: gravação sem fala não vira insight.
+    const usabilidade = avaliarTranscricao(fullTranscript)
+    if (!usabilidade.usavel) {
+      logger.warn(`[InPerson] Meeting ${meetingId} sem conteúdo aproveitável: ${usabilidade.motivo}`)
+      await supabase
+        .from('meetings')
+        .update({ status: 'failed', failure_reason: `no_usable_audio: ${usabilidade.motivo}` })
+        .eq('id', meetingId)
+      return
+    }
 
     // 3. Insights + finalização (paridade com handleComplete do MeetingBaas)
     try {

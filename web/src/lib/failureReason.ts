@@ -163,6 +163,13 @@ const REASON_MAP: Record<string, FailureDescription> = {
     detail:
       'O bot esperou na sala de espera até a reunião terminar sem ser admitido. Alguém de dentro da sala precisa aceitar o pedido de entrada.',
   },
+  skribby_failed: {
+    kind: 'erro',
+    short: 'O serviço de gravação falhou.',
+    title: 'O serviço de gravação falhou',
+    detail:
+      'O bot foi enviado, mas o serviço de gravação encerrou com erro. Se a reunião ainda estiver em andamento, dá para gravar pelo aplicativo.',
+  },
   skribby_invalid_credentials: {
     kind: 'erro',
     short: 'A conta do bot foi recusada pelo Google.',
@@ -186,10 +193,10 @@ const REASON_MAP: Record<string, FailureDescription> = {
   },
   no_usable_audio: {
     kind: 'nao_gravada',
-    short: 'Ninguém falou durante a gravação.',
-    title: 'Nenhum áudio aproveitável',
+    short: 'Não houve fala para transcrever.',
+    title: 'A gravação não tem conversa',
     detail:
-      'A gravação aconteceu, mas não havia fala suficiente para transcrever — sala vazia, microfones desligados ou reunião encerrada logo no começo.',
+      'O bot esteve na sala, mas não captou fala: sala vazia, microfones desligados, ou a conversa aconteceu em outro link. Preferimos não gerar resumo nem insights nesse caso — analisar silêncio produziria uma leitura inventada da reunião.',
   },
   ui_element_not_found: {
     kind: 'erro',

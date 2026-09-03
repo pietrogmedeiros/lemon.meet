@@ -12,6 +12,7 @@
 
 import { supabase } from '../config/supabase.js'
 import { logger } from '../utils/logger.js'
+import { avaliarTranscricao } from './transcriptUsable.js'
 import { insightsService } from './InsightsService.js'
 import { fireWebhookForMeeting } from '../routes/integrations.routes.js'
 import { gdriveService } from './GDriveService.js'
@@ -77,6 +78,23 @@ export async function runTranscriptPipeline(
   }).eq('id', meetingId)
 
   logger.info(`[TranscriptPipeline] ${segments.length} segmentos salvos para meeting ${meetingId}`)
+
+  // Silêncio não vira análise de vendas.
+  //
+  // Em 03/09 a Daily Comercial gravou 13 minutos de sala sem fala; o Whisper
+  // devolveu "you Thank you. Thank you..." e o DeepSeek gerou BANT zerado e
+  // follow-up inventado em cima disso. A reunião aparecia como "Concluída" com
+  // insights — o pior resultado possível, porque parece que o produto entendeu
+  // a conversa.
+  const usabilidade = avaliarTranscricao(fullTranscript)
+  if (!usabilidade.usavel) {
+    logger.warn(`[TranscriptPipeline] Meeting ${meetingId} sem conteúdo aproveitável: ${usabilidade.motivo}`)
+    await supabase.from('meetings').update({
+      status: 'failed',
+      failure_reason: `no_usable_audio: ${usabilidade.motivo}`,
+    }).eq('id', meetingId)
+    return
+  }
 
   // Gera insights + integrações
   try {
