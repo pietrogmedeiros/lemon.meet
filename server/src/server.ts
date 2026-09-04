@@ -19,6 +19,7 @@ import { attendeeWebhookHandler } from './routes/attendee.routes.js'
 import { skribbyWebhookHandler } from './routes/skribby.routes.js'
 import calendarRouter from './routes/calendar.routes.js'
 import { TranscriptionService } from './services/TranscriptionService.js'
+import { dailyDigestService } from './services/DailyDigestService.js'
 import pipedriveRouter from './routes/pipedrive.routes.js'
 import hubspotRouter from './routes/hubspot.routes.js'
 import gdriveRouter from './routes/gdrive.routes.js'
@@ -134,7 +135,7 @@ app.use('/api', limiter)
  * o build falha e o contêiner ANTIGO continua no ar — sem isso, "está no ar" é
  * palpite por uptime. Trocar a cada mudança que precise ser confirmada.
  */
-const BUILD_TAG = 'silencio-nao-vira-insight-1'
+const BUILD_TAG = 'resumo-diario-1'
 
 let ffmpegReady: boolean | null = null
 let audioCodec: string | null = null
@@ -226,12 +227,20 @@ httpServer.listen(PORT, () => {
     // Inicia o cron de auto-dispatch de bots via Google Calendar
     calendarCronService.start()
   }
+
+  // Resumo do dia anterior, 07:47 (São Paulo)
+  if (process.env.DISABLE_DAILY_DIGEST === 'true') {
+    console.log('[DailyDigest] Desabilitado por DISABLE_DAILY_DIGEST=true')
+  } else {
+    dailyDigestService.start()
+  }
 })
 
 // Graceful shutdown
 const shutdown = async () => {
   console.log('Shutdown initiated...')
   calendarCronService.stop()
+  dailyDigestService.stop()
   
   // Fecha servidor HTTP
   httpServer.close(() => {
