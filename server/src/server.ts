@@ -135,7 +135,7 @@ app.use('/api', limiter)
  * o build falha e o contêiner ANTIGO continua no ar — sem isso, "está no ar" é
  * palpite por uptime. Trocar a cada mudança que precise ser confirmada.
  */
-const BUILD_TAG = 'resumo-semanal-2'
+const BUILD_TAG = 'resumo-disparo-3'
 
 let ffmpegReady: boolean | null = null
 let audioCodec: string | null = null
@@ -159,7 +159,36 @@ app.get('/health', (req, res) => {
     build: BUILD_TAG,
     ffmpeg: ffmpegReady,
     audioCodec,
+    // Booleano de propósito: prova que a variável chegou ao contêiner sem
+    // expor a chave. Sem isso, "coloquei a variável" é indistinguível de
+    // "coloquei e não pegou" até alguém reclamar que o e-mail não chegou.
+    resend: Boolean(process.env.RESEND_API_KEY),
   })
+})
+
+// Dispara o resumo por e-mail sob demanda. Guardado só pela chave de máquina,
+// mesmo esquema do /metrics — serve para testar depois de mexer em variável de
+// ambiente e para reenviar um dia específico sem esperar as 07:47.
+app.post('/api/admin/daily-digest/run', async (req, res) => {
+  const esperada = process.env.ADMIN_METRICS_KEY
+  if (!esperada || esperada.length < 16) {
+    res.status(503).json({ error: 'admin_metrics_key_not_configured' })
+    return
+  }
+  if (req.header('x-admin-key') !== esperada) {
+    res.status(401).json({ error: 'unauthorized' })
+    return
+  }
+  if (!process.env.RESEND_API_KEY) {
+    res.status(503).json({ error: 'resend_api_key_not_configured' })
+    return
+  }
+  try {
+    const resultado = await dailyDigestService.enviarParaTodos()
+    res.json({ ok: true, ...resultado })
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err instanceof Error ? err.message : String(err) })
+  }
 })
 
 // Prometheus scrape endpoint. Registrado antes do metricsMiddleware
