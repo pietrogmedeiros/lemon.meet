@@ -51,8 +51,12 @@ export interface DigestActionItem {
   meetingTitle: string | null
 }
 
+export type DigestModo = 'diario' | 'semanal'
+
 export interface DigestInput {
   nome: string
+  /** 'diario' = ontem (ter a sex). 'semanal' = semana passada (segunda). */
+  modo?: DigestModo
   meetings: DigestMeeting[]
   actionItems: DigestActionItem[]
   appUrl: string
@@ -103,31 +107,50 @@ function proximoPasso(insights: any): string | null {
 }
 
 /**
- * Devolve `null` quando não há nada a dizer — dia sem reunião não gera e-mail.
- * Silêncio é melhor que um "você não teve reuniões ontem" diário.
+ * Devolve `null` quando não há o que mostrar.
+ *
+ * ⚠️ Regra do Pietro (05/09): **sem nenhuma reunião GRAVADA, não manda e-mail.**
+ * Um resumo que só enumera o que falhou é cobrança, não resumo — e chegando
+ * todo dia vira ruído que acaba filtrado.
  */
 export function buildDigest(input: DigestInput): DigestEmail | null {
   const { nome, meetings, actionItems, appUrl, dataLabel } = input
+  const modo: DigestModo = input.modo ?? 'diario'
   if (meetings.length === 0) return null
 
   const gravadas = meetings.filter((m) => m.status === 'completed')
+  if (gravadas.length === 0) return null
+
   const perdidas = meetings.filter((m) => m.status !== 'completed')
   const naoAdmitidas = perdidas.filter((m) => NAO_ADMITIDO.has(codigo(m.failure_reason)))
 
+  const prefixo = modo === 'semanal' ? 'Sua semana' : 'Ontem'
   const subject =
     perdidas.length === 0
-      ? `Ontem: ${gravadas.length} ${gravadas.length === 1 ? 'reunião gravada' : 'reuniões gravadas'}`
-      : `Ontem: ${gravadas.length} de ${meetings.length} reuniões gravadas`
+      ? `${prefixo}: ${gravadas.length} ${gravadas.length === 1 ? 'reunião gravada' : 'reuniões gravadas'}`
+      : `${prefixo}: ${gravadas.length} de ${meetings.length} reuniões gravadas`
 
-  const linhasTexto: string[] = [`Resumo de ${dataLabel} — ${nome}`, '']
+  const linhasTexto: string[] = [
+    modo === 'semanal' ? `Semana de ${dataLabel} — ${nome}` : `Resumo de ${dataLabel} — ${nome}`,
+    '',
+  ]
 
   const partes: string[] = []
   partes.push(
-    `<p style="margin:0 0 4px;font:600 20px/1.3 -apple-system,Segoe UI,Roboto,sans-serif;color:#1a1a1a">Seu dia de ${esc(dataLabel)}</p>`,
-    `<p style="margin:0 0 20px;font:14px/1.5 -apple-system,Segoe UI,Roboto,sans-serif;color:#666">` +
-      `${meetings.length} ${meetings.length === 1 ? 'reunião' : 'reuniões'} · ${gravadas.length} com transcrição` +
-      (perdidas.length ? ` · ${perdidas.length} sem gravação` : '') +
+    // Logo hospedado no app web. E-mail não carrega asset local, e anexo inline
+    // cai em spam com mais frequência do que URL pública.
+    `<div style="text-align:center;padding:4px 0 22px">` +
+      `<img src="${appUrl}/lemon.meet.png" alt="Lemon.meet" width="132" style="width:132px;height:auto;border:0;display:inline-block">` +
+      `</div>`,
+    `<p style="margin:0 0 2px;font:600 22px/1.3 ${FONT};color:#1a1a1a">` +
+      (modo === 'semanal' ? `Boa semana, ${esc(nome)}` : `Bom dia, ${esc(nome)}`) +
       `</p>`,
+    `<p style="margin:0 0 18px;font:15px/1.5 ${FONT};color:#777">` +
+      (modo === 'semanal'
+        ? `Antes de começar, como foi a sua semana de ${esc(dataLabel)}`
+        : `Como foi o seu ${esc(dataLabel)}`) +
+      `</p>`,
+    numeros(meetings.length, gravadas.length, perdidas.length),
   )
 
   if (gravadas.length) {
@@ -144,13 +167,15 @@ export function buildDigest(input: DigestInput): DigestEmail | null {
         .filter(Boolean)
         .join(' · ')
       partes.push(
-        `<div style="padding:12px 0;border-bottom:1px solid #eee">` +
-          `<a href="${appUrl}/meetings/${m.id}" style="font:600 15px/1.4 -apple-system,Segoe UI,Roboto,sans-serif;color:#2D5A27;text-decoration:none">${esc(titulo)}</a>` +
-          `<div style="font:13px/1.5 -apple-system,Segoe UI,Roboto,sans-serif;color:#888;margin-top:2px">${esc(meta)}</div>` +
-          (passo
-            ? `<div style="font:13px/1.5 -apple-system,Segoe UI,Roboto,sans-serif;color:#444;margin-top:6px"><b>Próximo passo:</b> ${esc(passo)}</div>`
-            : '') +
-          `</div>`,
+        `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 10px;border:1px solid #ececec;border-radius:10px;border-left:3px solid #2D5A27">` +
+          `<tr><td style="padding:14px 16px">` +
+            `<a href="${appUrl}/meetings/${m.id}" style="font:600 15px/1.4 ${FONT};color:#2D5A27;text-decoration:none">${esc(titulo)}</a>` +
+            `<div style="font:13px/1.5 ${FONT};color:#999;margin-top:3px">${esc(meta)}</div>` +
+            (passo
+              ? `<div style="margin-top:10px;padding:9px 11px;background:#f6f8f5;border-radius:7px;font:13px/1.5 ${FONT};color:#3d4a3a">` +
+                `<span style="color:#2D5A27;font-weight:600">Próximo passo</span><br>${esc(passo)}</div>`
+              : '') +
+          `</td></tr></table>`,
       )
       linhasTexto.push(`- ${titulo} (${meta})${passo ? ` — próximo passo: ${passo}` : ''}`)
     }
@@ -163,10 +188,11 @@ export function buildDigest(input: DigestInput): DigestEmail | null {
       const titulo = m.title || 'Reunião'
       const motivo = MOTIVO_CURTO[codigo(m.failure_reason)] ?? 'a gravação não foi concluída'
       partes.push(
-        `<div style="padding:10px 0;border-bottom:1px solid #eee">` +
-          `<span style="font:500 14px/1.4 -apple-system,Segoe UI,Roboto,sans-serif;color:#1a1a1a">${esc(titulo)}</span>` +
-          `<span style="font:13px/1.4 -apple-system,Segoe UI,Roboto,sans-serif;color:#3b6bb8"> — ${esc(motivo)}</span>` +
-          `</div>`,
+        `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 8px;border:1px solid #e6ecf5;border-radius:10px;border-left:3px solid #7fa1d8;background:#fbfcfe">` +
+          `<tr><td style="padding:12px 16px">` +
+            `<span style="font:500 14px/1.4 ${FONT};color:#1a1a1a">${esc(titulo)}</span>` +
+            `<div style="font:13px/1.5 ${FONT};color:#4d6ea8;margin-top:2px">${esc(motivo)}</div>` +
+          `</td></tr></table>`,
       )
       linhasTexto.push(`- ${titulo} — ${motivo}`)
     }
@@ -190,12 +216,11 @@ export function buildDigest(input: DigestInput): DigestEmail | null {
     linhasTexto.push('', 'FICOU PENDENTE')
     for (const a of actionItems.slice(0, 8)) {
       partes.push(
-        `<div style="padding:8px 0;font:14px/1.5 -apple-system,Segoe UI,Roboto,sans-serif;color:#1a1a1a">` +
-          `• ${esc(a.text)}` +
-          (a.meetingTitle
-            ? `<span style="color:#999"> — ${esc(a.meetingTitle)}</span>`
-            : '') +
-          `</div>`,
+        `<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>` +
+          `<td width="18" valign="top" style="padding:7px 0 0;font:14px/1 ${FONT};color:#FFD700">◆</td>` +
+          `<td style="padding:5px 0;font:14px/1.55 ${FONT};color:#1a1a1a">${esc(a.text)}` +
+          (a.meetingTitle ? `<span style="color:#aaa"> · ${esc(a.meetingTitle)}</span>` : '') +
+          `</td></tr></table>`,
       )
       linhasTexto.push(`- ${a.text}${a.meetingTitle ? ` (${a.meetingTitle})` : ''}`)
     }
@@ -206,19 +231,54 @@ export function buildDigest(input: DigestInput): DigestEmail | null {
     }
   }
 
+  if (modo === 'semanal') {
+    partes.push(
+      `<div style="margin-top:24px;padding:14px 16px;background:#fffbe6;border-radius:10px;font:14px/1.6 ${FONT};color:#6b5a13">` +
+        `Boa semana e bons fechamentos. 🍋</div>`,
+    )
+    linhasTexto.push('', 'Boa semana e bons fechamentos.')
+  }
+
   partes.push(
-    `<p style="margin:24px 0 0;font:13px/1.5 -apple-system,Segoe UI,Roboto,sans-serif;color:#888">` +
-      `<a href="${appUrl}/meetings" style="color:#2D5A27">Ver tudo no Lemon.meet</a></p>`,
+    `<div style="text-align:center;padding:26px 0 6px">` +
+      `<a href="${appUrl}/meetings" style="display:inline-block;padding:11px 22px;background:#2D5A27;color:#fff;border-radius:8px;font:600 14px/1 ${FONT};text-decoration:none">Ver tudo no Lemon.meet</a>` +
+      `</div>`,
+    `<p style="margin:16px 0 0;text-align:center;font:12px/1.6 ${FONT};color:#aaa">` +
+      (modo === 'semanal'
+        ? 'Você recebe este resumo às segundas, com a semana anterior.'
+        : 'Você recebe este resumo porque teve reuniões gravadas ontem no Lemon.meet.') +
+      `</p>`,
   )
 
   const html =
-    `<div style="max-width:560px;margin:0 auto;padding:24px;background:#fff">` +
+    `<div style="background:#f4f5f3;padding:28px 12px">` +
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;background:#fff;border-radius:14px">` +
+    `<tr><td style="padding:28px 26px 30px">` +
     partes.join('') +
-    `</div>`
+    `</td></tr></table></div>`
 
   return { subject, html, text: linhasTexto.join('\n') }
 }
 
+const FONT = '-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif'
+
 function secaoTitulo(t: string): string {
-  return `<p style="margin:22px 0 2px;font:600 12px/1.4 -apple-system,Segoe UI,Roboto,sans-serif;color:#999;letter-spacing:.06em;text-transform:uppercase">${t}</p>`
+  return `<p style="margin:24px 0 8px;font:600 12px/1.4 ${FONT};color:#999;letter-spacing:.07em;text-transform:uppercase">${t}</p>`
+}
+
+/** Faixa de números em tabela — Outlook não faz flexbox. */
+function numeros(total: number, gravadas: number, perdidas: number): string {
+  const cel = (valor: number, rotulo: string, cor: string) =>
+    `<td align="center" style="padding:12px 6px;background:#fafbfa;border-radius:10px">` +
+    `<div style="font:700 22px/1.1 ${FONT};color:${cor}">${valor}</div>` +
+    `<div style="font:11px/1.4 ${FONT};color:#999;text-transform:uppercase;letter-spacing:.05em;margin-top:3px">${rotulo}</div>` +
+    `</td>`
+  return (
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="6" style="margin:0 0 6px">` +
+    `<tr>` +
+    cel(total, 'reuniões', '#1a1a1a') +
+    cel(gravadas, 'gravadas', '#2D5A27') +
+    (perdidas ? cel(perdidas, 'sem gravação', '#4d6ea8') : '') +
+    `</tr></table>`
+  )
 }

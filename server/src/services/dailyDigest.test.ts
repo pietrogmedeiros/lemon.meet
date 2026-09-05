@@ -38,9 +38,13 @@ describe('buildDigest', () => {
   })
 
   it('traduz o motivo em vez de mostrar o código', () => {
+    // Precisa de uma gravada junto: dia só com falha não gera e-mail (regra 05/09).
     const d = buildDigest({
       ...base,
-      meetings: [reuniao({ status: 'failed', failure_reason: 'skribby_not_admitted' })],
+      meetings: [
+        reuniao({}),
+        reuniao({ id: 'x', status: 'failed', failure_reason: 'skribby_not_admitted' }),
+      ],
       actionItems: [],
     })!
     expect(d.text).toContain('ninguém admitiu o bot na sala')
@@ -50,7 +54,10 @@ describe('buildDigest', () => {
   it('a dica do convite só aparece a partir de 2 não-admitidas', () => {
     const uma = buildDigest({
       ...base,
-      meetings: [reuniao({ status: 'failed', failure_reason: 'skribby_not_admitted' })],
+      meetings: [
+        reuniao({}),
+        reuniao({ id: 'x', status: 'failed', failure_reason: 'skribby_not_admitted' }),
+      ],
       actionItems: [],
     })!
     expect(uma.html).not.toContain('contato@lemon-meet.com')
@@ -58,7 +65,8 @@ describe('buildDigest', () => {
     const duas = buildDigest({
       ...base,
       meetings: [
-        reuniao({ status: 'failed', failure_reason: 'skribby_not_admitted' }),
+        reuniao({}),
+        reuniao({ id: 'b', status: 'failed', failure_reason: 'skribby_not_admitted' }),
         reuniao({ id: 'c', status: 'failed', failure_reason: 'bot_failed: request_to_join_denied' }),
       ],
       actionItems: [],
@@ -94,5 +102,52 @@ describe('buildDigest', () => {
     })!
     expect(d.html).not.toContain('<script>')
     expect(d.html).toContain('&lt;script&gt;')
+  })
+
+})
+
+describe('regras novas de 05/09', () => {
+  it('nenhuma reunião gravada → NÃO manda e-mail', () => {
+    const d = buildDigest({
+      ...base,
+      meetings: [
+        reuniao({ status: 'failed', failure_reason: 'skribby_not_admitted' }),
+        reuniao({ id: 'b', status: 'failed', failure_reason: 'bot_failed' }),
+      ],
+      actionItems: [],
+    })
+    expect(d).toBeNull()
+  })
+
+  it('uma gravada no meio das falhas → manda', () => {
+    const d = buildDigest({
+      ...base,
+      meetings: [
+        reuniao({}),
+        reuniao({ id: 'b', status: 'failed', failure_reason: 'skribby_not_admitted' }),
+      ],
+      actionItems: [],
+    })
+    expect(d).not.toBeNull()
+  })
+
+  it('modo semanal muda assunto, saudação e fecho', () => {
+    const d = buildDigest({
+      ...base,
+      modo: 'semanal',
+      dataLabel: '31/08 a 06/09',
+      meetings: [reuniao({})],
+      actionItems: [],
+    })!
+    expect(d.subject).toBe('Sua semana: 1 reunião gravada')
+    expect(d.html).toContain('Boa semana, Deive')
+    expect(d.text).toContain('Boa semana e bons fechamentos')
+  })
+
+  it('modo diário continua falando de ontem', () => {
+    const d = buildDigest({ ...base, meetings: [reuniao({})], actionItems: [] })!
+    expect(d.subject).toBe('Ontem: 1 reunião gravada')
+    expect(d.html).toContain('Bom dia, Deive')
+    expect(d.html).not.toContain('Boa semana')
   })
 })

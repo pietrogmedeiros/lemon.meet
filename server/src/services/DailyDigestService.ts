@@ -1,8 +1,10 @@
-// DailyDigestService.ts — envia o resumo do dia anterior às 07:47 (São Paulo).
+// DailyDigestService.ts — resumo por e-mail às 07:47 (São Paulo), de segunda a sexta.
 //
 // Regras de atenção, deliberadas:
-//  - só recebe quem TEVE reunião no dia anterior. Dia vazio não gera e-mail;
-//    resumo que chega sempre vira ruído e acaba filtrado.
+//  - só recebe quem teve pelo menos uma reunião GRAVADA no período. Resumo que
+//    só enumera falha é cobrança, não resumo (regra do Pietro, 05/09).
+//  - segunda a sexta. Na SEGUNDA o e-mail resume a semana anterior e deseja boa
+//    semana; nos outros dias resume o dia anterior.
 //  - só assinatura ativa, mesma regra do cron de bots.
 //  - um envio por dia por processo. Se o contêiner reiniciar depois do horário,
 //    o dia já enviado não repete.
@@ -38,14 +40,39 @@ function partesData(d: Date): { iso: string; label: string; hora: number; minuto
   }
 }
 
-/** Início e fim do dia ANTERIOR, em UTC, para o fuso de São Paulo (UTC-3). */
+/** Início do dia de hoje (00:00 em São Paulo) expresso em UTC. */
+function inicioDeHojeUtc(agora: Date): number {
+  const [ano, mes, dia] = partesData(agora).iso.split('-').map(Number)
+  return Date.UTC(ano, mes - 1, dia, 3, 0, 0) // 00:00 -03 = 03:00 UTC
+}
+
+/** Início e fim do dia ANTERIOR, em UTC, para o fuso de São Paulo. */
 export function janelaDiaAnterior(agora: Date): { ini: string; fim: string; label: string } {
-  const hoje = partesData(agora)
-  const [ano, mes, dia] = hoje.iso.split('-').map(Number)
-  const inicioHojeUtc = Date.UTC(ano, mes - 1, dia, 3, 0, 0) // 00:00 -03 = 03:00 UTC
-  const ini = new Date(inicioHojeUtc - 24 * 3600 * 1000)
-  const fim = new Date(inicioHojeUtc)
-  return { ini: ini.toISOString(), fim: fim.toISOString(), label: partesData(ini).label }
+  const hoje = inicioDeHojeUtc(agora)
+  const ini = new Date(hoje - 24 * 3600 * 1000)
+  return { ini: ini.toISOString(), fim: new Date(hoje).toISOString(), label: partesData(ini).label }
+}
+
+/**
+ * Semana ANTERIOR (segunda a domingo), para o e-mail de segunda-feira.
+ * O domingo entra por completude — reunião de domingo é rara, mas some se a
+ * janela parar na sexta, e sumir sem avisar é pior que uma linha a mais.
+ */
+export function janelaSemanaAnterior(agora: Date): { ini: string; fim: string; label: string } {
+  const fim = inicioDeHojeUtc(agora)               // segunda 00:00 -03
+  const ini = fim - 7 * 24 * 3600 * 1000           // segunda anterior 00:00 -03
+  const ultimoDia = new Date(fim - 24 * 3600 * 1000)
+  return {
+    ini: new Date(ini).toISOString(),
+    fim: new Date(fim).toISOString(),
+    label: `${partesData(new Date(ini)).label} a ${partesData(ultimoDia).label}`,
+  }
+}
+
+/** Dia da semana em São Paulo: 0=domingo … 6=sábado. */
+export function diaDaSemana(agora: Date): number {
+  const nome = new Intl.DateTimeFormat('en-US', { timeZone: FUSO, weekday: 'short' }).format(agora)
+  return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(nome)
 }
 
 export class DailyDigestService {
@@ -59,6 +86,8 @@ export class DailyDigestService {
       const agora = new Date()
       const { iso, hora, minuto } = partesData(agora)
       if (hora !== HORA || minuto !== MINUTO || this.ultimoEnvio === iso) return
+      const dia = diaDaSemana(agora)
+      if (dia === 0 || dia === 6) return // fim de semana não recebe nada
       this.ultimoEnvio = iso
       this.enviarParaTodos(agora).catch((err) =>
         logger.error('[DailyDigest] falha no ciclo:', err),
@@ -73,8 +102,13 @@ export class DailyDigestService {
 
   /** Exposto para teste manual e para um eventual endpoint administrativo. */
   async enviarParaTodos(agora = new Date()): Promise<{ enviados: number; pulados: number }> {
-    const { ini, fim, label } = janelaDiaAnterior(agora)
-    logger.info(`[DailyDigest] montando resumo de ${label} (${ini} → ${fim})`)
+    // Segunda-feira resume a SEMANA anterior: sábado e domingo não têm reunião,
+    // e um "resumo de ontem" na segunda falaria do domingo, sempre vazio.
+    const semanal = diaDaSemana(agora) === 1
+    const { ini, fim, label } = semanal ? janelaSemanaAnterior(agora) : janelaDiaAnterior(agora)
+    logger.info(
+      `[DailyDigest] montando resumo ${semanal ? 'SEMANAL' : 'diário'} de ${label} (${ini} → ${fim})`,
+    )
 
     const { data: assinaturas } = await supabase
       .from('user_subscriptions')
@@ -85,7 +119,7 @@ export class DailyDigestService {
     let pulados = 0
     for (const { user_id } of assinaturas ?? []) {
       try {
-        const ok = await this.enviarParaUsuario(user_id, ini, fim, label)
+        const ok = await this.enviarParaUsuario(user_id, ini, fim, label, semanal ? 'semanal' : 'diario')
         ok ? enviados++ : pulados++
       } catch (err) {
         pulados++
@@ -101,6 +135,7 @@ export class DailyDigestService {
     ini: string,
     fim: string,
     label: string,
+    modo: 'diario' | 'semanal' = 'diario',
   ): Promise<boolean> {
     const { data: meetings } = await supabase
       .from('meetings')
@@ -129,6 +164,7 @@ export class DailyDigestService {
       email.split('@')[0]
 
     const digest = buildDigest({
+      modo,
       nome,
       meetings: meetings as any,
       actionItems: (itens ?? []).map((i: any) => ({

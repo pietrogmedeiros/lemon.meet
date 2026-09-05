@@ -1,4 +1,4 @@
-import { janelaDiaAnterior } from './DailyDigestService.js'
+import { janelaDiaAnterior, janelaSemanaAnterior, diaDaSemana } from './DailyDigestService.js'
 
 describe('janelaDiaAnterior', () => {
   it('às 07:47 de 04/09 (São Paulo) resume o dia 03/09 inteiro', () => {
@@ -19,5 +19,29 @@ describe('janelaDiaAnterior', () => {
     // 04/09 01:00 UTC = 03/09 22:00 em São Paulo → dia anterior é 02/09
     const j = janelaDiaAnterior(new Date('2026-09-04T01:00:00Z'))
     expect(j.label).toBe('02/09')
+  })
+
+})
+
+describe('janelaSemanaAnterior (e-mail de segunda)', () => {
+  it('na segunda 07/09 resume de 31/08 a 06/09', () => {
+    const j = janelaSemanaAnterior(new Date('2026-09-07T10:47:00Z'))
+    expect(j.ini).toBe('2026-08-31T03:00:00.000Z')
+    expect(j.fim).toBe('2026-09-07T03:00:00.000Z')
+    expect(j.label).toBe('31/08 a 06/09')
+  })
+})
+
+describe('diaDaSemana (fuso de São Paulo, não do contêiner)', () => {
+  it('segunda-feira às 07:47 local', () => {
+    expect(diaDaSemana(new Date('2026-09-07T10:47:00Z'))).toBe(1)
+  })
+  it('sábado e domingo', () => {
+    expect(diaDaSemana(new Date('2026-09-04T10:47:00Z'))).toBe(5) // sexta
+    expect(diaDaSemana(new Date('2026-09-05T10:47:00Z'))).toBe(6) // sábado
+    expect(diaDaSemana(new Date('2026-09-06T10:47:00Z'))).toBe(0) // domingo
+  })
+  it('01:00 UTC de segunda ainda é DOMINGO em São Paulo', () => {
+    expect(diaDaSemana(new Date('2026-09-07T01:00:00Z'))).toBe(0)
   })
 })
