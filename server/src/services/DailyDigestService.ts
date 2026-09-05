@@ -5,7 +5,7 @@
 //    só enumera falha é cobrança, não resumo (regra do Pietro, 05/09).
 //  - segunda a sexta. Na SEGUNDA o e-mail resume a semana anterior e deseja boa
 //    semana; nos outros dias resume o dia anterior.
-//  - só assinatura ativa, mesma regra do cron de bots.
+//  - só assinatura ATIVA e PAGA (trial não recebe).
 //  - um envio por dia por processo. Se o contêiner reiniciar depois do horário,
 //    o dia já enviado não repete.
 //
@@ -110,10 +110,14 @@ export class DailyDigestService {
       `[DailyDigest] montando resumo ${semanal ? 'SEMANAL' : 'diário'} de ${label} (${ini} → ${fim})`,
     )
 
+    // Só quem paga. `status='active'` sozinho inclui TRIAL — em 05/09 eram 12
+    // assinaturas ativas, 5 delas trial (uma é conta de teste). Regra do Pietro:
+    // o resumo vai para pagamento em dia.
     const { data: assinaturas } = await supabase
       .from('user_subscriptions')
       .select('user_id')
       .eq('status', 'active')
+      .neq('plan', 'trial')
 
     let enviados = 0
     let pulados = 0
