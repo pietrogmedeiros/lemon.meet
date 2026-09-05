@@ -19,7 +19,7 @@ import { attendeeWebhookHandler } from './routes/attendee.routes.js'
 import { skribbyWebhookHandler } from './routes/skribby.routes.js'
 import calendarRouter from './routes/calendar.routes.js'
 import { TranscriptionService } from './services/TranscriptionService.js'
-import { dailyDigestService } from './services/DailyDigestService.js'
+import { dailyDigestService, proximoDisparo } from './services/DailyDigestService.js'
 import pipedriveRouter from './routes/pipedrive.routes.js'
 import hubspotRouter from './routes/hubspot.routes.js'
 import gdriveRouter from './routes/gdrive.routes.js'
@@ -135,7 +135,7 @@ app.use('/api', limiter)
  * o build falha e o contêiner ANTIGO continua no ar — sem isso, "está no ar" é
  * palpite por uptime. Trocar a cada mudança que precise ser confirmada.
  */
-const BUILD_TAG = 'resumo-so-pagantes-4'
+const BUILD_TAG = 'resumo-janela-5'
 
 let ffmpegReady: boolean | null = null
 let audioCodec: string | null = null
@@ -163,6 +163,10 @@ app.get('/health', (req, res) => {
     // expor a chave. Sem isso, "coloquei a variável" é indistinguível de
     // "coloquei e não pegou" até alguém reclamar que o e-mail não chegou.
     resend: Boolean(process.env.RESEND_API_KEY),
+    digest: {
+      proximo: proximoDisparo(new Date()),
+      ultimoEnvio: dailyDigestService.ultimoDiaEnviado,
+    },
   })
 })
 

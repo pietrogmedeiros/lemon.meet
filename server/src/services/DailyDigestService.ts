@@ -23,6 +23,16 @@ const FUSO = 'America/Sao_Paulo'
 const HORA = 7
 const MINUTO = 47
 const CHECK_MS = 60 * 1000
+/**
+ * Janela de tolerância, em minutos.
+ *
+ * ⚠️ Com janela de 1 minuto o e-mail some sem avisar: o `setInterval` tica num
+ * offset fixo em relação ao BOOT, então um restart às 07:47:30 faz a primeira
+ * verificação cair às 07:48:30 e o dia inteiro é perdido. Some a isso o drift
+ * natural do timer. A guarda `ultimoEnvio` garante um envio por dia, então
+ * alargar a janela não duplica nada.
+ */
+const JANELA_MIN = 5
 
 /** "2026-09-04" e "04/09" no fuso do usuário, sem depender do fuso do contêiner. */
 function partesData(d: Date): { iso: string; label: string; hora: number; minuto: number } {
@@ -75,6 +85,25 @@ export function diaDaSemana(agora: Date): number {
   return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(nome)
 }
 
+/**
+ * Quando o próximo resumo sai, no fuso de São Paulo. Exposto no /health porque
+ * "o cron está de pé" e "o cron vai disparar no horário certo" são coisas
+ * diferentes — e a segunda só se descobre no dia seguinte, tarde demais.
+ */
+export function proximoDisparo(agora: Date): string {
+  for (let i = 0; i < 8; i++) {
+    const candidato = new Date(agora.getTime() + i * 24 * 3600 * 1000)
+    const { iso, hora, minuto } = partesData(candidato)
+    const dia = diaDaSemana(candidato)
+    if (dia === 0 || dia === 6) continue
+    const jaPassouHoje = i === 0 && (hora > HORA || (hora === HORA && minuto >= MINUTO + JANELA_MIN))
+    if (jaPassouHoje) continue
+    const semanal = dia === 1 ? ' (semanal)' : ''
+    return `${iso} ${String(HORA).padStart(2, '0')}:${String(MINUTO).padStart(2, '0')} ${FUSO}${semanal}`
+  }
+  return 'indefinido'
+}
+
 export class DailyDigestService {
   private timer: ReturnType<typeof setInterval> | null = null
   private ultimoEnvio: string | null = null
@@ -85,7 +114,8 @@ export class DailyDigestService {
     this.timer = setInterval(() => {
       const agora = new Date()
       const { iso, hora, minuto } = partesData(agora)
-      if (hora !== HORA || minuto !== MINUTO || this.ultimoEnvio === iso) return
+      const dentroDaJanela = hora === HORA && minuto >= MINUTO && minuto < MINUTO + JANELA_MIN
+      if (!dentroDaJanela || this.ultimoEnvio === iso) return
       const dia = diaDaSemana(agora)
       if (dia === 0 || dia === 6) return // fim de semana não recebe nada
       this.ultimoEnvio = iso
@@ -93,6 +123,11 @@ export class DailyDigestService {
         logger.error('[DailyDigest] falha no ciclo:', err),
       )
     }, CHECK_MS)
+  }
+
+  /** Último dia (ISO, fuso de SP) em que este processo enviou. */
+  get ultimoDiaEnviado(): string | null {
+    return this.ultimoEnvio
   }
 
   stop(): void {
