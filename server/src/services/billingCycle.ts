@@ -30,3 +30,57 @@ export async function liberarCiclo(
 
   return novoFim
 }
+
+// ── Criação de cobrança, compartilhada pelas rotas ───────────────────────────
+
+import { randomUUID } from 'crypto'
+import { logger } from '../utils/logger.js'
+import { criarLinkCartao } from './infinitepay.js'
+import { PRECO_CENTAVOS } from './paymentRails.js'
+
+/**
+ * Cria a cobrança no trilho disponível e devolve a URL de pagamento.
+ *
+ * Existe como serviço porque DUAS rotas precisam: a nova (/api/payments/card) e
+ * a antiga (/api/subscription/checkout), que é a que o front já chama. Sem isso,
+ * ligar o trilho fazia o botão VOLTAR para a tela e cair no fluxo de assinatura
+ * recorrente que a loja recusa — pior do que o botão escondido.
+ */
+export async function criarCobrancaCartao(
+  userId: string,
+  plan: 'starter' | 'professional',
+  urlApp: string,
+  urlApi: string,
+): Promise<string> {
+  const orderNsu = randomUUID()
+  const webhookToken = randomUUID()
+  const valor = PRECO_CENTAVOS[plan]
+
+  const { error } = await supabase.from('payment_charges').insert({
+    user_id: userId,
+    plan,
+    provider: 'infinitepay',
+    amount_cents: valor,
+    order_nsu: orderNsu,
+    webhook_token: webhookToken,
+  })
+  if (error) {
+    logger.error('[Pagamento] falha ao registrar cobrança:', error)
+    throw new Error('Não foi possível iniciar o pagamento.')
+  }
+
+  try {
+    const url = await criarLinkCartao({
+      orderNsu,
+      valorCentavos: valor,
+      descricao: `Lemon.meet ${plan === 'starter' ? 'Starter' : 'Professional'} — 30 dias`,
+      redirectUrl: `${urlApp}/settings?checkout=success`,
+      webhookUrl: `${urlApi}/api/payments/infinitepay/webhook/${webhookToken}`,
+    })
+    await supabase.from('payment_charges').update({ checkout_url: url }).eq('order_nsu', orderNsu)
+    return url
+  } catch (err) {
+    await supabase.from('payment_charges').update({ status: 'cancelled' }).eq('order_nsu', orderNsu)
+    throw err
+  }
+}

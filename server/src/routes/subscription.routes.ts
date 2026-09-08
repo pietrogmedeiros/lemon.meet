@@ -12,7 +12,7 @@ import {
   productIdForPlan,
 } from '../services/abacatepay.js'
 import { trilhosDisponiveis } from '../services/paymentRails.js'
-import { liberarCiclo } from '../services/billingCycle.js'
+import { liberarCiclo, criarCobrancaCartao } from '../services/billingCycle.js'
 
 const router: Router = Router()
 
@@ -195,6 +195,26 @@ router.post('/checkout', authMiddleware as RequestHandler, async (req: AuthReque
 
   if (plan !== 'starter' && plan !== 'professional') {
     return res.status(400).json({ error: 'Plano inválido. Use "starter" ou "professional".' })
+  }
+
+  // ⚠️ O front chama ESTA rota. Enquanto ela seguisse no fluxo de assinatura
+  // recorrente, ligar o trilho só faria o botão voltar para a tela e quebrar no
+  // clique — pior que botão escondido. Com cartão disponível, a cobrança passa
+  // a ser avulsa pela InfinitePay.
+  if (disponibilidade.trilhos.includes('card')) {
+    try {
+      const url = await criarCobrancaCartao(
+        userId,
+        plan,
+        (process.env.FRONTEND_URL || 'https://lemon-meet.web.app').replace(/\/$/, ''),
+        (process.env.SERVER_URL || 'https://api.lemon-meet.com').replace(/\/$/, ''),
+      )
+      return res.json({ url })
+    } catch (err) {
+      const detalhe = err instanceof Error ? err.message : String(err)
+      logger.error('[Checkout] cartão falhou:', detalhe)
+      return res.status(502).json({ error: 'Não foi possível abrir o pagamento.', detail: detalhe })
+    }
   }
 
   try {
