@@ -11,7 +11,7 @@ import { authMiddleware, type AuthRequest } from '../middleware/auth.middleware.
 import { supabase } from '../config/supabase.js'
 import { logger } from '../utils/logger.js'
 import { criarLinkCartao, cartaoConfigurado } from '../services/infinitepay.js'
-import { criarCobrancaPix } from '../services/abacatepay.js'
+import { criarPixQrCode } from '../services/abacatepay.js'
 import { PRECO_CENTAVOS, DIAS_POR_CICLO } from '../services/paymentRails.js'
 import { liberarCiclo } from '../services/billingCycle.js'
 
@@ -103,20 +103,28 @@ router.post('/pix', authMiddleware as RequestHandler, async (req: AuthRequest, r
     })
     if (insErr) throw new Error(insErr.message)
 
-    const cobranca = await criarCobrancaPix({
-      plano: plan,
+    const nome = plan === 'starter' ? 'Starter' : 'Professional'
+    const pix = await criarPixQrCode({
       valorCentavos: valor,
+      descricao: `Lemon.meet ${nome} — 30 dias`,
       externalId: orderNsu,
-      returnUrl: `${urlApp()}/settings`,
-      completionUrl: `${urlApp()}/settings?checkout=success`,
+      expiraEmSegundos: 3600,
     })
 
     await supabase
       .from('payment_charges')
-      .update({ checkout_url: cobranca.url })
+      .update({ checkout_url: pix.id })
       .eq('order_nsu', orderNsu)
 
-    return res.json({ url: cobranca.url })
+    // Devolve o código, não uma URL: o PIX é exibido dentro do app.
+    return res.json({
+      pix: {
+        brCode: pix.brCode,
+        brCodeBase64: pix.brCodeBase64,
+        expiresAt: pix.expiresAt,
+        amountCents: valor,
+      },
+    })
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     logger.error('[Pagamento] PIX falhou:', msg)
@@ -146,14 +154,20 @@ router.post('/pix/probe', async (req, res) => {
   try {
     // Sem cliente: a v1 exige cellphone e taxId para criar um, e o objetivo
     // aqui é descobrir se a LOJA aceita PIX avulso, não cadastrar ninguém.
-    const cobranca = await criarCobrancaPix({
-      plano: 'starter',
+    const pix = await criarPixQrCode({
       valorCentavos: 100, // mínimo da AbacatePay
+      descricao: 'Sonda de configuracao - Lemon.meet',
       externalId: `probe-${randomUUID()}`,
-      returnUrl: `${urlApp()}/settings`,
-      completionUrl: `${urlApp()}/settings`,
+      expiraEmSegundos: 600,
     })
-    return res.json({ ok: true, aceita_pix_avulso: true, url: cobranca.url, status: cobranca.status })
+    return res.json({
+      ok: true,
+      aceita_pix_avulso: true,
+      id: pix.id,
+      status: pix.status,
+      tem_brcode: Boolean(pix.brCode),
+      expira_em: pix.expiresAt,
+    })
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     return res.status(200).json({ ok: false, aceita_pix_avulso: false, motivo: msg })

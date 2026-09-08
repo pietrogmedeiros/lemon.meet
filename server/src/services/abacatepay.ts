@@ -185,6 +185,40 @@ export async function criarCobrancaPix(input: {
   return callV1<AbacateCobrancaPix>('/billing/create', corpo)
 }
 
+export interface AbacatePixQrCode {
+  id: string
+  status: string
+  amount: number
+  brCode: string
+  brCodeBase64: string
+  expiresAt?: string
+}
+
+/**
+ * QR Code PIX (`/v1/pixQrCode/create`) — o caminho que de fato serve aqui.
+ *
+ * Por que não `/billing/create`: aquela rota EXIGE cliente ("Customer not
+ * found"), e criar cliente na v1 exige `cellphone` e `taxId`, que o Lemon não
+ * pede a ninguém. Já aqui o único campo obrigatório é o valor, e o cliente é
+ * opcional — então ninguém precisa digitar CPF no nosso checkout.
+ *
+ * Bônus: devolve `brCode` (copia-e-cola) e `brCodeBase64` (imagem), então o PIX
+ * é exibido DENTRO do app, sem mandar a pessoa para outro site.
+ */
+export function criarPixQrCode(input: {
+  valorCentavos: number
+  descricao: string
+  externalId: string
+  expiraEmSegundos?: number
+}): Promise<AbacatePixQrCode> {
+  return callV1<AbacatePixQrCode>('/pixQrCode/create', {
+    amount: input.valorCentavos,
+    description: input.descricao,
+    expiresIn: input.expiraEmSegundos ?? 3600,
+    metadata: { externalId: input.externalId },
+  })
+}
+
 export function cancelSubscription(subscriptionId: string): Promise<unknown> {
   return call('/subscriptions/cancel', { id: subscriptionId })
 }
