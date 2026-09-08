@@ -24,7 +24,6 @@ import { TranscriptionService } from './services/TranscriptionService.js'
 import { dailyDigestService, proximoDisparo } from './services/DailyDigestService.js'
 import pipedriveRouter from './routes/pipedrive.routes.js'
 import hubspotRouter from './routes/hubspot.routes.js'
-import gdriveRouter from './routes/gdrive.routes.js'
 import notificationsRouter from './routes/notifications.routes.js'
 import feedbackRouter from './routes/feedback.routes.js'
 import accountRouter from './routes/account.routes.js'
@@ -143,7 +142,7 @@ app.use('/api', limiter)
  * o build falha e o contêiner ANTIGO continua no ar — sem isso, "está no ar" é
  * palpite por uptime. Trocar a cada mudança que precise ser confirmada.
  */
-const BUILD_TAG = 'pix-status-15'
+const BUILD_TAG = 'gdrive-off-16'
 
 let ffmpegReady: boolean | null = null
 let audioCodec: string | null = null
@@ -226,7 +225,8 @@ app.use('/api/site-chat', siteChatRouter)
 app.use('/api/payments', paymentsRouter)
 app.use('/api/pipedrive', pipedriveRouter)
 app.use('/api/hubspot', hubspotRouter)
-app.use('/api/gdrive', gdriveRouter)
+// Google Drive (drive.file) desativado em 08/09/2026: sem tela no app e retirado
+// do pedido de verificacao OAuth do Google. GDriveService segue inerte (sem token).
 app.use('/api/notifications', notificationsRouter)
 app.use('/api/feedback', feedbackRouter)
 app.use('/api/account', accountRouter)
