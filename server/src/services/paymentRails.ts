@@ -49,3 +49,18 @@ export function trilhosDisponiveis(): DisponibilidadePagamento {
   }
   return { habilitado: true, trilhos }
 }
+
+/**
+ * Preço por plano, em centavos — a fonte é o SERVIDOR.
+ *
+ * Hoje o valor só existe escrito na tela (`MainLayout.tsx`), e no Autho CRM isso
+ * já rendeu a lição: tela que calcula preço acaba mostrando um número e
+ * cobrando outro. Aqui a tela exibe, mas quem cobra é este arquivo.
+ */
+export const PRECO_CENTAVOS: Record<'starter' | 'professional', number> = {
+  starter: 8990,       // R$ 89,90
+  professional: 11990, // R$ 119,90
+}
+
+/** Dias liberados por cobrança paga. Não há débito automático em nenhum trilho. */
+export const DIAS_POR_CICLO = 30

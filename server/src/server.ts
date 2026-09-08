@@ -19,6 +19,7 @@ import { attendeeWebhookHandler } from './routes/attendee.routes.js'
 import { skribbyWebhookHandler } from './routes/skribby.routes.js'
 import calendarRouter from './routes/calendar.routes.js'
 import siteChatRouter from './routes/site-chat.routes.js'
+import paymentsRouter from './routes/payments.routes.js'
 import { TranscriptionService } from './services/TranscriptionService.js'
 import { dailyDigestService, proximoDisparo } from './services/DailyDigestService.js'
 import pipedriveRouter from './routes/pipedrive.routes.js'
@@ -222,6 +223,7 @@ app.use('/api/calendar', calendarRouter)
 // Público (sem authMiddleware): o visitante do site não tem conta. Protegido
 // por origem + limite de taxa dentro do próprio router.
 app.use('/api/site-chat', siteChatRouter)
+app.use('/api/payments', paymentsRouter)
 app.use('/api/pipedrive', pipedriveRouter)
 app.use('/api/hubspot', hubspotRouter)
 app.use('/api/gdrive', gdriveRouter)
