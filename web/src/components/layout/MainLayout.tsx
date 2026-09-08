@@ -2,6 +2,7 @@ import { ReactNode, useState } from 'react'
 import { Sidebar, TopNavBar } from '@/components/layout'
 import { useSubscription, useAuth } from '@/contexts'
 import { Clock, Lock, Zap, AlertTriangle } from 'lucide-react'
+import { usePaymentAvailability } from '../../hooks/usePaymentAvailability'
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:3000'
 
@@ -19,6 +20,8 @@ export function MainLayout({ children }: MainLayoutProps) {
   const { isTrial, isExpired, daysLeft, loading, subscription } = useSubscription()
   const { session } = useAuth()
   const [checkoutLoading, setCheckoutLoading] = useState<'starter' | 'professional' | null>(null)
+  // Só oferece compra se o servidor disser que consegue cobrar.
+  const { data: pagamento } = usePaymentAvailability()
 
   // ⚠️ Estes dois botões chamavam alert('Em breve!'). Esta é a tela do trial
   // EXPIRADO: a pessoa perdia o acesso, via o preço, clicava para pagar e
@@ -133,13 +136,15 @@ export function MainLayout({ children }: MainLayoutProps) {
                       <li className="flex items-center gap-1.5">✓ Insights com IA</li>
                       <li className="flex items-center gap-1.5">✓ Histórico de reuniões</li>
                     </ul>
-                    <button
-                      onClick={() => handleCheckout('starter')}
-                      disabled={checkoutLoading === 'starter'}
-                      className="w-full py-2.5 rounded-xl border-2 border-[#2D5A27] text-brand text-sm font-semibold hover:bg-[#2D5A27]/5 transition disabled:opacity-50"
-                    >
-                      {checkoutLoading === 'starter' ? 'Abrindo…' : 'Assinar Starter'}
-                    </button>
+                    {pagamento.habilitado && (
+                      <button
+                        onClick={() => handleCheckout('starter')}
+                        disabled={checkoutLoading === 'starter'}
+                        className="w-full py-2.5 rounded-xl border-2 border-[#2D5A27] text-brand text-sm font-semibold hover:bg-[#2D5A27]/5 transition disabled:opacity-50"
+                      >
+                        {checkoutLoading === 'starter' ? 'Abrindo…' : 'Assinar Starter'}
+                      </button>
+                    )}
                   </div>
 
                   {/* Professional */}
@@ -159,15 +164,23 @@ export function MainLayout({ children }: MainLayoutProps) {
                       <li className="flex items-center gap-1.5">✓ Times e membros</li>
                       <li className="flex items-center gap-1.5">✓ Reuniões do time</li>
                     </ul>
-                    <button
-                      onClick={() => handleCheckout('professional')}
-                      disabled={checkoutLoading === 'professional'}
-                      className="w-full py-2.5 rounded-xl bg-[#2D5A27] text-white text-sm font-semibold hover:bg-[#1E3D1A] transition shadow-sm disabled:opacity-50"
-                    >
-                      {checkoutLoading === 'professional' ? 'Abrindo…' : 'Assinar Professional'}
-                    </button>
+                    {pagamento.habilitado && (
+                      <button
+                        onClick={() => handleCheckout('professional')}
+                        disabled={checkoutLoading === 'professional'}
+                        className="w-full py-2.5 rounded-xl bg-[#2D5A27] text-white text-sm font-semibold hover:bg-[#1E3D1A] transition shadow-sm disabled:opacity-50"
+                      >
+                        {checkoutLoading === 'professional' ? 'Abrindo…' : 'Assinar Professional'}
+                      </button>
+                    )}
                   </div>
                 </div>
+
+                {!pagamento.habilitado && pagamento.motivo && (
+                  <p className="text-sm text-secondary bg-neutral-lighter border border-neutral-light rounded-xl px-4 py-3">
+                    {pagamento.motivo}
+                  </p>
+                )}
 
                 <p className="text-xs text-[#BBBBBB]">
                   Dúvidas?{' '}

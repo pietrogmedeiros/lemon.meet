@@ -11,6 +11,7 @@ import {
   planFromProductId,
   productIdForPlan,
 } from '../services/abacatepay.js'
+import { trilhosDisponiveis } from '../services/paymentRails.js'
 
 const router: Router = Router()
 
@@ -173,8 +174,22 @@ router.get('/details', authMiddleware as RequestHandler, async (req: AuthRequest
 // ── POST /api/subscription/checkout ──────────────────────────
 // Cria customer (se ainda não tiver) + checkout de subscription no AbacatePay
 // e retorna a URL hospedada de pagamento.
+// ── GET /api/subscription/payment-availability ────────────────
+// Público de propósito: a tela precisa saber ANTES de mostrar botão. Não expõe
+// provedor nem configuração — só se dá para cobrar e por quais meios.
+router.get('/payment-availability', (_req, res) => {
+  res.json(trilhosDisponiveis())
+})
+
 router.post('/checkout', authMiddleware as RequestHandler, async (req: AuthRequest, res: Response) => {
   const userId = req.user!.id
+  // Sem trilho não adianta chamar o provedor: o erro dele é técnico e a pessoa
+  // não tem o que fazer com ele. Recusa aqui, com o mesmo texto da tela.
+  const disponibilidade = trilhosDisponiveis()
+  if (!disponibilidade.habilitado) {
+    return res.status(503).json({ error: disponibilidade.motivo, code: 'payment_unavailable' })
+  }
+
   const { plan } = req.body as { plan: 'starter' | 'professional' }
 
   if (plan !== 'starter' && plan !== 'professional') {

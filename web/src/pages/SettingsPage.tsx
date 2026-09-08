@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts'
 import { useSubscription } from '@/contexts'
 import { supabase } from '@/lib/supabase'
 import { User, Lock, CheckCircle, AlertCircle, Loader, KeyRound, Mail, Shield, CreditCard, Zap, Crown } from 'lucide-react'
+import { usePaymentAvailability } from '../hooks/usePaymentAvailability'
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:3000'
 
@@ -15,6 +16,8 @@ export function SettingsPage() {
 
   // --- Checkout ---
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null)
+  // Mesma regra do paywall: sem trilho de cobrança, não se oferece compra.
+  const { data: pagamento } = usePaymentAvailability()
 
   // Feedback de retorno do gateway de pagamento
   const checkoutMsg = useMemo<'success' | 'cancelled' | null>(() => {
@@ -454,6 +457,7 @@ export function SettingsPage() {
                       {f}
                     </div>
                   ))}
+                  {pagamento.habilitado && (
                   <button
                     onClick={() => handleCheckout('starter')}
                     disabled={checkoutLoading === 'starter'}
@@ -462,6 +466,7 @@ export function SettingsPage() {
                     {checkoutLoading === 'starter' ? <Loader size={14} className="animate-spin" /> : null}
                     Assinar Starter
                   </button>
+                  )}
                 </div>
               </div>
 
@@ -484,6 +489,7 @@ export function SettingsPage() {
                       {f}
                     </div>
                   ))}
+                  {pagamento.habilitado && (
                   <button
                     onClick={() => handleCheckout('professional')}
                     disabled={checkoutLoading === 'professional'}
@@ -492,6 +498,7 @@ export function SettingsPage() {
                     {checkoutLoading === 'professional' ? <Loader size={14} className="animate-spin" /> : null}
                     Assinar Professional
                   </button>
+                  )}
                 </div>
               </div>
 
