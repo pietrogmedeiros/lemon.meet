@@ -152,13 +152,18 @@ export interface AbacateCobrancaPix {
 export async function criarCobrancaPix(input: {
   plano: 'starter' | 'professional'
   valorCentavos: number
-  customerId: string
+  /**
+   * Opcional. A v1 exige cellphone e taxId para CRIAR cliente, e não pedimos
+   * nenhum dos dois no cadastro — então, quando não houver cliente, a cobrança
+   * vai sem ele e a AbacatePay coleta os dados na própria tela de pagamento.
+   */
+  customerId?: string
   externalId: string
   returnUrl: string
   completionUrl: string
 }): Promise<AbacateCobrancaPix> {
   const nome = input.plano === 'starter' ? 'Starter' : 'Professional'
-  return callV1<AbacateCobrancaPix>('/billing/create', {
+  const corpo: Record<string, unknown> = {
     frequency: 'ONE_TIME',
     methods: ['PIX'],
     products: [
@@ -170,11 +175,14 @@ export async function criarCobrancaPix(input: {
         price: input.valorCentavos,
       },
     ],
-    customerId: input.customerId,
     externalId: input.externalId,
     returnUrl: input.returnUrl,
     completionUrl: input.completionUrl,
-  })
+  }
+  // `customerId` e `customer` são mutuamente exclusivos, e o schema recusa
+  // propriedade a mais — então o campo só entra se existir de fato.
+  if (input.customerId) corpo.customerId = input.customerId
+  return callV1<AbacateCobrancaPix>('/billing/create', corpo)
 }
 
 export function cancelSubscription(subscriptionId: string): Promise<unknown> {

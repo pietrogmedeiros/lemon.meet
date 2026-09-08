@@ -11,7 +11,7 @@ import { authMiddleware, type AuthRequest } from '../middleware/auth.middleware.
 import { supabase } from '../config/supabase.js'
 import { logger } from '../utils/logger.js'
 import { criarLinkCartao, cartaoConfigurado } from '../services/infinitepay.js'
-import { criarClienteV1, criarCobrancaPix } from '../services/abacatepay.js'
+import { criarCobrancaPix } from '../services/abacatepay.js'
 import { PRECO_CENTAVOS, DIAS_POR_CICLO } from '../services/paymentRails.js'
 import { liberarCiclo } from '../services/billingCycle.js'
 
@@ -91,8 +91,6 @@ router.post('/pix', authMiddleware as RequestHandler, async (req: AuthRequest, r
   const valor = PRECO_CENTAVOS[plan]
 
   try {
-    const customerId = await customerIdV1(userId, req.user!.email ?? '')
-
     const { error: insErr } = await supabase.from('payment_charges').insert({
       user_id: userId,
       plan,
@@ -108,7 +106,6 @@ router.post('/pix', authMiddleware as RequestHandler, async (req: AuthRequest, r
     const cobranca = await criarCobrancaPix({
       plano: plan,
       valorCentavos: valor,
-      customerId,
       externalId: orderNsu,
       returnUrl: `${urlApp()}/settings`,
       completionUrl: `${urlApp()}/settings?checkout=success`,
@@ -130,22 +127,6 @@ router.post('/pix', authMiddleware as RequestHandler, async (req: AuthRequest, r
   }
 })
 
-/**
- * Cliente para a cobrança PIX, criado na v1.
- *
- * ⚠️ NÃO reaproveita o `abacate_customer_id` guardado: ele veio da v2, e chave e
- * recurso são versionados — id de uma versão na outra é falha silenciosa à
- * espera. Cria na v1 e guarda por cima; o fluxo v2 de assinatura está morto de
- * qualquer forma, porque a loja não tem recorrência.
- */
-async function customerIdV1(userId: string, email: string): Promise<string> {
-  const criado = await criarClienteV1({ email, name: email.split('@')[0] })
-  await supabase
-    .from('user_subscriptions')
-    .update({ abacate_customer_id: criado.id })
-    .eq('user_id', userId)
-  return criado.id
-}
 
 // ── POST /api/payments/pix/probe ──────────────────────────────
 // Cria uma cobrança de R$ 1,00 só para descobrir se a loja aceita PIX AVULSO.
@@ -163,11 +144,11 @@ router.post('/pix/probe', async (req, res) => {
 
   const email = String((req.body as any)?.email ?? 'contato@lemon-meet.com')
   try {
-    const cliente = await criarClienteV1({ email, name: 'Sonda de configuracao' })
+    // Sem cliente: a v1 exige cellphone e taxId para criar um, e o objetivo
+    // aqui é descobrir se a LOJA aceita PIX avulso, não cadastrar ninguém.
     const cobranca = await criarCobrancaPix({
       plano: 'starter',
       valorCentavos: 100, // mínimo da AbacatePay
-      customerId: cliente.id,
       externalId: `probe-${randomUUID()}`,
       returnUrl: `${urlApp()}/settings`,
       completionUrl: `${urlApp()}/settings`,
