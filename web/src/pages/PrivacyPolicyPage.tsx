@@ -76,7 +76,7 @@ export function PrivacyPolicyPage() {
 
             <h3 className="text-base font-semibold text-primary dark:text-white mt-5 mb-2">Para onde o áudio vai</h3>
             <p>
-              Quando você encerra a gravação, o arquivo de áudio é enviado para o servidor do Lemon.meet. Lá ele é transcrito automaticamente e, em seguida, a transcrição é usada para gerar os insights. Esses dois passos são feitos por fornecedores fora do Brasil — veja o item 7.
+              Quando você encerra a gravação, o arquivo de áudio é enviado para o servidor do Lemon.meet. Lá ele é transcrito automaticamente e, em seguida, a transcrição é usada para gerar os insights. Esses dois passos são feitos por fornecedores fora do Brasil — veja o item 8.
             </p>
             <p className="mt-3">
               Até o servidor confirmar o recebimento, o arquivo fica guardado no próprio aparelho — é isso que permite gravar sem internet e enviar depois. Confirmado o envio, o arquivo é apagado do celular.
@@ -87,7 +87,7 @@ export function PrivacyPolicyPage() {
               <strong>O arquivo de áudio da reunião presencial é apagado do nosso servidor assim que o processamento termina</strong> — tanto quando dá tudo certo quanto quando algo falha no meio do caminho. Não guardamos esse áudio nem disponibilizamos link para ouvi-lo depois.
             </p>
             <p className="mt-3">
-              <strong>O que permanece na sua conta é a transcrição em texto e os insights</strong> gerados a partir dela, junto com os metadados da reunião. É esse conteúdo que você acessa no app e no site, e é ele que é apagado quando você solicita a exclusão da conta (item 8).
+              <strong>O que permanece na sua conta é a transcrição em texto e os insights</strong> gerados a partir dela, junto com os metadados da reunião. É esse conteúdo que você acessa no app e no site, e é ele que é apagado quando você solicita a exclusão da conta (item 9).
             </p>
 
             <h3 className="text-base font-semibold text-primary dark:text-white mt-5 mb-2">O que declaramos à Apple</h3>
@@ -146,18 +146,69 @@ export function PrivacyPolicyPage() {
             <p className="mt-3">
               Além disso, se você ativar uma integração (HubSpot, Pipedrive, Google Drive ou webhook próprio), enviamos os dados e insights das suas reuniões para o destino que você conectou. Isso só acontece por ação sua e pode ser desligado nas configurações.
             </p>
-            <p className="mt-3">Todos os fornecedores operam sob seus próprios termos e políticas de privacidade, e são contratualmente obrigados a tratar os dados apenas para os fins do serviço — exigimos deles proteção equivalente à que descrevemos aqui, e nenhum deles está autorizado a usar o conteúdo das suas reuniões para publicidade ou para vendê-lo a outros. O item 7 explica em que país cada um deles está.</p>
+            <p className="mt-3">Todos os fornecedores operam sob seus próprios termos e políticas de privacidade, e são contratualmente obrigados a tratar os dados apenas para os fins do serviço — exigimos deles proteção equivalente à que descrevemos aqui, e nenhum deles está autorizado a usar o conteúdo das suas reuniões para publicidade ou para vendê-lo a outros. O item 8 explica em que país cada um deles está.</p>
           </section>
 
-          {/* DECISÃO JURÍDICA PENDENTE — seção 7.
+          {/* DECISÃO JURÍDICA PENDENTE — seção 8.
               Os fatos estão verificados: banco Supabase em sa-east-1 (São Paulo), servidor de
               aplicação na Contabo, na Alemanha (confirmado no painel da Contabo), áudio para
               Groq/EUA e transcrição para DeepSeek/China.
               Falta decidir com apoio jurídico a BASE LEGAL declarada para a transferência
               internacional (art. 33 da LGPD): execução de contrato, consentimento ou cláusulas
               contratuais padrão. O texto abaixo descreve a finalidade sem nomear a hipótese. */}
+          {/* Exigência do Google para verificação de app com escopo sensível
+              (calendar.events). A ausência desta declaração é uma das causas
+              mais comuns de recusa — e sem verificação o usuário vê o aviso de
+              "app não verificado" ao conectar a agenda, além de existir teto de
+              usuários. Manter o texto afirmativo e com o link oficial. */}
           <section>
-            <h2 className="text-lg font-semibold text-primary dark:text-white mb-3">7. Onde seus dados ficam e para onde são enviados</h2>
+            <h2 className="text-lg font-semibold text-primary dark:text-white mb-3">7. Dados do Google (Agenda e Drive)</h2>
+            <p>
+              Para agendar a gravação das suas reuniões, o Lemon.meet pede acesso ao seu Google Agenda. Se você ativar a integração com o Google Drive, também pedimos permissão para salvar arquivos lá.
+            </p>
+
+            <h3 className="text-base font-semibold text-primary dark:text-white mt-5 mb-2">O que pedimos e por quê</h3>
+            <ul className="list-disc pl-5 space-y-1">
+              <li>
+                <strong>Agenda (<code>calendar.events</code>)</strong> — lemos os eventos da sua agenda para saber quando cada reunião começa e qual é o link da videoconferência, e assim enviar o assistente de gravação no horário certo. Também usamos essa permissão para adicionar o assistente como convidado nos eventos que <em>você organiza</em>, para que ele seja admitido automaticamente. Não lemos, alteramos nem apagamos nada além disso.
+              </li>
+              <li>
+                <strong>Google Drive (<code>drive.file</code>)</strong> — apenas para gravar, na pasta que você escolher, os arquivos que o próprio Lemon.meet cria (resumos e insights). Essa permissão <strong>não dá acesso</strong> aos demais arquivos do seu Drive.
+              </li>
+            </ul>
+
+            <h3 className="text-base font-semibold text-primary dark:text-white mt-5 mb-2">Uso limitado dos dados</h3>
+            <p>
+              O uso e a transferência, pelo Lemon.meet, de informações recebidas das APIs do Google seguem a{' '}
+              <a
+                href="https://developers.google.com/terms/api-services-user-data-policy"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline text-brand"
+              >
+                Política de Dados do Usuário dos Serviços de API do Google
+              </a>
+              , incluindo os requisitos de <strong>Uso Limitado</strong>.
+            </p>
+            <p className="mt-3">
+              Na prática, isso significa que os dados obtidos do Google são usados apenas para oferecer e melhorar as funcionalidades que você ativou; <strong>não são vendidos</strong>, <strong>não são usados para publicidade</strong> e <strong>não são usados para treinar modelos de inteligência artificial</strong> generalizados. Nenhuma pessoa da nossa equipe lê esses dados, exceto quando você pede suporte, para cumprir a lei, ou para investigar uma falha de segurança — e sempre no menor escopo possível.
+            </p>
+            <p className="mt-3">
+              Você pode revogar esses acessos quando quiser, desconectando a integração nas configurações do Lemon.meet ou em{' '}
+              <a
+                href="https://myaccount.google.com/permissions"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline text-brand"
+              >
+                myaccount.google.com/permissions
+              </a>
+              .
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-lg font-semibold text-primary dark:text-white mb-3">8. Onde seus dados ficam e para onde são enviados</h2>
             <p>
               Este item vale para o produto inteiro — site, app para Mac e app para iPhone, reuniões online e presenciais.
             </p>
@@ -192,7 +243,7 @@ export function PrivacyPolicyPage() {
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold text-primary dark:text-white mb-3">8. Retenção de dados</h2>
+            <h2 className="text-lg font-semibold text-primary dark:text-white mb-3">9. Retenção de dados</h2>
             <p>
               Seus dados são mantidos enquanto sua conta estiver ativa. O áudio das reuniões presenciais é a exceção: ele é apagado do servidor logo após o processamento, como descrito no item 3.
             </p>
@@ -202,14 +253,14 @@ export function PrivacyPolicyPage() {
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold text-primary dark:text-white mb-3">9. Segurança</h2>
+            <h2 className="text-lg font-semibold text-primary dark:text-white mb-3">10. Segurança</h2>
             <p>
               Utilizamos criptografia em trânsito (TLS/HTTPS) e em repouso para todos os dados sensíveis. O acesso ao banco de dados é controlado por políticas de Row-Level Security (RLS), garantindo que cada usuário acesse apenas seus próprios dados.
             </p>
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold text-primary dark:text-white mb-3">10. Seus direitos (LGPD)</h2>
+            <h2 className="text-lg font-semibold text-primary dark:text-white mb-3">11. Seus direitos (LGPD)</h2>
             <p>Em conformidade com a Lei Geral de Proteção de Dados (Lei nº 13.709/2018), você tem direito a:</p>
             <ul className="list-disc pl-5 space-y-1 mt-2">
               <li>Confirmar a existência de tratamento dos seus dados.</li>
@@ -223,21 +274,21 @@ export function PrivacyPolicyPage() {
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold text-primary dark:text-white mb-3">11. Cookies</h2>
+            <h2 className="text-lg font-semibold text-primary dark:text-white mb-3">12. Cookies</h2>
             <p>
               Utilizamos apenas cookies estritamente necessários para autenticação e manutenção de sessão. Não utilizamos cookies de rastreamento ou publicidade.
             </p>
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold text-primary dark:text-white mb-3">12. Alterações nesta política</h2>
+            <h2 className="text-lg font-semibold text-primary dark:text-white mb-3">13. Alterações nesta política</h2>
             <p>
               Podemos atualizar esta política periodicamente. Notificaremos os usuários sobre mudanças significativas por e-mail ou via aviso na plataforma.
             </p>
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold text-primary dark:text-white mb-3">13. Contato</h2>
+            <h2 className="text-lg font-semibold text-primary dark:text-white mb-3">14. Contato</h2>
             <p>
               Dúvidas sobre esta política? Fale conosco:<br />
               <strong>contato@lemon-meet.com</strong>
