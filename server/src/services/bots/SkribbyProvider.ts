@@ -104,11 +104,18 @@ export class SkribbyProvider implements IBotProvider {
       webhook_url: this.webhookUrl,
       custom_metadata: { lemon_meeting_id: meetingId },
       stop_options: STOP_OPTIONS,
-      // TODO(piloto): campos AINDA NÃO confirmados no contrato do Skribby —
-      // deduplication_key (backstop de concorrência do CalendarCron) e language.
-      // Se o create rejeitar campos desconhecidos, remover estes dois.
+      // TODO(piloto): deduplication_key (backstop de concorrência do
+      // CalendarCron) NÃO está na lista de campos do create na doc do Skribby —
+      // provavelmente é ignorado em silêncio, como `language` era. Confirmar.
       deduplication_key: dedupKey ?? meetingId,
-      language: this.language,
+      // ⚠️ O campo é `lang`, NÃO `language`. Mandamos `language` de 08/2026 até
+      // 08/09/2026 e o Skribby ignorou em silêncio: o bot voltava com
+      // `lang: null` e `detected_lang: "en"`. Consequência medida: o Whisper
+      // deles detectava INGLÊS em reunião brasileira, alucinava "Thank you."
+      // sobre o silêncio inicial e TRADUZIA as primeiras falas ("Fala, Maicão"
+      // virou "Hey, my sogro"), normalizando para pt só depois. Atingia 58% das
+      // transcrições, ~850 caracteres cada. Valores aceitos: pt, pt-BR, pt-PT.
+      lang: this.language,
       // Modelo default (groq/whisper-large-v3-turbo) NÃO diariza (speaker=null).
       // TODO(piloto): para ter speaker, setar transcription_model p/ Deepgram/AssemblyAI.
     }
