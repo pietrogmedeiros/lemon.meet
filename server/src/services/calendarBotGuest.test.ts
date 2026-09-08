@@ -86,3 +86,36 @@ describe('decideBotInvite', () => {
     expect(d.invite).toBe(true)
   })
 })
+
+describe('piloto: convite também em reunião com cliente', () => {
+  const comCliente = {
+    organizer: { email: 'kledson.araujo@starbem.app', self: true },
+    attendees: [{ email: 'kledson.araujo@starbem.app' }, { email: 'comprador@clientex.com.br' }],
+  }
+
+  it('sem piloto, reunião com externo continua intocada', () => {
+    expect(decideBotInvite(comCliente, BOT)).toEqual({ invite: false, reason: 'tem_externo' })
+  })
+
+  it('com piloto, convida e devolve a lista completa', () => {
+    const d = decideBotInvite(comCliente, BOT, true)
+    expect(d.invite).toBe(true)
+    expect(d.invite && d.attendees).toHaveLength(2)
+  })
+
+  it('piloto NÃO derruba as outras travas: fora organizador segue recusado', () => {
+    const deOutro = {
+      organizer: { email: 'cliente@outra.com', self: false },
+      attendees: [{ email: 'kledson.araujo@starbem.app' }],
+    }
+    expect(decideBotInvite(deOutro, BOT, true)).toEqual({ invite: false, reason: 'nao_organizador' })
+  })
+
+  it('piloto NÃO reconvida quem já está na lista', () => {
+    const jaTem = {
+      organizer: { email: 'kledson.araujo@starbem.app', self: true },
+      attendees: [{ email: 'cliente@fora.com' }, { email: BOT }],
+    }
+    expect(decideBotInvite(jaTem, BOT, true)).toEqual({ invite: false, reason: 'ja_convidado' })
+  })
+})

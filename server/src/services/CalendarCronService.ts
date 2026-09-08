@@ -22,6 +22,20 @@ import { decideBotInvite } from './calendarBotGuest.js'
  * os 44 minutos inteiros na sala de espera e nenhuma reunião foi gravada.
  */
 const BOT_GUEST_EMAIL = (process.env.BOT_GUEST_EMAIL?.trim() || 'contato@lemon-meet.com').toLowerCase()
+
+/**
+ * PILOTO (08/09/2026, decisão do Pietro): para estes usuários o bot é convidado
+ * em TODAS as reuniões que eles organizam, inclusive com cliente — não só nas
+ * internas. Objetivo: medir se o convite elimina o `not_admitted`, que é a
+ * maior perda do produto (11 de 20 reuniões consultadas morreram assim).
+ * Começa com o Kledson; ampliar ou desligar é editar a variável, sem deploy.
+ */
+const PILOTO_CONVITE_EXTERNO = new Set(
+  (process.env.BOT_GUEST_PILOT_USERS ?? '1c2661cd-24e9-417e-a25b-76192fdd7d09')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean),
+)
 import { botIdColumn, type BotProviderName } from './bots/IBotProvider.js'
 import { resolveMeetingTeamId } from '../utils/teamAccess.js'
 import { fanOutFromOwner } from '../routes/meetingbaas.routes.js'
@@ -367,8 +381,9 @@ export class CalendarCronService {
    *
    * Vai com `sendUpdates=none`: ninguém recebe e-mail de atualização.
    */
-  private async inviteBotGuest(item: any, accessToken: string): Promise<void> {
-    const decision = decideBotInvite(item, BOT_GUEST_EMAIL)
+  private async inviteBotGuest(item: any, accessToken: string, userId: string): Promise<void> {
+    const noPiloto = PILOTO_CONVITE_EXTERNO.has(userId)
+    const decision = decideBotInvite(item, BOT_GUEST_EMAIL, noPiloto)
     if (!decision.invite) {
       if (decision.reason === 'tem_externo') {
         logger.info(`[CalendarCron] Evento ${item.id} tem convidado externo — não convido o bot`)
@@ -393,7 +408,9 @@ export class CalendarCronService {
       const detail = (await res.text()).slice(0, 200)
       throw new Error(`Google respondeu ${res.status}: ${detail}`)
     }
-    logger.info(`[CalendarCron] 🤖 Bot convidado no evento interno ${item.id}`)
+    logger.info(
+      `[CalendarCron] 🤖 Bot convidado no evento ${item.id}${noPiloto ? ' (piloto: inclui externo)' : ' (interno)'}`,
+    )
   }
 
   private async dispatchBotForEvent(item: any, userId: string, accessToken?: string): Promise<void> {
@@ -424,7 +441,7 @@ export class CalendarCronService {
     // sobre quem ganhou a corrida do bot.
     if (accessToken) {
       try {
-        await this.inviteBotGuest(item, accessToken)
+        await this.inviteBotGuest(item, accessToken, userId)
       } catch (err) {
         logger.warn(`[CalendarCron] Não consegui convidar o bot no evento ${eventId}:`, err)
       }

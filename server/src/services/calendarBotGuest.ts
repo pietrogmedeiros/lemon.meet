@@ -55,6 +55,14 @@ export type InviteDecision =
 export function decideBotInvite(
   event: GoogleEventLike,
   botEmail: string,
+  /**
+   * PILOTO: convida o bot mesmo em reunião com cliente. Ligado por usuário via
+   * `BOT_GUEST_PILOT_USERS`, porque é aí que está o volume — na agenda do Deive,
+   * 21 das 26 reuniões com Meet que ele organiza têm convidado externo, e são
+   * elas que dominam o `not_admitted`. O custo é de percepção: o cliente vê
+   * "Lemon Contato" na lista de convidados.
+   */
+  permitirExterno = false,
 ): InviteDecision {
   const organizerEmail = event.organizer?.email?.toLowerCase()
   const domain = organizerEmail?.split('@')[1]
@@ -76,7 +84,7 @@ export function decideBotInvite(
   if (emails.includes(botEmail.toLowerCase())) {
     return { invite: false, reason: 'ja_convidado' }
   }
-  if (!emails.every((e) => e.split('@')[1] === domain)) {
+  if (!permitirExterno && !emails.every((e) => e.split('@')[1] === domain)) {
     return { invite: false, reason: 'tem_externo' }
   }
   return { invite: true, attendees: event.attendees ?? [] }
