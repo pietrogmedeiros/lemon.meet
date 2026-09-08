@@ -46,3 +46,14 @@ create index if not exists payment_charges_pending_idx
 -- `webhook_token` são credenciais de ativação — usuário não pode ler nem o
 -- próprio, senão o webhook aberto vira plano grátis.
 alter table payment_charges enable row level security;
+
+-- ── Adendo (08/09/2026): id da cobrança no provedor ─────────────────────────
+-- O PIX por QR Code não tem URL de checkout: o que precisamos guardar é o id
+-- (`pix_char_...`) para consultar o status depois. Guardar isso em
+-- `checkout_url` funcionaria e mentiria sobre o que o campo é.
+alter table payment_charges
+  add column if not exists provider_charge_id text;
+
+create index if not exists payment_charges_provider_id_idx
+  on payment_charges (provider_charge_id)
+  where provider_charge_id is not null;

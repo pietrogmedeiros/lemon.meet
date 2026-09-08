@@ -219,6 +219,29 @@ export function criarPixQrCode(input: {
   })
 }
 
+/**
+ * Consulta o status de um QR Code PIX.
+ *
+ * POR QUE ISSO E NÃO WEBHOOK: a documentação de webhooks da AbacatePay não
+ * lista NENHUM evento para pixQrCode — só checkout, transparent e subscription.
+ * Depender de adivinhar o nome do evento seria construir a falha mais cara
+ * possível aqui: a pessoa paga e o plano não ativa. Perguntar é determinístico.
+ */
+export async function consultarPixQrCode(id: string): Promise<{ status: string }> {
+  const chave = process.env.ABACATEPAY_API_KEY_V1 || process.env.ABACATEPAY_API_KEY || ''
+  const res = await fetch(`https://api.abacatepay.com/v1/pixQrCode/check?id=${encodeURIComponent(id)}`, {
+    headers: { Authorization: `Bearer ${chave}` },
+  })
+  const texto = await res.text()
+  let json: any
+  try { json = JSON.parse(texto) } catch { throw new Error('AbacatePay check devolveu resposta ilegível') }
+  if (!res.ok || json?.error) {
+    throw new Error(`AbacatePay check falhou: ${json?.error ?? texto.slice(0, 160)}`)
+  }
+  const dados = json?.data ?? json
+  return { status: String(dados?.status ?? 'UNKNOWN') }
+}
+
 export function cancelSubscription(subscriptionId: string): Promise<unknown> {
   return call('/subscriptions/cancel', { id: subscriptionId })
 }

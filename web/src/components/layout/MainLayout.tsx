@@ -1,10 +1,10 @@
 import { ReactNode, useState } from 'react'
 import { Sidebar, TopNavBar } from '@/components/layout'
-import { useSubscription, useAuth } from '@/contexts'
+import { useSubscription } from '@/contexts'
 import { Clock, Lock, Zap, AlertTriangle } from 'lucide-react'
 import { usePaymentAvailability } from '../../hooks/usePaymentAvailability'
+import { EscolhaPagamento } from '../billing/EscolhaPagamento'
 
-const API = import.meta.env.VITE_API_URL || 'http://localhost:3000'
 
 interface MainLayoutProps {
   children: ReactNode
@@ -18,33 +18,11 @@ const PLAN_LABELS: Record<string, string> = {
 
 export function MainLayout({ children }: MainLayoutProps) {
   const { isTrial, isExpired, daysLeft, loading, subscription } = useSubscription()
-  const { session } = useAuth()
-  const [checkoutLoading, setCheckoutLoading] = useState<'starter' | 'professional' | null>(null)
   // Só oferece compra se o servidor disser que consegue cobrar.
   const { data: pagamento } = usePaymentAvailability()
+  // Qual plano está sendo assinado — abre a escolha de meio de pagamento.
+  const [planoEscolhido, setPlanoEscolhido] = useState<'starter' | 'professional' | null>(null)
 
-  // ⚠️ Estes dois botões chamavam alert('Em breve!'). Esta é a tela do trial
-  // EXPIRADO: a pessoa perdia o acesso, via o preço, clicava para pagar e
-  // recebia um aviso de "em breve" — com o checkout já funcionando na tela de
-  // Configurações desde sempre. Mesma chamada de lá, nada novo inventado aqui.
-  const handleCheckout = async (plan: 'starter' | 'professional') => {
-    if (!session?.access_token) return
-    setCheckoutLoading(plan)
-    try {
-      const res = await fetch(`${API}/api/subscription/checkout`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-        body: JSON.stringify({ plan }),
-      })
-      const data = await res.json()
-      if (data.url) window.location.href = data.url
-      else alert([data.error ?? 'Erro ao iniciar pagamento.', data.detail].filter(Boolean).join('\n\n'))
-    } catch {
-      alert('Erro ao conectar com o servidor.')
-    } finally {
-      setCheckoutLoading(null)
-    }
-  }
 
   // Configuração do banner de trial
   const getBanner = () => {
@@ -138,11 +116,10 @@ export function MainLayout({ children }: MainLayoutProps) {
                     </ul>
                     {pagamento.habilitado && (
                       <button
-                        onClick={() => handleCheckout('starter')}
-                        disabled={checkoutLoading === 'starter'}
+                        onClick={() => setPlanoEscolhido('starter')}
                         className="w-full py-2.5 rounded-xl border-2 border-[#2D5A27] text-brand text-sm font-semibold hover:bg-[#2D5A27]/5 transition disabled:opacity-50"
                       >
-                        {checkoutLoading === 'starter' ? 'Abrindo…' : 'Assinar Starter'}
+                        Assinar Starter
                       </button>
                     )}
                   </div>
@@ -166,15 +143,22 @@ export function MainLayout({ children }: MainLayoutProps) {
                     </ul>
                     {pagamento.habilitado && (
                       <button
-                        onClick={() => handleCheckout('professional')}
-                        disabled={checkoutLoading === 'professional'}
+                        onClick={() => setPlanoEscolhido('professional')}
                         className="w-full py-2.5 rounded-xl bg-[#2D5A27] text-white text-sm font-semibold hover:bg-[#1E3D1A] transition shadow-sm disabled:opacity-50"
                       >
-                        {checkoutLoading === 'professional' ? 'Abrindo…' : 'Assinar Professional'}
+                        Assinar Professional
                       </button>
                     )}
                   </div>
                 </div>
+
+                {planoEscolhido && (
+                  <EscolhaPagamento
+                    plano={planoEscolhido}
+                    trilhos={pagamento.trilhos}
+                    onFechar={() => setPlanoEscolhido(null)}
+                  />
+                )}
 
                 {!pagamento.habilitado && pagamento.motivo && (
                   <p className="text-sm text-secondary bg-neutral-lighter border border-neutral-light rounded-xl px-4 py-3">

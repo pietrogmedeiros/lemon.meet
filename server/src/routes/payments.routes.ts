@@ -11,7 +11,7 @@ import { authMiddleware, type AuthRequest } from '../middleware/auth.middleware.
 import { supabase } from '../config/supabase.js'
 import { logger } from '../utils/logger.js'
 import { criarLinkCartao, cartaoConfigurado } from '../services/infinitepay.js'
-import { criarPixQrCode } from '../services/abacatepay.js'
+import { criarPixQrCode, consultarPixQrCode } from '../services/abacatepay.js'
 import { PRECO_CENTAVOS, DIAS_POR_CICLO } from '../services/paymentRails.js'
 import { liberarCiclo } from '../services/billingCycle.js'
 
@@ -111,13 +111,18 @@ router.post('/pix', authMiddleware as RequestHandler, async (req: AuthRequest, r
       expiraEmSegundos: 3600,
     })
 
-    await supabase
+    const { data: linha } = await supabase
       .from('payment_charges')
-      .update({ checkout_url: pix.id })
+      .update({ provider_charge_id: pix.id })
       .eq('order_nsu', orderNsu)
+      .select('id')
+      .maybeSingle()
 
     // Devolve o código, não uma URL: o PIX é exibido dentro do app.
+    // `chargeId` é o que a tela usa para perguntar se já foi pago — nunca o
+    // `order_nsu`, que é credencial de ativação.
     return res.json({
+      chargeId: linha?.id,
       pix: {
         brCode: pix.brCode,
         brCodeBase64: pix.brCodeBase64,
@@ -135,6 +140,47 @@ router.post('/pix', authMiddleware as RequestHandler, async (req: AuthRequest, r
   }
 })
 
+
+// ── GET /api/payments/charge/:id ──────────────────────────────
+// A tela do PIX pergunta aqui se já caiu. Consulta o provedor quando ainda está
+// pendente, porque a AbacatePay não documenta webhook para QR Code — e "a
+// pessoa paga e o plano não ativa" é a falha mais cara deste fluxo.
+router.get('/charge/:id', authMiddleware as RequestHandler, async (req: AuthRequest, res: Response) => {
+  const userId = req.user!.id
+  const { data: cobranca } = await supabase
+    .from('payment_charges')
+    .select('id, user_id, plan, status, provider, provider_charge_id, paid_at')
+    .eq('id', req.params.id)
+    .maybeSingle()
+
+  if (!cobranca || cobranca.user_id !== userId) {
+    return res.status(404).json({ error: 'Cobrança não encontrada.' })
+  }
+  if (cobranca.status === 'paid') {
+    return res.json({ status: 'paid', plan: cobranca.plan, paidAt: cobranca.paid_at })
+  }
+
+  if (cobranca.provider === 'abacatepay' && cobranca.provider_charge_id) {
+    try {
+      const { status } = await consultarPixQrCode(cobranca.provider_charge_id)
+      if (status === 'PAID' || status === 'COMPLETED') {
+        await liberarCiclo(cobranca.user_id, cobranca.plan as 'starter' | 'professional')
+        await supabase
+          .from('payment_charges')
+          .update({ status: 'paid', paid_at: new Date().toISOString() })
+          .eq('id', cobranca.id)
+        logger.info(`[Pagamento] PIX confirmado por consulta — cobrança ${cobranca.id}`)
+        return res.json({ status: 'paid', plan: cobranca.plan })
+      }
+      return res.json({ status: 'pending', providerStatus: status })
+    } catch (err) {
+      logger.warn('[Pagamento] falha ao consultar PIX:', err)
+      return res.json({ status: 'pending' })
+    }
+  }
+
+  return res.json({ status: cobranca.status })
+})
 
 // ── POST /api/payments/pix/probe ──────────────────────────────
 // Cria uma cobrança de R$ 1,00 só para descobrir se a loja aceita PIX AVULSO.

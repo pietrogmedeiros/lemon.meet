@@ -143,7 +143,7 @@ app.use('/api', limiter)
  * o build falha e o contêiner ANTIGO continua no ar — sem isso, "está no ar" é
  * palpite por uptime. Trocar a cada mudança que precise ser confirmada.
  */
-const BUILD_TAG = 'pix-qrcode-14'
+const BUILD_TAG = 'pix-status-15'
 
 let ffmpegReady: boolean | null = null
 let audioCodec: string | null = null
