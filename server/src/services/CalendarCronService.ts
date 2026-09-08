@@ -28,10 +28,14 @@ const BOT_GUEST_EMAIL = (process.env.BOT_GUEST_EMAIL?.trim() || 'contato@lemon-m
  * em TODAS as reuniões que eles organizam, inclusive com cliente — não só nas
  * internas. Objetivo: medir se o convite elimina o `not_admitted`, que é a
  * maior perda do produto (11 de 20 reuniões consultadas morreram assim).
- * Começa com o Kledson; ampliar ou desligar é editar a variável, sem deploy.
+ * Ampliar ou desligar é editar a variável, sem deploy.
  */
 const PILOTO_CONVITE_EXTERNO = new Set(
-  (process.env.BOT_GUEST_PILOT_USERS ?? '1c2661cd-24e9-417e-a25b-76192fdd7d09')
+  // Deive (era Kledson): o convite só funciona onde a pessoa ORGANIZA o evento,
+  // e na semana de 01–08/09 o Kledson organizou 5 reuniões (3 com cliente)
+  // contra 31 do Deive (25 com cliente). Com o Kledson o piloto não teria
+  // amostra para concluir nada até sexta.
+  (process.env.BOT_GUEST_PILOT_USERS ?? '07147e88-bb65-4bfb-be29-1bef3e569df2')
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean),
