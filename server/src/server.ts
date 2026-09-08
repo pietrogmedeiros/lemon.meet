@@ -18,6 +18,7 @@ import meetingBaasRouter from './routes/meetingbaas.routes.js'
 import { attendeeWebhookHandler } from './routes/attendee.routes.js'
 import { skribbyWebhookHandler } from './routes/skribby.routes.js'
 import calendarRouter from './routes/calendar.routes.js'
+import siteChatRouter from './routes/site-chat.routes.js'
 import { TranscriptionService } from './services/TranscriptionService.js'
 import { dailyDigestService, proximoDisparo } from './services/DailyDigestService.js'
 import pipedriveRouter from './routes/pipedrive.routes.js'
@@ -89,6 +90,12 @@ app.use(cors({
       'https://lemon-meet-staging.firebaseapp.com',
       // Lemon.crm (host que embeda o app via iframe)
       ...lemonCrmOrigins,
+      // Site de marketing — usa POST /api/site-chat no lugar de falar com o
+      // DeepSeek direto do navegador (o que vazou a chave até 08/09/2026).
+      'https://espremaseulimao.com.br',
+      'https://www.espremaseulimao.com.br',
+      'https://espremaseulimao.web.app',
+      'https://esprema-seulimao.web.app',
     ]
     // Permite extensões Chrome e requisições sem origin (ex: curl)
     if (!origin || origin.startsWith('chrome-extension://') || allowed.includes(origin)) {
@@ -135,7 +142,7 @@ app.use('/api', limiter)
  * o build falha e o contêiner ANTIGO continua no ar — sem isso, "está no ar" é
  * palpite por uptime. Trocar a cada mudança que precise ser confirmada.
  */
-const BUILD_TAG = 'resumo-janela-5'
+const BUILD_TAG = 'site-chat-proxy-6'
 
 let ffmpegReady: boolean | null = null
 let audioCodec: string | null = null
@@ -212,6 +219,9 @@ app.use('/api/integrations', integrationsRouter)
 app.use('/api/coaching', coachingRouter)
 app.use('/api/meetingbaas', meetingBaasRouter)
 app.use('/api/calendar', calendarRouter)
+// Público (sem authMiddleware): o visitante do site não tem conta. Protegido
+// por origem + limite de taxa dentro do próprio router.
+app.use('/api/site-chat', siteChatRouter)
 app.use('/api/pipedrive', pipedriveRouter)
 app.use('/api/hubspot', hubspotRouter)
 app.use('/api/gdrive', gdriveRouter)
