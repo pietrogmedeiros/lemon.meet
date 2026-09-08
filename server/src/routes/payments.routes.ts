@@ -11,7 +11,7 @@ import { authMiddleware, type AuthRequest } from '../middleware/auth.middleware.
 import { supabase } from '../config/supabase.js'
 import { logger } from '../utils/logger.js'
 import { criarLinkCartao, cartaoConfigurado } from '../services/infinitepay.js'
-import { createCustomer, criarCobrancaPix } from '../services/abacatepay.js'
+import { criarClienteV1, criarCobrancaPix } from '../services/abacatepay.js'
 import { PRECO_CENTAVOS, DIAS_POR_CICLO } from '../services/paymentRails.js'
 import { liberarCiclo } from '../services/billingCycle.js'
 
@@ -91,7 +91,7 @@ router.post('/pix', authMiddleware as RequestHandler, async (req: AuthRequest, r
   const valor = PRECO_CENTAVOS[plan]
 
   try {
-    const customerId = await customerIdDoUsuario(userId, req.user!.email ?? '')
+    const customerId = await customerIdV1(userId, req.user!.email ?? '')
 
     const { error: insErr } = await supabase.from('payment_charges').insert({
       user_id: userId,
@@ -130,17 +130,16 @@ router.post('/pix', authMiddleware as RequestHandler, async (req: AuthRequest, r
   }
 })
 
-/** Reaproveita o cliente já criado na AbacatePay; cria só na primeira vez. */
-async function customerIdDoUsuario(userId: string, email: string): Promise<string> {
-  const { data } = await supabase
-    .from('user_subscriptions')
-    .select('abacate_customer_id')
-    .eq('user_id', userId)
-    .maybeSingle()
-
-  if (data?.abacate_customer_id) return data.abacate_customer_id as string
-
-  const criado = await createCustomer({ email, name: email.split('@')[0] })
+/**
+ * Cliente para a cobrança PIX, criado na v1.
+ *
+ * ⚠️ NÃO reaproveita o `abacate_customer_id` guardado: ele veio da v2, e chave e
+ * recurso são versionados — id de uma versão na outra é falha silenciosa à
+ * espera. Cria na v1 e guarda por cima; o fluxo v2 de assinatura está morto de
+ * qualquer forma, porque a loja não tem recorrência.
+ */
+async function customerIdV1(userId: string, email: string): Promise<string> {
+  const criado = await criarClienteV1({ email, name: email.split('@')[0] })
   await supabase
     .from('user_subscriptions')
     .update({ abacate_customer_id: criado.id })
@@ -158,11 +157,13 @@ router.post('/pix/probe', async (req, res) => {
   const esperada = process.env.ADMIN_METRICS_KEY
   if (!esperada || esperada.length < 16) return res.status(503).json({ error: 'admin_key_missing' })
   if (req.header('x-admin-key') !== esperada) return res.status(401).json({ error: 'unauthorized' })
-  if (!process.env.ABACATEPAY_API_KEY) return res.status(503).json({ error: 'abacatepay_key_missing' })
+  if (!process.env.ABACATEPAY_API_KEY_V1 && !process.env.ABACATEPAY_API_KEY) {
+    return res.status(503).json({ error: 'abacatepay_key_missing' })
+  }
 
   const email = String((req.body as any)?.email ?? 'contato@lemon-meet.com')
   try {
-    const cliente = await createCustomer({ email, name: 'Sonda de configuração' })
+    const cliente = await criarClienteV1({ email, name: 'Sonda de configuracao' })
     const cobranca = await criarCobrancaPix({
       plano: 'starter',
       valorCentavos: 100, // mínimo da AbacatePay

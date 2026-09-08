@@ -32,7 +32,8 @@ export interface DisponibilidadePagamento {
 export function trilhosDisponiveis(): DisponibilidadePagamento {
   const trilhos: TrilhoPagamento[] = []
 
-  if (process.env.ABACATEPAY_PIX_ONE_TIME === 'true' && process.env.ABACATEPAY_API_KEY) {
+  const chavePix = process.env.ABACATEPAY_API_KEY_V1 || process.env.ABACATEPAY_API_KEY
+  if (process.env.ABACATEPAY_PIX_ONE_TIME === 'true' && chavePix) {
     trilhos.push('pix')
   }
   if ((process.env.BILLING_INFINITEPAY_TAG ?? '').trim()) {

@@ -41,12 +41,22 @@ export interface AbacateCustomer {
   name?: string
 }
 
-/** A cobrança avulsa mora na v1; assinatura mora na v2. */
+/**
+ * A cobrança avulsa mora na v1; cliente e assinatura moram na v2.
+ *
+ * ⚠️ As chaves são POR VERSÃO: usar a chave v2 na v1 devolve
+ * "API key version mismatch" — foi o que a sonda de 08/09 descobriu, e o erro
+ * parecia (mas não era) "a loja não aceita PIX". Por isso existe
+ * ABACATEPAY_API_KEY_V1, separada da chave v2 que já está em uso. Sem a v1
+ * definida, cai na principal — que é o comportamento certo caso um dia a conta
+ * passe a ter chave única.
+ */
 async function callV1<T>(path: string, body: unknown): Promise<T> {
+  const chave = process.env.ABACATEPAY_API_KEY_V1 || process.env.ABACATEPAY_API_KEY || ''
   const res = await fetch(`https://api.abacatepay.com/v1${path}`, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${process.env.ABACATEPAY_API_KEY ?? ''}`,
+      Authorization: `Bearer ${chave}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(body),
@@ -105,6 +115,18 @@ export function createSubscriptionCheckout(input: {
     completionUrl: input.completionUrl,
     externalId: input.externalId,
     metadata: input.metadata,
+  })
+}
+
+/**
+ * Cliente na v1. O `customer` inline da cobrança exige cellphone e taxId, que
+ * não pedimos a ninguém no cadastro — então o caminho é criar o cliente antes e
+ * mandar só o id.
+ */
+export function criarClienteV1(input: { email: string; name?: string }): Promise<{ id: string }> {
+  return callV1<{ id: string }>('/customer/create', {
+    email: input.email,
+    name: input.name ?? input.email.split('@')[0],
   })
 }
 
