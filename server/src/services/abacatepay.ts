@@ -41,6 +41,25 @@ export interface AbacateCustomer {
   name?: string
 }
 
+/** A cobrança avulsa mora na v1; assinatura mora na v2. */
+async function callV1<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`https://api.abacatepay.com/v1${path}`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${process.env.ABACATEPAY_API_KEY ?? ''}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  })
+  const texto = await res.text()
+  let json: any
+  try { json = JSON.parse(texto) } catch { throw new Error(`AbacatePay v1${path} devolveu resposta ilegível`) }
+  if (!res.ok || json?.error) {
+    throw new Error(`AbacatePay v1${path} falhou: ${json?.error ?? json?.message ?? texto.slice(0, 160)}`)
+  }
+  return (json?.data ?? json) as T
+}
+
 export function createCustomer(input: {
   email: string
   name?: string
@@ -86,6 +105,53 @@ export function createSubscriptionCheckout(input: {
     completionUrl: input.completionUrl,
     externalId: input.externalId,
     metadata: input.metadata,
+  })
+}
+
+export interface AbacateCobrancaPix {
+  id: string
+  url: string
+  status: string
+  amount: number
+}
+
+/**
+ * Cobrança AVULSA por PIX (`/v1/billing/create`, `frequency: ONE_TIME`).
+ *
+ * Existe porque a loja não tem trilho de recorrência: nem CARD nem PIX
+ * Automático. Cada pagamento libera um ciclo, e a renovação é explícita.
+ *
+ * ⚠️ Armadilha paga no Autho CRM: a AbacatePay cobra o preço do PRODUTO, não o
+ * valor mandado na cobrança — mandaram R$ 2,50 e ela cobrou R$ 1,00. Por isso o
+ * `externalId` carrega o preço: um produto por faixa, criado sob demanda. Mudou
+ * o preço, muda o externalId, e nasce outro produto em vez de cobrar o antigo.
+ * ⚠️ O mínimo da AbacatePay é R$ 1,00; abaixo disso o erro não diz nada.
+ */
+export async function criarCobrancaPix(input: {
+  plano: 'starter' | 'professional'
+  valorCentavos: number
+  customerId: string
+  externalId: string
+  returnUrl: string
+  completionUrl: string
+}): Promise<AbacateCobrancaPix> {
+  const nome = input.plano === 'starter' ? 'Starter' : 'Professional'
+  return callV1<AbacateCobrancaPix>('/billing/create', {
+    frequency: 'ONE_TIME',
+    methods: ['PIX'],
+    products: [
+      {
+        externalId: `lemon-${input.plano}-${input.valorCentavos}`,
+        name: `Lemon.meet ${nome}`,
+        description: `Lemon.meet ${nome} — 30 dias`,
+        quantity: 1,
+        price: input.valorCentavos,
+      },
+    ],
+    customerId: input.customerId,
+    externalId: input.externalId,
+    returnUrl: input.returnUrl,
+    completionUrl: input.completionUrl,
   })
 }
 

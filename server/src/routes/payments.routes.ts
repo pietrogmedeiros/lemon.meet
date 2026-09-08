@@ -11,7 +11,9 @@ import { authMiddleware, type AuthRequest } from '../middleware/auth.middleware.
 import { supabase } from '../config/supabase.js'
 import { logger } from '../utils/logger.js'
 import { criarLinkCartao, cartaoConfigurado } from '../services/infinitepay.js'
+import { createCustomer, criarCobrancaPix } from '../services/abacatepay.js'
 import { PRECO_CENTAVOS, DIAS_POR_CICLO } from '../services/paymentRails.js'
+import { liberarCiclo } from '../services/billingCycle.js'
 
 const router: Router = Router()
 
@@ -73,6 +75,109 @@ router.post('/card', authMiddleware as RequestHandler, async (req: AuthRequest, 
   }
 })
 
+// ── POST /api/payments/pix ────────────────────────────────────
+router.post('/pix', authMiddleware as RequestHandler, async (req: AuthRequest, res: Response) => {
+  const userId = req.user!.id
+  const { plan } = req.body as { plan: 'starter' | 'professional' }
+
+  if (plan !== 'starter' && plan !== 'professional') {
+    return res.status(400).json({ error: 'Plano inválido.' })
+  }
+  if (process.env.ABACATEPAY_PIX_ONE_TIME !== 'true' || !process.env.ABACATEPAY_API_KEY) {
+    return res.status(503).json({ error: 'Pagamento por PIX indisponível.', code: 'pix_unavailable' })
+  }
+
+  const orderNsu = randomUUID()
+  const valor = PRECO_CENTAVOS[plan]
+
+  try {
+    const customerId = await customerIdDoUsuario(userId, req.user!.email ?? '')
+
+    const { error: insErr } = await supabase.from('payment_charges').insert({
+      user_id: userId,
+      plan,
+      provider: 'abacatepay',
+      amount_cents: valor,
+      order_nsu: orderNsu,
+      // O webhook da AbacatePay é assinado (HMAC), então aqui o token não é a
+      // defesa — mas a coluna é obrigatória e um segredo por cobrança não custa.
+      webhook_token: randomUUID(),
+    })
+    if (insErr) throw new Error(insErr.message)
+
+    const cobranca = await criarCobrancaPix({
+      plano: plan,
+      valorCentavos: valor,
+      customerId,
+      externalId: orderNsu,
+      returnUrl: `${urlApp()}/settings`,
+      completionUrl: `${urlApp()}/settings?checkout=success`,
+    })
+
+    await supabase
+      .from('payment_charges')
+      .update({ checkout_url: cobranca.url })
+      .eq('order_nsu', orderNsu)
+
+    return res.json({ url: cobranca.url })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    logger.error('[Pagamento] PIX falhou:', msg)
+    await supabase.from('payment_charges').update({ status: 'cancelled' }).eq('order_nsu', orderNsu)
+    // `detail` traz a mensagem da AbacatePay (ela não expõe a chave). Sem isso,
+    // esta integração já ficou um mês quebrada com erro genérico na tela.
+    return res.status(502).json({ error: 'Não foi possível gerar o PIX.', detail: msg })
+  }
+})
+
+/** Reaproveita o cliente já criado na AbacatePay; cria só na primeira vez. */
+async function customerIdDoUsuario(userId: string, email: string): Promise<string> {
+  const { data } = await supabase
+    .from('user_subscriptions')
+    .select('abacate_customer_id')
+    .eq('user_id', userId)
+    .maybeSingle()
+
+  if (data?.abacate_customer_id) return data.abacate_customer_id as string
+
+  const criado = await createCustomer({ email, name: email.split('@')[0] })
+  await supabase
+    .from('user_subscriptions')
+    .update({ abacate_customer_id: criado.id })
+    .eq('user_id', userId)
+  return criado.id
+}
+
+// ── POST /api/payments/pix/probe ──────────────────────────────
+// Cria uma cobrança de R$ 1,00 só para descobrir se a loja aceita PIX AVULSO.
+// Existe porque a chave de produção não sai do EasyPanel: sem isso, ligar o
+// trilho seria publicar código sem nunca ter exercitado o caminho real — que é
+// exatamente como esta integração ficou um mês quebrada. Guardado pela chave de
+// máquina, igual ao /metrics.
+router.post('/pix/probe', async (req, res) => {
+  const esperada = process.env.ADMIN_METRICS_KEY
+  if (!esperada || esperada.length < 16) return res.status(503).json({ error: 'admin_key_missing' })
+  if (req.header('x-admin-key') !== esperada) return res.status(401).json({ error: 'unauthorized' })
+  if (!process.env.ABACATEPAY_API_KEY) return res.status(503).json({ error: 'abacatepay_key_missing' })
+
+  const email = String((req.body as any)?.email ?? 'contato@lemon-meet.com')
+  try {
+    const cliente = await createCustomer({ email, name: 'Sonda de configuração' })
+    const cobranca = await criarCobrancaPix({
+      plano: 'starter',
+      valorCentavos: 100, // mínimo da AbacatePay
+      customerId: cliente.id,
+      externalId: `probe-${randomUUID()}`,
+      returnUrl: `${urlApp()}/settings`,
+      completionUrl: `${urlApp()}/settings`,
+    })
+    return res.json({ ok: true, aceita_pix_avulso: true, url: cobranca.url, status: cobranca.status })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    return res.status(200).json({ ok: false, aceita_pix_avulso: false, motivo: msg })
+  }
+})
+
 // ── POST /api/payments/infinitepay/webhook/:token ─────────────
 // SEM autenticação por design do provedor: ele só chama quando o pagamento é
 // APROVADO, e não manda status nem evento. Quem autoriza é o par
@@ -116,23 +221,5 @@ router.post('/infinitepay/webhook/:token', async (req, res) => {
   return res.json({ received: true })
 })
 
-/** Soma um ciclo ao que a pessoa já tem. Pagar antes do vencimento não deve custar dias. */
-async function liberarCiclo(userId: string, plan: 'starter' | 'professional'): Promise<void> {
-  const { data: atual } = await supabase
-    .from('user_subscriptions')
-    .select('plan_ends_at')
-    .eq('user_id', userId)
-    .maybeSingle()
-
-  const agora = Date.now()
-  const fimAtual = atual?.plan_ends_at ? new Date(atual.plan_ends_at).getTime() : 0
-  const base = Number.isFinite(fimAtual) && fimAtual > agora ? fimAtual : agora
-  const novoFim = new Date(base + DIAS_POR_CICLO * 24 * 3600 * 1000).toISOString()
-
-  await supabase
-    .from('user_subscriptions')
-    .update({ plan, status: 'active', plan_ends_at: novoFim, updated_at: new Date().toISOString() })
-    .eq('user_id', userId)
-}
 
 export default router

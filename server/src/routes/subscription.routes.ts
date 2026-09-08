@@ -12,6 +12,7 @@ import {
   productIdForPlan,
 } from '../services/abacatepay.js'
 import { trilhosDisponiveis } from '../services/paymentRails.js'
+import { liberarCiclo } from '../services/billingCycle.js'
 
 const router: Router = Router()
 
@@ -403,6 +404,37 @@ export async function abacatepayWebhookHandler(req: Request, res: Response): Pro
           .eq('abacate_customer_id', customer.id)
 
         console.log(`[webhook] subscription.cancelled — ${customer.id} (subs ${subscription.id})`)
+        break
+      }
+
+      // Cobrança AVULSA paga (PIX). A loja não tem recorrência, então é este
+      // evento — e não subscription.* — que libera o ciclo hoje.
+      case 'billing.paid':
+      case 'billing.completed': {
+        const billing = event.data?.billing ?? event.data
+        const nsu = billing?.externalId ?? billing?.external_id
+        if (!nsu) {
+          console.warn('[webhook] billing.paid sem externalId — ignorado')
+          break
+        }
+        const { data: cobranca } = await supabase
+          .from('payment_charges')
+          .select('id, user_id, plan, status')
+          .eq('order_nsu', nsu)
+          .maybeSingle()
+
+        if (!cobranca) {
+          console.warn(`[webhook] billing.paid sem cobrança correspondente (${String(nsu).slice(0, 8)}…)`)
+          break
+        }
+        if (cobranca.status === 'paid') break // reenvio do provedor
+
+        await liberarCiclo(cobranca.user_id, cobranca.plan as 'starter' | 'professional')
+        await supabase
+          .from('payment_charges')
+          .update({ status: 'paid', paid_at: new Date().toISOString(), webhook_payload: event })
+          .eq('id', cobranca.id)
+        console.log(`[webhook] PIX pago — cobrança ${cobranca.id}, plano ${cobranca.plan} liberado`)
         break
       }
 
