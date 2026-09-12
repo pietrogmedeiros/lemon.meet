@@ -142,7 +142,7 @@ app.use('/api', limiter)
  * o build falha e o contêiner ANTIGO continua no ar — sem isso, "está no ar" é
  * palpite por uptime. Trocar a cada mudança que precise ser confirmada.
  */
-const BUILD_TAG = 'skribby-lang-17'
+const BUILD_TAG = 'piloto-time-18'
 
 let ffmpegReady: boolean | null = null
 let audioCodec: string | null = null

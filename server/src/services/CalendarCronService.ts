@@ -31,11 +31,26 @@ const BOT_GUEST_EMAIL = (process.env.BOT_GUEST_EMAIL?.trim() || 'contato@lemon-m
  * Ampliar ou desligar é editar a variável, sem deploy.
  */
 const PILOTO_CONVITE_EXTERNO = new Set(
-  // Deive (era Kledson): o convite só funciona onde a pessoa ORGANIZA o evento,
-  // e na semana de 01–08/09 o Kledson organizou 5 reuniões (3 com cliente)
-  // contra 31 do Deive (25 com cliente). Com o Kledson o piloto não teria
-  // amostra para concluir nada até sexta.
-  (process.env.BOT_GUEST_PILOT_USERS ?? '07147e88-bb65-4bfb-be29-1bef3e569df2')
+  // AMPLIADO em 12/09/2026 para o time todo (Deive, Débora, Kledson, Adriano).
+  //
+  // O piloto rodou só com o Deive de 08 a 11/09 e o resultado justificou:
+  // `not_admitted` caiu de 29% para 13% nas reuniões dele, enquanto no grupo de
+  // controle (os outros três) subiu de 38% para 40% no mesmo período. As 3
+  // falhas que sobraram foram em eventos que ele NÃO organiza — fora do alcance
+  // do mecanismo, porque o Google só deixa o organizador mexer na lista.
+  //
+  // ⚠️ O padrão vive no código porque a variável NUNCA foi criada no EasyPanel —
+  // o piloto inteiro rodou neste literal. Criar `BOT_GUEST_PILOT_USERS` lá
+  // continua sendo o jeito de ampliar ou DESLIGAR sem deploy, e é o caminho a
+  // usar se aparecer atrito com cliente (houve 6 `request_denied` na semana,
+  // gente clicando em negar o bot — todos em reuniões SEM convite).
+  (process.env.BOT_GUEST_PILOT_USERS ??
+    [
+      '07147e88-bb65-4bfb-be29-1bef3e569df2', // deive.oliveira
+      '3e9b5f9f-0bf7-4386-8c78-50c3b4cc4816', // debora.vieira
+      '1c2661cd-24e9-417e-a25b-76192fdd7d09', // kledson.araujo
+      '63a89189-9486-4270-8a1f-e9ca3a35db88', // adriano.palombo
+    ].join(','))
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean),
