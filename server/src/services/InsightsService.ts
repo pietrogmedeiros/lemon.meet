@@ -1,12 +1,8 @@
-import OpenAI from 'openai';
+import { llm, LLM_MODEL, textoDaResposta, comRetry } from '../config/llm.js';
 import { logger } from '../utils/logger.js';
 import { supabase } from '../config/supabase.js';
 
 // DeepSeek usa a mesma interface do OpenAI SDK
-const deepseek = new OpenAI({
-  apiKey: process.env.DEEPSEEK_API_KEY,
-  baseURL: 'https://api.deepseek.com',
-});
 
 // Dimensão padrão usada por BANT e SPIN (score 0-10 + evidência textual)
 export interface ScoreDimension {
@@ -330,20 +326,24 @@ export class InsightsService {
 
       const userPrompt = `Transcrição da reunião:\n\n${transcript}`;
 
-      const response = await deepseek.chat.completions.create({
-        model: 'deepseek-chat',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
-        ],
-        temperature: 0.3,
-        response_format: { type: 'json_object' },
-      });
+      const response = await comRetry('insights', () =>
+        llm.chat.completions.create({
+          model: LLM_MODEL,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt }
+          ],
+          temperature: 0.3,
+          response_format: { type: 'json_object' },
+        }));
 
-      const content = response.choices[0]?.message?.content;
+      const content = textoDaResposta(response);
 
       if (!content) {
-        throw new Error('No content in DeepSeek response');
+        // Mensagem que diz o que houve, em vez do TypeError opaco de 14/09.
+        throw new Error(
+          `o provedor de IA (${LLM_MODEL}) respondeu sem conteúdo utilizável`,
+        );
       }
 
       const parsed = JSON.parse(content);
@@ -493,8 +493,8 @@ ${metricLine}
 Próximos passos: ${insights.actionItems.slice(0, 3).join('; ')}
 Sugestões de follow-up: ${insights.followUpSuggestions.slice(0, 2).join('; ')}`;
 
-    const response = await deepseek.chat.completions.create({
-      model: 'deepseek-chat',
+    const response = await llm.chat.completions.create({
+      model: LLM_MODEL,
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
@@ -502,7 +502,7 @@ Sugestões de follow-up: ${insights.followUpSuggestions.slice(0, 2).join('; ')}`
       temperature: 0.5,
     });
 
-    return response.choices[0]?.message?.content ?? '';
+    return textoDaResposta(response) ?? '';
   }
 
   /**
@@ -564,8 +564,8 @@ Retorne APENAS o texto do briefing, sem cabeçalhos ou formatação markdown.`;
 
     const userPrompt = `Reunião atual: ${currentMeetingTitle}\n\nHistórico de reuniões anteriores:\n${history}`;
 
-    const response = await deepseek.chat.completions.create({
-      model: 'deepseek-chat',
+    const response = await llm.chat.completions.create({
+      model: LLM_MODEL,
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
@@ -573,7 +573,7 @@ Retorne APENAS o texto do briefing, sem cabeçalhos ou formatação markdown.`;
       temperature: 0.4,
     });
 
-    return response.choices[0]?.message?.content ?? '';
+    return textoDaResposta(response) ?? '';
   }
 
   /**
@@ -642,8 +642,8 @@ ${transcriptContext.substring(0, 1000)}
 
 Regenere a mensagem aplicando o tom ${tone.toUpperCase()}.`;
 
-    const response = await deepseek.chat.completions.create({
-      model: 'deepseek-chat',
+    const response = await llm.chat.completions.create({
+      model: LLM_MODEL,
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
@@ -651,7 +651,7 @@ Regenere a mensagem aplicando o tom ${tone.toUpperCase()}.`;
       temperature: 0.7,
     });
 
-    return response.choices[0]?.message?.content?.trim() ?? originalFup;
+    return textoDaResposta(response)?.trim() ?? originalFup;
   }
 
   /**

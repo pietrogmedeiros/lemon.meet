@@ -13,6 +13,7 @@ import { Router, type Request, type Response } from 'express'
 import type express from 'express'
 import rateLimit from 'express-rate-limit'
 import { logger } from '../utils/logger.js'
+import { llm, LLM_MODEL, LLM_PROVIDER, textoDaResposta } from '../config/llm.js'
 
 const router: express.Router = Router()
 
@@ -59,8 +60,7 @@ router.post('/', limite, async (req: Request, res: Response) => {
     return res.status(403).json({ error: 'origin_not_allowed' })
   }
 
-  const apiKey = process.env.DEEPSEEK_API_KEY
-  if (!apiKey) return res.status(503).json({ error: 'deepseek_not_configured' })
+  if (LLM_PROVIDER === 'nenhum') return res.status(503).json({ error: 'llm_not_configured' })
 
   const bruto = Array.isArray(req.body?.messages) ? (req.body.messages as MensagemEntrada[]) : []
   const lang = typeof req.body?.lang === 'string' && req.body.lang in INSTRUCOES ? req.body.lang : 'pt'
@@ -76,25 +76,14 @@ router.post('/', limite, async (req: Request, res: Response) => {
   if (total > MAX_CHARS_TOTAL) return res.status(413).json({ error: 'conversation_too_long' })
 
   try {
-    const resposta = await fetch('https://api.deepseek.com/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({
-        model: 'deepseek-chat',
-        messages: [{ role: 'system', content: INSTRUCOES[lang] }, ...mensagens],
-        temperature: 0.7,
-        max_tokens: 500,
-      }),
+    const dados = await llm.chat.completions.create({
+      model: LLM_MODEL,
+      messages: [{ role: 'system', content: INSTRUCOES[lang] }, ...mensagens],
+      temperature: 0.7,
+      max_tokens: 500,
     })
 
-    if (!resposta.ok) {
-      const detalhe = (await resposta.text()).slice(0, 200)
-      logger.error(`[SiteChat] DeepSeek recusou (${resposta.status}): ${detalhe}`)
-      return res.status(502).json({ error: 'upstream_error' })
-    }
-
-    const dados = (await resposta.json()) as any
-    const content = dados?.choices?.[0]?.message?.content
+    const content = textoDaResposta(dados)
     if (typeof content !== 'string') return res.status(502).json({ error: 'empty_completion' })
 
     return res.json({ content })

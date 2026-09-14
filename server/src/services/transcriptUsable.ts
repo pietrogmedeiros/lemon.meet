@@ -15,6 +15,29 @@ const ALUCINACOES = [
   'thank you', 'thanks for watching', 'you', 'obrigado', 'obrigada', 'tchau',
   'legendas pela comunidade amara.org', 'amara.org', 'legendas', 'subscribe',
   'música', 'music', 'aplausos', 'applause', 'bye',
+  // Acrescentados em 14/09/2026. Até 08/09 o Skribby transcrevia com idioma
+  // AUTODETECTADO e errava para inglês, então a alucinação de silêncio vinha em
+  // inglês ("Thank you." repetido) e esta lista bastava. Depois que passamos a
+  // mandar `lang: pt-BR` (ver [[lemon-skribby-idioma]]), o modelo passou a
+  // alucinar EM PORTUGUÊS e estes padrões escaparam da lista.
+  //
+  // ⚠️ "e aí" também é saudação legítima. Remover é seguro porque a regra só
+  // DESCONTA a frase e depois exige 12 palavras distintas no que sobra: uma
+  // reunião real tem muito mais do que cumprimentos. Mesmo compromisso que já
+  // valia para 'obrigado' e 'tchau'.
+  'e aí', 'e ai', 'inscreva-se', 'inscreva se',
+]
+
+/**
+ * Alucinações com cauda variável — não dá para casar por texto fixo.
+ * O Whisper credita um legendador inventado ("Legenda por Adriana Zanotto",
+ * "Legenda por Sônia Ruberti"), que é o primo brasileiro do `amara.org`. Sem
+ * remover o NOME junto, ele sobra como duas palavras distintas e ajuda a
+ * transcrição de silêncio a passar do corte de 12.
+ */
+const ALUCINACOES_REGEX = [
+  /legenda[s]?\s+(por|pela|pelo)\s+\S+(\s+\S+)?/g,
+  /legendado[s]?\s+(por|pela|pelo)\s+\S+(\s+\S+)?/g,
 ]
 
 /** Normaliza: minúsculas, sem pontuação, espaços colapsados. */
@@ -46,6 +69,12 @@ export function avaliarTranscricao(texto: string | null | undefined): Usabilidad
   if (!t) return { usavel: false, motivo: 'transcrição vazia' }
 
   let restante = t
+  // Os padrões com cauda variável saem PRIMEIRO: "legenda por fulano de tal"
+  // precisa levar o nome junto, antes que 'legendas' (texto fixo) quebre a
+  // expressão e deixe o nome órfão.
+  for (const padrao of ALUCINACOES_REGEX) {
+    restante = restante.replace(padrao, ' ')
+  }
   for (const frase of ALUCINACOES) {
     restante = restante.split(frase).join(' ')
   }

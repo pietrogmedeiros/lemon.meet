@@ -1,11 +1,7 @@
-import OpenAI from 'openai';
+import { llm, LLM_MODEL, textoDaResposta } from '../config/llm.js';
 import { logger } from '../utils/logger.js';
 import { supabase } from '../config/supabase.js';
 
-const deepseek = new OpenAI({
-  apiKey: process.env.DEEPSEEK_API_KEY,
-  baseURL: 'https://api.deepseek.com',
-});
 
 export interface RapportCompany {
   name: string;
@@ -163,8 +159,8 @@ Omita "company" se for apenas perfil pessoal. Omita "person" se for apenas empre
       ? `Analise as informações abaixo e gere o rapport:\n\n${contextParts.join('\n\n')}`
       : `Gere rapport com base nas URLs fornecidas:\n- Website: ${urls.website ?? 'não informado'}\n- LinkedIn: ${urls.linkedin ?? 'não informado'}\n- Instagram: ${urls.instagram ?? 'não informado'}`;
 
-    const completion = await deepseek.chat.completions.create({
-      model: 'deepseek-chat',
+    const completion = await llm.chat.completions.create({
+      model: LLM_MODEL,
       temperature: 0.5,
       response_format: { type: 'json_object' },
       messages: [
@@ -173,7 +169,7 @@ Omita "company" se for apenas perfil pessoal. Omita "person" se for apenas empre
       ],
     });
 
-    const raw = completion.choices[0]?.message?.content ?? '{}';
+    const raw = textoDaResposta(completion) ?? '{}';
 
     let data: RapportData;
     try {

@@ -7,17 +7,13 @@
 
 import { Router, type Response } from 'express'
 import type express from 'express'
-import OpenAI from 'openai'
+import { llm, LLM_MODEL, textoDaResposta } from '../config/llm.js';
 import { authMiddleware, type AuthRequest } from '../middleware/auth.middleware.js'
 import { supabase } from '../config/supabase.js'
 import { logger } from '../utils/logger.js'
 
 const router: express.Router = Router()
 
-const deepseek = new OpenAI({
-  apiKey: process.env.DEEPSEEK_API_KEY,
-  baseURL: 'https://api.deepseek.com',
-})
 
 // ── Cache em memória ──────────────────────────────────────────
 // Chave: userId  Valor: { coaching, meetingsAnalyzed, meetingCount, cachedAt }
@@ -130,8 +126,8 @@ Regras importantes:
 
     const userPrompt = `Dados das últimas ${meetings.length} reuniões do vendedor:\n${JSON.stringify(summary, null, 2)}`
 
-    const response = await deepseek.chat.completions.create({
-      model: 'deepseek-chat',
+    const response = await llm.chat.completions.create({
+      model: LLM_MODEL,
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
@@ -140,7 +136,9 @@ Regras importantes:
       response_format: { type: 'json_object' },
     })
 
-    const coaching = JSON.parse(response.choices[0].message.content!)
+    const bruto = textoDaResposta(response)
+    if (!bruto) throw new Error(`o provedor de IA (${LLM_MODEL}) respondeu sem conteúdo utilizável`)
+    const coaching = JSON.parse(bruto)
 
     // Armazena no cache
     coachingCache.set(userId, {

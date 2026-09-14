@@ -34,6 +34,7 @@ import webinarRouter from './routes/webinar.routes.js'
 import { calendarCronService } from './services/CalendarCronService.js'
 import { setupSocketIO } from './config/socket.js'
 import { metricsMiddleware, metricsHandler } from './metrics.js'
+import { LLM_PROVIDER, LLM_MODEL } from './config/llm.js'
 
 // Load environment variables
 dotenv.config()
@@ -142,7 +143,7 @@ app.use('/api', limiter)
  * o build falha e o contêiner ANTIGO continua no ar — sem isso, "está no ar" é
  * palpite por uptime. Trocar a cada mudança que precise ser confirmada.
  */
-const BUILD_TAG = 'piloto-time-18'
+const BUILD_TAG = 'llm-robusto-19'
 
 let ffmpegReady: boolean | null = null
 let audioCodec: string | null = null
@@ -164,6 +165,7 @@ app.get('/health', (req, res) => {
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     build: BUILD_TAG,
+    llm: { provider: LLM_PROVIDER, model: LLM_MODEL },
     ffmpeg: ffmpegReady,
     audioCodec,
     // Booleano de propósito: prova que a variável chegou ao contêiner sem
