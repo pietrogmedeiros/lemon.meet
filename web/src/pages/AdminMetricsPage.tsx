@@ -16,7 +16,6 @@ import { Card } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:3000'
-const ADMIN_KEY_STORAGE = 'admin-metrics-key'
 
 const DEV_ALLOWLIST = new Set(['pietrogoncalvesmedeiros@gmail.com'])
 
@@ -372,9 +371,6 @@ export function AdminMetricsPage() {
   const [authChecked, setAuthChecked] = useState(false)
   const [userEmail, setUserEmail] = useState<string | null>(null)
   const [accessToken, setAccessToken] = useState<string | null>(null)
-  const [adminKey, setAdminKey] = useState<string>(() => localStorage.getItem(ADMIN_KEY_STORAGE) || '')
-  const [keyPrompt, setKeyPrompt] = useState('')
-  const [keyError, setKeyError] = useState<string | null>(null)
 
   const [range, setRange] = useState<RangeKey>('30d')
   const [data, setData] = useState<MetricsPayload | null>(null)
@@ -401,57 +397,35 @@ export function AdminMetricsPage() {
 
   // Fetch
   const fetchMetrics = useCallback(async () => {
-    if (!accessToken || !adminKey || !isAllowed) return
+    if (!accessToken || !isAllowed) return
     setLoading(true)
     setError(null)
     try {
       const res = await fetch(`${API}/api/admin/metrics?range=${range}`, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
-          'x-admin-key': adminKey,
         },
       })
       if (res.status === 403) {
-        const body = await res.json().catch(() => ({}))
-        if (body.error === 'invalid_admin_key') {
-          setKeyError('Chave inválida. Limpe e tente de novo.')
-          setLoading(false)
-          return
-        }
-        setError('Sem permissão.')
+        // Sem chave desde 14/09/2026: o único jeito de cair aqui é a conta não
+        // estar em DEV_USER_EMAILS no backend.
+        setError('Sem permissão. Esta conta não está na allowlist do servidor.')
         setLoading(false)
         return
       }
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const json = (await res.json()) as MetricsPayload
       setData(json)
-      setKeyError(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
       setLoading(false)
     }
-  }, [accessToken, adminKey, isAllowed, range, refreshKey])
+  }, [accessToken, isAllowed, range, refreshKey])
 
   useEffect(() => { fetchMetrics() }, [fetchMetrics])
 
-  const handleSaveKey = () => {
-    const k = keyPrompt.trim()
-    if (k.length < 16) {
-      setKeyError('Token muito curto (mín. 16 chars).')
-      return
-    }
-    localStorage.setItem(ADMIN_KEY_STORAGE, k)
-    setAdminKey(k)
-    setKeyPrompt('')
-    setKeyError(null)
-  }
 
-  const handleClearKey = () => {
-    localStorage.removeItem(ADMIN_KEY_STORAGE)
-    setAdminKey('')
-    setData(null)
-  }
 
   const tsLabels = useMemo(() => data?.timeseries.days.map(d => d.slice(5)) ?? [], [data])
 
@@ -472,36 +446,6 @@ export function AdminMetricsPage() {
       </MainLayout>
     )
   }
-  if (!adminKey) {
-    return (
-      <MainLayout>
-        <div className="p-6 max-w-md">
-          <Card>
-            <h1 className="text-lg font-semibold mb-2">Token do painel</h1>
-            <p className="text-sm text-secondary mb-3">Cole o <code>ADMIN_METRICS_KEY</code> configurado no servidor.</p>
-            <input
-              type="password"
-              value={keyPrompt}
-              onChange={e => setKeyPrompt(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') handleSaveKey() }}
-              placeholder="x-admin-key"
-              className="w-full px-3 py-2 border border-neutral-light rounded text-sm"
-              autoFocus
-            />
-            {keyError && <p className="text-xs text-red-600 mt-2">{keyError}</p>}
-            <button
-              onClick={handleSaveKey}
-              className="mt-3 px-4 py-2 bg-[#2D5A27] text-white rounded text-sm hover:bg-[#244520]"
-            >
-              Salvar e entrar
-            </button>
-          </Card>
-        </div>
-      </MainLayout>
-    )
-  }
-
-  // ── render principal ───────────────────────────────────────
   return (
     <MainLayout>
       <div className="p-4 sm:p-6 max-w-7xl">
@@ -532,7 +476,6 @@ export function AdminMetricsPage() {
               {loading ? 'Atualizando…' : 'Atualizar'}
             </button>
             <button
-              onClick={handleClearKey}
               className="px-3 py-1.5 border border-neutral-light rounded text-sm bg-surface hover:bg-background text-secondary"
               title="Esquecer o token e voltar ao prompt"
             >

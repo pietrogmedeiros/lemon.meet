@@ -58,6 +58,7 @@ const TeamSchedulingListPage  = lazy(() => import('@/pages/TeamSchedulingListPag
 const PublicSchedulingPage    = lazy(() => import('@/pages/PublicSchedulingPage').then(m => ({ default: m.PublicSchedulingPage })))
 const FeatureRequestsPage     = lazy(() => import('@/pages/FeatureRequestsPage').then(m => ({ default: m.FeatureRequestsPage })))
 const AdminMetricsPage        = lazy(() => import('@/pages/AdminMetricsPage').then(m => ({ default: m.AdminMetricsPage })))
+const AdminBillingPage        = lazy(() => import('@/pages/AdminBillingPage').then(m => ({ default: m.AdminBillingPage })))
 const WebinarConfigPage       = lazy(() => import('@/pages/WebinarConfigPage').then(m => ({ default: m.WebinarConfigPage })))
 const PublicWebinarPage       = lazy(() => import('@/pages/PublicWebinarPage').then(m => ({ default: m.PublicWebinarPage })))
 
@@ -225,6 +226,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <AdminMetricsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/faturamento"
+            element={
+              <ProtectedRoute>
+                <AdminBillingPage />
               </ProtectedRoute>
             }
           />

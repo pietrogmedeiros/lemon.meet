@@ -30,6 +30,7 @@ import accountRouter from './routes/account.routes.js'
 import schedulingRouter from './routes/scheduling.routes.js'
 import featureRequestsRouter from './routes/feature-requests.routes.js'
 import adminMetricsRouter from './routes/admin-metrics.routes.js'
+import adminBillingRouter from './routes/admin-billing.routes.js'
 import webinarRouter from './routes/webinar.routes.js'
 import { calendarCronService } from './services/CalendarCronService.js'
 import { setupSocketIO } from './config/socket.js'
@@ -143,7 +144,7 @@ app.use('/api', limiter)
  * o build falha e o contêiner ANTIGO continua no ar — sem isso, "está no ar" é
  * palpite por uptime. Trocar a cada mudança que precise ser confirmada.
  */
-const BUILD_TAG = 'llm-robusto-19'
+const BUILD_TAG = 'faturamento-20'
 
 let ffmpegReady: boolean | null = null
 let audioCodec: string | null = null
@@ -235,6 +236,7 @@ app.use('/api/account', accountRouter)
 app.use('/api/scheduling', schedulingRouter)
 app.use('/api/feature-requests', featureRequestsRouter)
 app.use('/api/admin/metrics', adminMetricsRouter)
+app.use('/api/admin', adminBillingRouter)
 app.use('/api/webinars', webinarRouter)
 
 // 404 handler

@@ -1,9 +1,16 @@
 // ============================================================
 // admin-metrics.middleware.ts
-// Gate duplo pro painel /admin/metrics:
-//   1. user.email ∈ DEV_USER_EMAILS (mesma allowlist usada em teamAccess.ts)
-//   2. header x-admin-key === process.env.ADMIN_METRICS_KEY
+// Gate das telas internas (/admin/metrics e /admin/faturamento):
+//   user.email ∈ DEV_USER_EMAILS (hoje: só pietrogoncalvesmedeiros@gmail.com)
 // Roda depois de authMiddleware (que popula req.user).
+//
+// ⚠️ MUDOU em 14/09/2026: antes exigia TAMBÉM o header `x-admin-key` contra
+// ADMIN_METRICS_KEY. A chave saiu por decisão do Pietro — ela não somava
+// segurança real (a allowlist de e-mail já restringe a uma conta) e custava um
+// prompt manual e um valor no localStorage a cada navegador novo. A conta do
+// Supabase, com 2FA do Google por trás, é o fator que de fato protege.
+//
+// A env ADMIN_METRICS_KEY ficou órfã: pode sair do EasyPanel quando quiser.
 // ============================================================
 
 import type { Response, NextFunction } from 'express'
@@ -22,22 +29,9 @@ export async function adminMetricsGate(
     return
   }
 
-  const expectedKey = process.env.ADMIN_METRICS_KEY
-  if (!expectedKey || expectedKey.length < 16) {
-    logger.error('[AdminMetrics] ADMIN_METRICS_KEY não configurada (ou curta demais). Defina no .env (≥16 chars).')
-    res.status(503).json({ error: 'admin_metrics_key_not_configured' })
-    return
-  }
-
-  const providedKey = req.headers['x-admin-key']
-  if (typeof providedKey !== 'string' || providedKey !== expectedKey) {
-    res.status(403).json({ error: 'invalid_admin_key' })
-    return
-  }
-
-  const allowed = await isDevUser(userId)
+  const allowed = await isDevUser(userId, req.user?.email)
   if (!allowed) {
-    logger.warn(`[AdminMetrics] Acesso negado pra userId=${userId} (não está em DEV_USER_EMAILS)`)
+    logger.warn(`[Admin] Acesso negado pra userId=${userId} (fora de DEV_USER_EMAILS)`)
     res.status(403).json({ error: 'not_in_dev_allowlist' })
     return
   }
