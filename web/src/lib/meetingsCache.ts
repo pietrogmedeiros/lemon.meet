@@ -8,9 +8,26 @@ const TTL_MS = 30_000 // 30 segundos
 
 interface CacheEntry {
   data: Meeting[]
+  stats: MeetingsStats | null
   expiresAt: number
   userId: string // NOVO: vincula cache ao usuário
-  promise?: Promise<Meeting[]> // deduplica fetches simultâneos
+  promise?: Promise<MeetingsResult> // deduplica fetches simultâneos
+}
+
+// Contadores calculados NO BANCO. `data` é sempre uma página (o PostgREST corta
+// qualquer listagem em 1000 linhas), então contar o array dá um número travado
+// no teto assim que a base passa disso. Quem mostra total usa isto.
+export interface MeetingsStats {
+  total: number | null
+  completed: number | null
+  processing: number | null
+  /** true quando a listagem devolvida é só uma fatia do que existe. */
+  truncated: boolean
+}
+
+export interface MeetingsResult {
+  meetings: Meeting[]
+  stats: MeetingsStats | null
 }
 
 export interface Meeting {
@@ -50,7 +67,13 @@ export interface FetchMeetingsOptions {
   withInsights?: boolean
 }
 
+/** Atalho para quem só precisa da lista (a maioria das telas). */
 export async function fetchMeetings(limit = 100, options: FetchMeetingsOptions = {}): Promise<Meeting[]> {
+  const { meetings } = await fetchMeetingsWithStats(limit, options)
+  return meetings
+}
+
+export async function fetchMeetingsWithStats(limit = 100, options: FetchMeetingsOptions = {}): Promise<MeetingsResult> {
   const now = Date.now()
   const variant: CacheVariant = options.withInsights ? 'insights' : 'base'
   let cache = caches[variant]
@@ -62,7 +85,7 @@ export async function fetchMeetings(limit = 100, options: FetchMeetingsOptions =
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) {
     console.warn('[MeetingsCache] ❌ Sem sessão, não pode buscar reuniões')
-    return []
+    return { meetings: [], stats: null }
   }
 
   const currentUserId = session.user.id
@@ -98,7 +121,7 @@ export async function fetchMeetings(limit = 100, options: FetchMeetingsOptions =
   // Serve do cache se ainda válido E for do mesmo usuário
   if (cache && now < cache.expiresAt && cache.userId === currentUserId) {
     console.log('[MeetingsCache] ✅ Usando cache válido')
-    return cache.data
+    return { meetings: cache.data, stats: cache.stats }
   }
 
   // 'insights' é superset de 'base': quem só precisa do básico pode aproveitar
@@ -108,7 +131,7 @@ export async function fetchMeetings(limit = 100, options: FetchMeetingsOptions =
     const rich = caches.insights
     if (rich && now < rich.expiresAt && rich.userId === currentUserId) {
       console.log('[MeetingsCache] ✅ Reaproveitando cache com insights')
-      return rich.data
+      return { meetings: rich.data, stats: rich.stats }
     }
   }
 
@@ -127,26 +150,28 @@ export async function fetchMeetings(limit = 100, options: FetchMeetingsOptions =
   console.log('[MeetingsCache] 🔄 Buscando reuniões do servidor...')
   console.log('[MeetingsCache] 📡 API URL:', url)
 
-  const promise = (async (): Promise<Meeting[]> => {
+  const promise = (async (): Promise<MeetingsResult> => {
     const res = await fetch(url, {
       headers: { Authorization: `Bearer ${session?.access_token}` },
     })
     if (!res.ok) throw new Error('Failed to fetch meetings')
     const json = await res.json()
     const meetings: Meeting[] = json.meetings ?? []
+    const stats: MeetingsStats | null = json.stats ?? null
 
-    console.log('[MeetingsCache] ✅ Reuniões carregadas:', meetings.length)
+    console.log('[MeetingsCache] ✅ Reuniões carregadas:', meetings.length, '| total no banco:', stats?.total ?? '?')
 
     setCache({
       data: meetings,
+      stats,
       expiresAt: Date.now() + TTL_MS,
       userId: currentUserId // Vincula ao usuário
     })
-    return meetings
+    return { meetings, stats }
   })()
 
   // Armazena a promise para deduplicação
-  if (!cache) setCache({ data: [], expiresAt: 0, userId: currentUserId, promise })
+  if (!cache) setCache({ data: [], stats: null, expiresAt: 0, userId: currentUserId, promise })
   else cache.promise = promise
 
   try {

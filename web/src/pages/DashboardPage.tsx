@@ -5,7 +5,7 @@ import { MainLayout } from '@/components/layout';
 import { Card, Badge } from '@/components/ui';
 import { Video, Clock, Calendar, TrendingUp, CheckCircle, Loader, ExternalLink } from 'lucide-react';
 import { formatDate } from '@/lib';
-import { fetchMeetings as fetchMeetingsCache, invalidateMeetingsCache, type Meeting } from '@/lib/meetingsCache';
+import { fetchMeetingsWithStats, invalidateMeetingsCache, type Meeting, type MeetingsStats } from '@/lib/meetingsCache';
 import { supabase } from '@/lib/supabase';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:3000';
@@ -14,6 +14,7 @@ export function DashboardPage() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const [meetings, setMeetings] = useState<Meeting[]>([]);
+  const [dbStats, setDbStats] = useState<MeetingsStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   console.log('[Dashboard] 🏠 Componente montado')
@@ -108,9 +109,10 @@ export function DashboardPage() {
     console.log('[Dashboard] 📡 Iniciando fetchMeetings...')
     setIsLoading(true);
     try {
-      const data = await fetchMeetingsCache();
+      const { meetings: data, stats } = await fetchMeetingsWithStats();
       console.log('[Dashboard] ✅ Reuniões carregadas:', data.length)
       setMeetings(data);
+      setDbStats(stats);
     } catch (err) {
       console.error('[Dashboard] ❌ Erro ao buscar reuniões:', err);
     } finally {
@@ -132,10 +134,13 @@ export function DashboardPage() {
     return `${m}m ${s}s`;
   };
 
+  // Os contadores vêm de COUNT no banco (`dbStats`). A lista é só uma página —
+  // o PostgREST corta em 1000 linhas, então `meetings.length` travava em "1000".
+  // Só cai no cálculo local se o COUNT tiver falhado no servidor.
   const stats = {
-    total: meetings.length,
-    concluidas: meetings.filter(m => m.status === 'completed').length,
-    processando: meetings.filter(m => m.status === 'processing' || m.status === 'recording').length,
+    total: dbStats?.total ?? meetings.length,
+    concluidas: dbStats?.completed ?? meetings.filter(m => m.status === 'completed').length,
+    processando: dbStats?.processing ?? meetings.filter(m => m.status === 'processing' || m.status === 'recording').length,
   };
 
   const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);

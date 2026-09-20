@@ -202,6 +202,31 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
       return res.status(500).json({ success: false, message: 'Error fetching meetings' })
     }
 
+    // ⚠️ `meetings.length` NÃO serve de total: o PostgREST corta toda listagem
+    // em 1000 linhas (db-max-rows), então o contador do Dashboard travava em
+    // "1000" assim que a conta passava disso — e "Concluídas"/"Em Processamento"
+    // contavam só dentro dessa fatia. Os totais reais vêm de COUNT no banco
+    // (head=true: conta sem trafegar linha nenhuma).
+    const countBy = async (filter?: (q: any) => any) => {
+      let query = supabase
+        .from('meetings')
+        .select('id', { count: 'exact', head: true })
+        .in('user_id', memberIds)
+      if (filter) query = filter(query)
+      const { count, error: countError } = await query
+      if (countError) {
+        logger.error('[meetings] falha ao contar reuniões:', countError)
+        return null
+      }
+      return count ?? 0
+    }
+
+    const [totalCount, completedCount, processingCount] = await Promise.all([
+      countBy(),
+      countBy(q => q.eq('status', 'completed')),
+      countBy(q => q.in('status', ['processing', 'recording'])),
+    ])
+
     // Determina has_transcript sem trafegar o texto completo da transcrição.
     // Considera "com transcrição" se houver texto em meetings.transcript OU
     // ao menos um registro em transcript_segments.
@@ -270,8 +295,17 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
       has_transcript: hasTranscriptSet.has(m.id),
     }))
 
+    // `stats` é sempre sobre a base inteira; `meetings` é a página pedida.
+    // Se o COUNT falhar, devolve null e o front cai no cálculo local (a fatia).
+    const stats = {
+      total: totalCount,
+      completed: completedCount,
+      processing: processingCount,
+      truncated: (data ?? []).length >= limit || (totalCount !== null && (data ?? []).length < totalCount),
+    }
+
     res.set('Cache-Control', 'private, max-age=20, stale-while-revalidate=40')
-    return res.json({ success: true, meetings })
+    return res.json({ success: true, meetings, stats })
   } catch (err) {
     logger.error('Unexpected error in GET /meetings:', err)
     return res.status(500).json({ success: false, message: 'Internal server error' })

@@ -27,9 +27,11 @@ interface MetricsPayload {
   generatedAt: string
   tookMs: number
   fromCache?: boolean
+  rangeStart: string | null
   counts: {
     users: number
     meetings: number
+    meetingsInRange: number
     teams: number
     teamMembers: number
     calendarIntegrations: number
@@ -39,15 +41,19 @@ interface MetricsPayload {
     totalUsers: number
     newUsers7d: number
     newUsers30d: number
+    newUsersInRange: number
     dau: number
     wau: number
     mau: number
+    /** meetings criadas DENTRO do período selecionado */
     totalMeetings: number
+    totalMeetingsAllTime: number
     meetings7d: number
     meetings30d: number
     transcriptSuccessPct: number
     insightsSuccessPct: number
-    avgTimeToInsightsMs: number | null
+    /** fim da reunião → insights prontos (ended_at → updated_at) */
+    timeToInsights: { medianMs: number | null; p90Ms: number | null; sample: number }
     activationRate: number
     usersWithMeeting: number
   }
@@ -80,13 +86,13 @@ interface MetricsPayload {
       teamType: string | null
       framework: string | null
       totalMeetings: number
-      meetings30d: number
+      meetingsInRange: number
       activeUsers: number
       memberCount: number
     }>
     teamTypeDistribution: Array<{ label: string; count: number }>
     frameworkDistribution: Array<{ label: string; count: number }>
-    activeTeams30d: number
+    activeTeamsInRange: number
   }
   retention: {
     cohorts: Array<{ weekLabel: string; size: number; retention: Array<number | null> }>
@@ -127,10 +133,11 @@ function formatPct(n: number | null | undefined): string {
   return `${n.toFixed(1)}%`
 }
 function formatMs(ms: number | null | undefined): string {
-  if (!ms) return '—'
+  if (ms === null || ms === undefined) return '—'
   const sec = ms / 1000
-  if (sec < 60) return `${sec.toFixed(0)}s`
-  return `${(sec / 60).toFixed(1)}min`
+  if (sec < 90) return `${sec.toFixed(sec < 10 ? 1 : 0)}s`
+  if (sec < 90 * 60) return `${(sec / 60).toFixed(1)}min`
+  return `${(sec / 3600).toFixed(1)}h`
 }
 function formatDuration(s: number | null | undefined): string {
   if (!s) return '—'
@@ -428,6 +435,8 @@ export function AdminMetricsPage() {
 
 
   const tsLabels = useMemo(() => data?.timeseries.days.map(d => d.slice(5)) ?? [], [data])
+  // Rótulo do período, pra cada card dizer se segue o filtro ou é acumulado.
+  const rangeLabel = data ? (data.range === 'all' ? 'no histórico' : `em ${data.rangeDays}d`) : ''
 
   // ── render gates ───────────────────────────────────────────
   if (!authChecked) {
@@ -492,12 +501,16 @@ export function AdminMetricsPage() {
           <>
             {/* ── KPIs ───────────────────────────────────────── */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
-              <KpiCard title="Total users" value={formatNumber(data.overview.totalUsers)} hint={`+${data.overview.newUsers7d} em 7d · +${data.overview.newUsers30d} em 30d`} />
-              <KpiCard title="DAU / WAU / MAU" value={`${data.overview.dau} / ${data.overview.wau} / ${data.overview.mau}`} hint="usuários distintos c/ meeting" />
-              <KpiCard title="Meetings totais" value={formatNumber(data.overview.totalMeetings)} hint={`${data.overview.meetings7d} em 7d · ${data.overview.meetings30d} em 30d`} />
-              <KpiCard title="Transcrição OK" value={formatPct(data.overview.transcriptSuccessPct)} hint="% de meetings c/ transcrição" />
-              <KpiCard title="Insights OK" value={formatPct(data.overview.insightsSuccessPct)} hint="completed sem failure_reason" />
-              <KpiCard title="Tempo até insights" value={formatMs(data.overview.avgTimeToInsightsMs)} hint="média (created → updated)" />
+              <KpiCard title="Total users" value={formatNumber(data.overview.totalUsers)} hint={`+${data.overview.newUsersInRange} ${rangeLabel} · base acumulada`} />
+              <KpiCard title="DAU / WAU / MAU" value={`${data.overview.dau} / ${data.overview.wau} / ${data.overview.mau}`} hint="janelas fixas, não segue o filtro" />
+              <KpiCard title={`Meetings ${rangeLabel}`} value={formatNumber(data.overview.totalMeetings)} hint={`${formatNumber(data.overview.totalMeetingsAllTime)} no histórico`} />
+              <KpiCard title="Transcrição OK" value={formatPct(data.overview.transcriptSuccessPct)} hint={`% de meetings c/ transcrição · ${rangeLabel}`} />
+              <KpiCard title="Insights OK" value={formatPct(data.overview.insightsSuccessPct)} hint={`completed sem failure_reason · ${rangeLabel}`} />
+              <KpiCard
+                title="Tempo até insights"
+                value={formatMs(data.overview.timeToInsights.medianMs)}
+                hint={`mediana fim→insights · p90 ${formatMs(data.overview.timeToInsights.p90Ms)} · n=${data.overview.timeToInsights.sample}`}
+              />
             </div>
 
             {/* ── Crescimento ────────────────────────────────── */}
@@ -637,12 +650,12 @@ export function AdminMetricsPage() {
             </Section>
 
             {/* ── Adoção de features ─────────────────────────── */}
-            <Section title="Adoção de features" subtitle="Em quais superfícies os usuários estão entrando">
+            <Section title="Adoção de features" subtitle={`Em quais superfícies os usuários estão entrando · ${rangeLabel}`}>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <KpiCard title="Google Calendar conectado" value={formatPct(data.adoption.calendarConnectedPct)} hint={`${data.adoption.calendarConnectedCount} users`} />
-                <KpiCard title="Usaram chat IA" value={formatPct(data.adoption.aiChatAdoptionPct)} hint={`${data.adoption.aiChatUsers} users`} />
-                <KpiCard title="Times c/ atividade 30d" value={formatNumber(data.teams.activeTeams30d)} hint={`de ${data.counts.teams} times`} />
-                <KpiCard title="Tokens IA totais" value={formatNumber(data.aiUsage.totalTokens)} hint={`${data.aiUsage.totalChats} chats`} />
+                <KpiCard title="Google Calendar conectado" value={formatPct(data.adoption.calendarConnectedPct)} hint={`${data.adoption.calendarConnectedCount} users · acumulado`} />
+                <KpiCard title={`Usaram chat IA ${rangeLabel}`} value={formatPct(data.adoption.aiChatAdoptionPct)} hint={`${data.adoption.aiChatUsers} users`} />
+                <KpiCard title={`Times c/ atividade ${rangeLabel}`} value={formatNumber(data.teams.activeTeamsInRange)} hint={`de ${data.counts.teams} times`} />
+                <KpiCard title={`Tokens IA ${rangeLabel}`} value={formatNumber(data.aiUsage.totalTokens)} hint={`${data.aiUsage.totalChats} chats no período`} />
               </div>
               <div className="mt-4">
                 <div className="text-xs text-secondary mb-2">% de users por fonte de meeting</div>
@@ -664,7 +677,7 @@ export function AdminMetricsPage() {
             </Section>
 
             {/* ── Times ──────────────────────────────────────── */}
-            <Section title="Times" subtitle="Top 10 por atividade e distribuição">
+            <Section title="Times" subtitle={`Top 10 por atividade no período · "Total" é o histórico do time`}>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="text-xs text-secondary border-b border-neutral-light">
@@ -673,7 +686,7 @@ export function AdminMetricsPage() {
                       <th className="text-left py-2 px-3">Tipo</th>
                       <th className="text-left py-2 px-3">Framework</th>
                       <th className="text-right py-2 px-3">Membros</th>
-                      <th className="text-right py-2 px-3">30d</th>
+                      <th className="text-right py-2 px-3">{data.range === 'all' ? 'Período' : `${data.rangeDays}d`}</th>
                       <th className="text-right py-2 px-3">Total</th>
                       <th className="text-right py-2 pl-3">Users ativos</th>
                     </tr>
@@ -685,7 +698,7 @@ export function AdminMetricsPage() {
                         <td className="py-2 px-3 text-secondary">{t.teamType ?? '—'}</td>
                         <td className="py-2 px-3 text-secondary">{t.framework ?? '—'}</td>
                         <td className="py-2 px-3 text-right tabular-nums">{t.memberCount}</td>
-                        <td className="py-2 px-3 text-right tabular-nums font-medium">{t.meetings30d}</td>
+                        <td className="py-2 px-3 text-right tabular-nums font-medium">{t.meetingsInRange}</td>
                         <td className="py-2 px-3 text-right tabular-nums">{t.totalMeetings}</td>
                         <td className="py-2 pl-3 text-right tabular-nums">{t.activeUsers}</td>
                       </tr>
@@ -714,7 +727,7 @@ export function AdminMetricsPage() {
             </Section>
 
             {/* ── Retenção ───────────────────────────────────── */}
-            <Section title="Retenção (cohorts semanais)" subtitle="% de usuários da cohort que voltaram a ter meeting na semana N">
+            <Section title="Retenção (cohorts semanais)" subtitle="% de usuários da cohort que voltaram a ter meeting na semana N · histórico completo, não segue o filtro">
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead>
@@ -751,7 +764,7 @@ export function AdminMetricsPage() {
             </Section>
 
             {/* ── IA usage ───────────────────────────────────── */}
-            <Section title="Uso de IA" subtitle="Chats, tokens e reprocessamentos por dia">
+            <Section title="Uso de IA" subtitle={`Chats, tokens e reprocessamentos por dia · ${rangeLabel}`}>
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 <div>
                   <div className="text-xs text-secondary mb-1">Chats IA/dia</div>
@@ -792,7 +805,7 @@ export function AdminMetricsPage() {
             </Section>
 
             <p className="text-xs text-tertiary mt-6 mb-2">
-              Dados de {data.counts.users} users · {data.counts.meetings} meetings · {data.counts.teams} times · {data.counts.aiChats} chats IA · cache 60s.
+              Dados de {data.counts.users} users · {data.counts.meetingsInRange} de {data.counts.meetings} meetings no período · {data.counts.teams} times · {data.counts.aiChats} chats IA · cache 60s.
             </p>
           </>
         )}

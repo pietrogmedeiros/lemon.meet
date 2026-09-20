@@ -140,17 +140,20 @@ async function fetchAllUsers(): Promise<UserLite[]> {
 }
 
 // ── Aggregators ──────────────────────────────────────────────
-function buildOverview(meetings: MeetingRow[], users: UserLite[]): any {
+// ⚠️ DOIS conjuntos de propósito: `inRange` é o que o seletor de período
+// filtra; `all` é o histórico completo, usado só pelo que é cumulativo por
+// definição (ativação, base de usuários). Antes o overview inteiro vinha de
+// `all` e o seletor não mexia em nada: "Meetings totais" era sempre 2.706 em
+// 7d, 30d, 90d ou Tudo.
+function buildOverview(inRange: MeetingRow[], all: MeetingRow[], users: UserLite[], rangeStartMs: number): any {
   const now = Date.now()
   const d1 = now - 24 * 3600 * 1000
   const d7 = now - 7 * 24 * 3600 * 1000
   const d30 = now - 30 * 24 * 3600 * 1000
 
-  const m7 = meetings.filter(m => new Date(m.created_at).getTime() >= d7)
-  const m30 = meetings.filter(m => new Date(m.created_at).getTime() >= d30)
-
+  // DAU/WAU/MAU são janelas fixas por definição — não seguem o seletor.
   const activeUserIds = (since: number) => new Set(
-    meetings
+    all
       .filter(m => m.user_id && new Date(m.created_at).getTime() >= since)
       .map(m => m.user_id as string),
   )
@@ -158,40 +161,52 @@ function buildOverview(meetings: MeetingRow[], users: UserLite[]): any {
   const wau = activeUserIds(d7).size
   const mau = activeUserIds(d30).size
 
-  const withTranscript = meetings.filter(m => (m.transcript ?? '').trim().length > 0).length
-  const withInsights = meetings.filter(m => m.insights && !m.failure_reason && m.status === 'completed').length
-  const transcriptRate = safePct(withTranscript, meetings.length)
-  const insightsRate = safePct(withInsights, meetings.length)
+  const withTranscript = inRange.filter(m => (m.transcript ?? '').trim().length > 0).length
+  const withInsights = inRange.filter(m => m.insights && !m.failure_reason && m.status === 'completed').length
+  const transcriptRate = safePct(withTranscript, inRange.length)
+  const insightsRate = safePct(withInsights, inRange.length)
 
-  // Tempo médio até insights: created_at → updated_at quando status=completed e sem failure_reason.
-  const completedDeltas = meetings
-    .filter(m => m.status === 'completed' && !m.failure_reason && m.updated_at && m.created_at)
-    .map(m => new Date(m.updated_at as string).getTime() - new Date(m.created_at).getTime())
+  // ⚠️ Antes media created_at → updated_at. `created_at` é quando a reunião foi
+  // CRIADA (bot despachado), então a conta engolia a reunião inteira e dava
+  // ~70min — a métrica media duração de reunião, não latência de processamento.
+  // O que importa é fim da reunião → insights prontos: ended_at → updated_at.
+  // Medido (300 completed, 2026-09-20): mediana 14s, média 17min — a média é
+  // dominada por reprocessamentos manuais, então o card mostra a MEDIANA.
+  const latencies = inRange
+    .filter(m => m.status === 'completed' && !m.failure_reason && m.updated_at && m.ended_at)
+    .map(m => new Date(m.updated_at as string).getTime() - new Date(m.ended_at as string).getTime())
     .filter(ms => ms > 0 && ms < 6 * 3600 * 1000)
-  const avgInsightsMs = completedDeltas.length
-    ? Math.round(completedDeltas.reduce((a, b) => a + b, 0) / completedDeltas.length)
-    : null
+    .sort((a, b) => a - b)
+  const pick = (q: number) => latencies.length ? latencies[Math.min(latencies.length - 1, Math.floor(latencies.length * q))] : null
+  const timeToInsights = {
+    medianMs: pick(0.5),
+    p90Ms: pick(0.9),
+    sample: latencies.length,
+  }
 
   const newUsers7d = users.filter(u => new Date(u.created_at).getTime() >= d7).length
   const newUsers30d = users.filter(u => new Date(u.created_at).getTime() >= d30).length
+  const newUsersInRange = users.filter(u => new Date(u.created_at).getTime() >= rangeStartMs).length
 
-  // Activated: usuários com ≥1 meeting alguma vez
-  const usersWithMeeting = new Set(meetings.map(m => m.user_id).filter(Boolean) as string[])
+  // Activated: usuários com ≥1 meeting alguma vez (cumulativo de propósito)
+  const usersWithMeeting = new Set(all.map(m => m.user_id).filter(Boolean) as string[])
   const activationRate = safePct(usersWithMeeting.size, users.length)
 
   return {
     totalUsers: users.length,
     newUsers7d,
     newUsers30d,
+    newUsersInRange,
     dau,
     wau,
     mau,
-    totalMeetings: meetings.length,
-    meetings7d: m7.length,
-    meetings30d: m30.length,
+    totalMeetings: inRange.length,
+    totalMeetingsAllTime: all.length,
+    meetings7d: all.filter(m => new Date(m.created_at).getTime() >= d7).length,
+    meetings30d: all.filter(m => new Date(m.created_at).getTime() >= d30).length,
     transcriptSuccessPct: transcriptRate,
     insightsSuccessPct: insightsRate,
-    avgTimeToInsightsMs: avgInsightsMs,
+    timeToInsights,
     activationRate,
     usersWithMeeting: usersWithMeeting.size,
   }
@@ -301,20 +316,20 @@ function buildTeams(
   meetings: MeetingRow[],
   teams: Array<{ id: string; name: string; team_type: string | null; evaluation_framework: string | null; created_at: string }>,
   members: Array<{ team_id: string; user_id: string; role: string; status: string }>,
+  rangeStartMs: number,
 ): any {
-  const now = Date.now()
-  const d30 = now - 30 * 24 * 3600 * 1000
-
-  const byTeam = new Map<string, { id: string; name: string; total: number; last30d: number; users: Set<string>; type: string | null; framework: string | null }>()
+  // A coluna "do período" segue o seletor (era 30d fixo, ignorando o filtro);
+  // "Total" e "Users ativos" continuam sendo o histórico do time.
+  const byTeam = new Map<string, { id: string; name: string; total: number; inRange: number; users: Set<string>; type: string | null; framework: string | null }>()
   for (const t of teams) {
-    byTeam.set(t.id, { id: t.id, name: t.name, total: 0, last30d: 0, users: new Set(), type: t.team_type, framework: t.evaluation_framework })
+    byTeam.set(t.id, { id: t.id, name: t.name, total: 0, inRange: 0, users: new Set(), type: t.team_type, framework: t.evaluation_framework })
   }
   for (const m of meetings) {
     if (!m.team_id) continue
     const t = byTeam.get(m.team_id)
     if (!t) continue
     t.total += 1
-    if (new Date(m.created_at).getTime() >= d30) t.last30d += 1
+    if (new Date(m.created_at).getTime() >= rangeStartMs) t.inRange += 1
     if (m.user_id) t.users.add(m.user_id)
   }
 
@@ -325,10 +340,10 @@ function buildTeams(
       teamType: t.type,
       framework: t.framework,
       totalMeetings: t.total,
-      meetings30d: t.last30d,
+      meetingsInRange: t.inRange,
       activeUsers: t.users.size,
     }))
-    .sort((a, b) => b.meetings30d - a.meetings30d)
+    .sort((a, b) => b.meetingsInRange - a.meetingsInRange)
 
   // Distribuições
   const typeDist = new Map<string, number>()
@@ -350,7 +365,7 @@ function buildTeams(
     teams: teamRows.map(t => ({ ...t, memberCount: memberCounts.get(t.id) ?? 0 })),
     teamTypeDistribution: [...typeDist.entries()].map(([k, v]) => ({ label: k, count: v })),
     frameworkDistribution: [...frameworkDist.entries()].map(([k, v]) => ({ label: k, count: v })),
-    activeTeams30d: teamRows.filter(t => t.meetings30d > 0).length,
+    activeTeamsInRange: teamRows.filter(t => t.meetingsInRange > 0).length,
   }
 }
 
@@ -571,28 +586,41 @@ router.get('/', authMiddleware, adminMetricsGate, async (req: AuthRequest, res: 
     const aiChats = (aiChatsData.data ?? []) as any[]
     const feedback = (feedbackData.data ?? []) as any[]
 
-    // Filtra meetings no range (overview usa tudo; timeseries usa só 'days')
+    // ⚠️ TUDO que é "no período" tem que sair de `meetingsInRange`/`aiChatsInRange`.
+    // Antes só `quality` e `providers` filtravam: overview, times, adoção e uso
+    // de IA liam `meetingsAll`, então trocar 7d ↔ 90d não mudava número nenhum
+    // naqueles blocos. Cumulativo de propósito (e rotulado assim no front):
+    // base de usuários, ativação, retenção por cohort e DAU/WAU/MAU.
+    const rangeStartMs = range === 'all' ? 0 : daysAgo(days).getTime()
     const meetingsInRange = range === 'all'
       ? meetingsAll
-      : meetingsAll.filter(m => new Date(m.created_at).getTime() >= daysAgo(days).getTime())
+      : meetingsAll.filter(m => new Date(m.created_at).getTime() >= rangeStartMs)
+    const aiChatsInRange = range === 'all'
+      ? aiChats
+      : aiChats.filter(c => new Date(c.created_at).getTime() >= rangeStartMs)
 
-    const overview = buildOverview(meetingsAll, users)
-    const timeseries = buildTimeseries(meetingsAll, users, days)
+    const overview = buildOverview(meetingsInRange, meetingsAll, users, rangeStartMs)
+    const timeseries = buildTimeseries(meetingsInRange, users, days)
     const quality = buildQuality(meetingsInRange)
     const providers = buildProviders(meetingsInRange)
-    const teamsBlock = buildTeams(meetingsAll, teams, members)
+    const teamsBlock = buildTeams(meetingsAll, teams, members, rangeStartMs)
     const retention = buildRetention(meetingsAll, users)
-    const adoption = buildAdoption(users, calInts, meetingsAll, aiChats)
-    const aiUsage = buildAiUsage(aiChats, meetingsAll, days)
+    const adoption = buildAdoption(users, calInts, meetingsInRange, aiChatsInRange)
+    // `meetingsAll` de propósito: reprocessamento é bucketizado por updated_at
+    // (a janela de dias já recorta), e uma reunião antiga reprocessada ontem
+    // some se a lista vier filtrada por created_at.
+    const aiUsage = buildAiUsage(aiChatsInRange, meetingsAll, days)
 
     const payload = {
       range,
       rangeDays: days,
       generatedAt: new Date().toISOString(),
       tookMs: Date.now() - t0,
+      rangeStart: range === 'all' ? null : new Date(rangeStartMs).toISOString(),
       counts: {
         users: users.length,
         meetings: meetingsAll.length,
+        meetingsInRange: meetingsInRange.length,
         teams: teams.length,
         teamMembers: members.length,
         calendarIntegrations: calInts.length,
