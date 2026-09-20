@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, Fragment } from 'react'
-import { Home, Video, TrendingUp, Settings, ChevronLeft, ChevronRight, Users, CreditCard, Plug, GraduationCap, FileText, Lock, HelpCircle, CalendarClock, Shield, Webhook, ChevronDown, Calendar, Repeat, Radio } from 'lucide-react'
+import { Home, Video, TrendingUp, Settings, ChevronLeft, ChevronRight, Users, CreditCard, Plug, GraduationCap, FileText, Lock, HelpCircle, CalendarClock, Shield, Webhook, ChevronDown, Calendar, Repeat, Radio, Receipt, Activity } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth, useSubscription } from '@/contexts'
@@ -89,6 +89,11 @@ export function Sidebar() {
     checkTeamOwnership()
   }, [checkTeamOwnership])
 
+  // Área interna: só a conta do dono. Mesma allowlist do backend
+  // (DEV_USER_EMAILS em utils/teamAccess.ts) — se divergir, a tela aparece e a
+  // API recusa, que é pior do que não aparecer.
+  const ehInterno = session?.user?.email === 'pietrogoncalvesmedeiros@gmail.com'
+
   const groups: MenuGroup[] = [
     {
       section: 'Principais',
@@ -122,6 +127,15 @@ export function Sidebar() {
         { id: 'settings',     path: '/settings',                 icon: Settings,   label: t('nav.settings', 'Configurações') },
       ],
     },
+    ...(ehInterno
+      ? [{
+          section: 'Interno',
+          items: [
+            { id: 'faturamento', path: '/admin/faturamento', icon: Receipt,   label: 'Faturamento' },
+            { id: 'metrics',     path: '/admin/metrics',     icon: Activity,  label: 'Métricas' },
+          ],
+        }]
+      : []),
   ]
 
   const isActive = (path: string) => {
@@ -163,7 +177,15 @@ export function Sidebar() {
           {groups.map((group, gi) => (
             <div key={gi} className={clsx(gi > 0 && 'mt-5')}>
               {expanded && group.section && (
-                <p className="px-5 pt-2 pb-1.5 text-[9.5px] font-semibold uppercase tracking-[0.14em] text-tertiary">
+                <p
+                  className={clsx(
+                    'px-5 pt-2 pb-1.5 text-[9.5px] font-semibold uppercase tracking-[0.14em]',
+                    // Amarelo da marca (#FFD700) marca a área interna: nenhum
+                    // cliente vê esses itens, e a cor evita confundi-los com o
+                    // produto ao compartilhar tela.
+                    group.section === 'Interno' ? 'text-accent-dark' : 'text-tertiary',
+                  )}
+                >
                   {group.section}
                 </p>
               )}
@@ -174,6 +196,7 @@ export function Sidebar() {
               {group.items.map((item) => {
                 const Icon = item.icon
                 const active = isActive(item.path)
+                const interno = group.section === 'Interno'
                 const isLocked = item.id === 'coaching' && !isPro
                 const hasChildren = !!item.children?.length
                 const childrenOpen = hasChildren && (openGroups[item.id] ?? true)
@@ -194,13 +217,17 @@ export function Sidebar() {
                         isLocked
                           ? 'opacity-60 cursor-not-allowed text-tertiary'
                           : active
-                            ? 'bg-neutral-lighter text-brand'
-                            : 'text-primary hover:bg-background'
+                            ? interno
+                              ? 'bg-accent/15 text-accent-dark'
+                              : 'bg-neutral-lighter text-brand'
+                            : interno
+                              ? 'text-accent-dark hover:bg-accent/10'
+                              : 'text-primary hover:bg-background'
                       )}
                     >
                       {/* Borda esquerda quando ativo */}
                       {active && expanded && (
-                        <span className="absolute left-0 top-0 bottom-0 w-[3px] bg-[#2D5A27]" />
+                        <span className={clsx('absolute left-0 top-0 bottom-0 w-[3px]', interno ? 'bg-[#E6C200]' : 'bg-[#2D5A27]')} />
                       )}
 
                       <Icon

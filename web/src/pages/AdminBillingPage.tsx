@@ -14,6 +14,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { MainLayout } from '@/components/layout'
 
 const API = import.meta.env.VITE_API_URL
 const ALLOWLIST = new Set(['pietrogoncalvesmedeiros@gmail.com'])
@@ -67,6 +68,19 @@ function dia(iso: string | null): string {
   if (!iso) return '—'
   const d = new Date(new Date(iso).getTime() - 3 * 3600_000)
   return `${String(d.getUTCDate()).padStart(2, '0')}/${String(d.getUTCMonth() + 1).padStart(2, '0')}`
+}
+
+/**
+ * Nome de time -> pedaço seguro de nome de arquivo.
+ * "Starbem.app" -> "starbem" | "Comercial Foozi" -> "comercial-foozi"
+ */
+function apelidoCliente(nome: string): string {
+  return nome
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // tira acento
+    .replace(/\.(app|com|com\.br|io|net)$/i, '')        // tira TLD do nome
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
 }
 
 const brl = (n: number) =>
@@ -133,7 +147,10 @@ export function AdminBillingPage() {
       const { default: html2pdf } = await import('html2pdf.js')
       await html2pdf().set({
         margin: [10, 10, 10, 10] as [number, number, number, number],
-        filename: `lemon-meet-uso-${nomeTime.replace(/\s+/g, '-').toLowerCase()}-${mes}.pdf`,
+        // `invoiced_<mês>_<cliente>.pdf`. O mês em YYYY-MM ordena sozinho na
+        // pasta; o cliente evita que a fatura da Foozi sobrescreva a da Starbem
+        // no mesmo mês, já que ambas cairiam no mesmo nome sem isso.
+        filename: `invoiced_${mes}${teamId === 'all' ? '' : `_${apelidoCliente(nomeTime)}`}.pdf`,
         image: { type: 'jpeg' as const, quality: 0.98 },
         html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' as const },
@@ -147,14 +164,15 @@ export function AdminBillingPage() {
 
   if (email && !permitido) {
     return (
-      <div className="p-8">
+      <MainLayout><div className="p-8">
         <h1 className="text-xl font-semibold text-primary">Acesso restrito</h1>
         <p className="text-neutral-mid mt-2">Esta área é interna.</p>
-      </div>
+      </div></MainLayout>
     )
   }
 
   return (
+    <MainLayout>
     <div className="p-6 max-w-[1100px] mx-auto">
       <h1 className="text-2xl font-bold text-primary">Comprovação de uso</h1>
       <p className="text-neutral-mid mt-1 mb-6">
@@ -231,11 +249,17 @@ export function AdminBillingPage() {
       {dados && faturaveis.length > 0 && (
         <div ref={faturaRef} style={{ background: '#fff', color: '#1a1a1a', padding: 32, fontFamily: 'Helvetica, Arial, sans-serif' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: `3px solid ${VERDE}`, paddingBottom: 16 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <img src="/lemon.meet.png" alt="Lemon.meet" style={{ width: 44, height: 44, objectFit: 'contain' }} />
-              <div>
-                <div style={{ fontSize: 22, fontWeight: 700, color: VERDE, lineHeight: 1.1 }}>Lemon.meet</div>
-                <div style={{ fontSize: 11, color: '#666' }}>Inteligência artificial para reuniões de vendas</div>
+            <div>
+              {/* ⚠️ Largura E altura explícitas, na proporção real do arquivo
+                  (568×300 ≈ 1,89:1). O html2canvas — que o html2pdf usa por
+                  baixo — NÃO respeita `object-fit`, então uma caixa quadrada
+                  esticava o logo no PDF mesmo aparecendo certo na tela.
+                  O arquivo já traz o nome "Lemon.meet", então não repetimos em
+                  texto ao lado. */}
+              <img src="/lemon.meet.png" alt="Lemon.meet" width={132} height={70}
+                style={{ width: 132, height: 70, display: 'block' }} />
+              <div style={{ fontSize: 11, color: '#666', marginTop: 4 }}>
+                Meeting Intelligence
               </div>
             </div>
             <div style={{ textAlign: 'right' }}>
@@ -249,7 +273,6 @@ export function AdminBillingPage() {
             {[
               { r: 'Acessos faturáveis', v: String(faturaveis.length), destaque: true },
               { r: 'Reuniões gravadas', v: String(dados.totais.gravadas) },
-              { r: 'Reuniões distintas', v: String(dados.totais.reunioesDistintas) },
               { r: 'Minutos registrados', v: dados.totais.minutos.toLocaleString('pt-BR') },
             ].map((c) => (
               <div key={c.r} style={{
@@ -268,7 +291,6 @@ export function AdminBillingPage() {
               <tr style={{ background: VERDE, color: '#fff' }}>
                 <th style={{ textAlign: 'left', padding: '9px 10px' }}>Usuário</th>
                 <th style={{ textAlign: 'right', padding: '9px 10px' }}>Gravadas</th>
-                <th style={{ textAlign: 'right', padding: '9px 10px' }}>Reuniões</th>
                 <th style={{ textAlign: 'right', padding: '9px 10px' }}>Minutos</th>
                 <th style={{ textAlign: 'center', padding: '9px 10px' }}>Período</th>
               </tr>
@@ -281,7 +303,6 @@ export function AdminBillingPage() {
                     <div style={{ color: '#777', fontSize: 11 }}>{u.email}</div>
                   </td>
                   <td style={{ textAlign: 'right', padding: '8px 10px', fontWeight: 700, color: VERDE }}>{u.gravadas}</td>
-                  <td style={{ textAlign: 'right', padding: '8px 10px' }}>{u.reunioes}</td>
                   <td style={{ textAlign: 'right', padding: '8px 10px' }}>
                     {u.minutos}{u.minutosIncompletos ? '*' : ''}
                   </td>
@@ -317,7 +338,6 @@ export function AdminBillingPage() {
           <div style={{ marginTop: 24, paddingTop: 12, borderTop: '1px solid #e5e5e5', fontSize: 10, color: '#777', lineHeight: 1.6 }}>
             <div><strong>Como este relatório é apurado</strong></div>
             <div>• <strong>Acesso faturável</strong>: pessoa com ao menos uma reunião <strong>gravada com sucesso</strong> no mês. Quem teve só tentativas frustradas não é cobrado.</div>
-            <div>• <strong>Reuniões</strong>: total atribuído à pessoa, incluindo as de time, que contam para cada participante. <strong>Reuniões distintas</strong> desconta essa repetição.</div>
             <div>• <strong>Minutos</strong>: calculados por início e fim da gravação. Valores com <strong>*</strong> são parciais — parte das reuniões não registrou o horário de término.</div>
             <div>• Período apurado em horário de Brasília, de {nomeDoMes(mes)}.</div>
             <div style={{ marginTop: 8, color: '#999' }}>Emitido em {new Date().toLocaleDateString('pt-BR')} · Lemon.meet</div>
@@ -325,5 +345,6 @@ export function AdminBillingPage() {
         </div>
       )}
     </div>
+    </MainLayout>
   )
 }
