@@ -21,6 +21,10 @@ const DEV_ALLOWLIST = new Set(['pietrogoncalvesmedeiros@gmail.com'])
 
 type RangeKey = '7d' | '30d' | '90d' | 'all'
 
+function rangeDaysOf(r: RangeKey): number {
+  return r === 'all' ? 90 : parseInt(r, 10)
+}
+
 interface MetricsPayload {
   range: RangeKey
   rangeDays: number
@@ -402,9 +406,16 @@ export function AdminMetricsPage() {
 
   const isAllowed = userEmail ? DEV_ALLOWLIST.has(userEmail) : false
 
+  // ⚠️ O payload leva segundos pra ser gerado. Sem este guard, trocar o filtro
+  // duas vezes seguidas deixava a resposta MAIS LENTA (a do range anterior)
+  // chegar por último e sobrescrever a tela — o seletor parecia não funcionar.
+  // Cada disparo ganha um número; só o último manda no estado.
+  const reqIdRef = useRef(0)
+
   // Fetch
   const fetchMetrics = useCallback(async () => {
     if (!accessToken || !isAllowed) return
+    const myReq = ++reqIdRef.current
     setLoading(true)
     setError(null)
     try {
@@ -413,6 +424,7 @@ export function AdminMetricsPage() {
           Authorization: `Bearer ${accessToken}`,
         },
       })
+      if (myReq !== reqIdRef.current) return // resposta obsoleta: descarta
       if (res.status === 403) {
         // Sem chave desde 14/09/2026: o único jeito de cair aqui é a conta não
         // estar em DEV_USER_EMAILS no backend.
@@ -422,11 +434,13 @@ export function AdminMetricsPage() {
       }
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const json = (await res.json()) as MetricsPayload
+      if (myReq !== reqIdRef.current) return
       setData(json)
     } catch (err) {
+      if (myReq !== reqIdRef.current) return
       setError(err instanceof Error ? err.message : String(err))
     } finally {
-      setLoading(false)
+      if (myReq === reqIdRef.current) setLoading(false)
     }
   }, [accessToken, isAllowed, range, refreshKey])
 
@@ -497,8 +511,16 @@ export function AdminMetricsPage() {
 
         {!data && loading && <p className="text-sm text-secondary">Carregando…</p>}
 
+        {/* Sem isto, a tela fica idêntica durante os segundos de geração e dá a
+            impressão de que o filtro não pegou. */}
+        {data && loading && (
+          <p className="text-xs text-secondary mb-3">
+            Recalculando para {range === 'all' ? 'todo o histórico' : `os últimos ${rangeDaysOf(range)} dias`}… os números abaixo ainda são do período anterior.
+          </p>
+        )}
+
         {data && (
-          <>
+          <div style={{ opacity: loading ? 0.45 : 1, transition: 'opacity 120ms' }}>
             {/* ── KPIs ───────────────────────────────────────── */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
               <KpiCard title="Total users" value={formatNumber(data.overview.totalUsers)} hint={`+${data.overview.newUsersInRange} ${rangeLabel} · base acumulada`} />
@@ -807,7 +829,7 @@ export function AdminMetricsPage() {
             <p className="text-xs text-tertiary mt-6 mb-2">
               Dados de {data.counts.users} users · {data.counts.meetingsInRange} de {data.counts.meetings} meetings no período · {data.counts.teams} times · {data.counts.aiChats} chats IA · cache 60s.
             </p>
-          </>
+          </div>
         )}
       </div>
     </MainLayout>

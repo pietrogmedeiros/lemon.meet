@@ -102,19 +102,29 @@ function safePct(num: number, den: number): number {
 }
 
 // ── Fetchers ─────────────────────────────────────────────────
-async function fetchAllMeetings(): Promise<MeetingRow[]> {
+// ⚠️ Duas larguras de propósito. O payload GORDO é `transcript` (texto inteiro
+// da reunião) + `insights` (JSONB): baixar isso de 2.706 reuniões levava o
+// painel a ~8s por refresh, e nessa espera o usuário troca o filtro achando
+// que ele não funciona. As métricas cumulativas (retenção, ativação, DAU,
+// total por time) só precisam de datas e ids — daí a versão LITE.
+const FULL_COLUMNS = 'id,user_id,team_id,status,source,platform,failure_reason,bot_provider,bot_fallback,duration_seconds,transcript,insights,created_at,ended_at,started_at,updated_at,title'
+const LITE_COLUMNS = 'id,user_id,team_id,status,source,failure_reason,created_at,ended_at,updated_at'
+
+async function fetchMeetingRows(columns: string, sinceIso: string | null): Promise<MeetingRow[]> {
   const PAGE = 1000
   const out: MeetingRow[] = []
   let from = 0
   for (;;) {
-    const { data, error } = await supabase
+    let q = supabase
       .from('meetings')
-      .select('id,user_id,team_id,status,source,platform,failure_reason,bot_provider,bot_fallback,duration_seconds,transcript,insights,created_at,ended_at,started_at,updated_at,title')
+      .select(columns)
       .order('created_at', { ascending: true })
       .range(from, from + PAGE - 1)
+    if (sinceIso) q = q.gte('created_at', sinceIso)
+    const { data, error } = await q
     if (error) throw new Error(`meetings fetch: ${error.message}`)
     if (!data || data.length === 0) break
-    out.push(...(data as MeetingRow[]))
+    out.push(...(data as unknown as MeetingRow[]))
     if (data.length < PAGE) break
     from += PAGE
   }
@@ -569,9 +579,16 @@ router.get('/', authMiddleware, adminMetricsGate, async (req: AuthRequest, res: 
 
     const t0 = Date.now()
 
+    // O recorte do período já entra no FETCH: pra 7d são ~64 reuniões com
+    // transcript em vez de 2.706. O histórico completo vem em LITE, que é o
+    // suficiente pro que é cumulativo.
+    const rangeStartMs = range === 'all' ? 0 : daysAgo(days).getTime()
+    const sinceIso = range === 'all' ? null : new Date(rangeStartMs).toISOString()
+
     // Buscas paralelas
-    const [meetingsAll, users, teamsData, membersData, calIntData, aiChatsData, feedbackData] = await Promise.all([
-      fetchAllMeetings(),
+    const [meetingsInRangeRaw, meetingsLite, users, teamsData, membersData, calIntData, aiChatsData, feedbackData] = await Promise.all([
+      fetchMeetingRows(FULL_COLUMNS, sinceIso),
+      fetchMeetingRows(LITE_COLUMNS, null),
       fetchAllUsers(),
       supabase.from('teams').select('id,name,team_type,evaluation_framework,created_at,owner_id'),
       supabase.from('team_members').select('team_id,user_id,role,status'),
@@ -588,28 +605,26 @@ router.get('/', authMiddleware, adminMetricsGate, async (req: AuthRequest, res: 
 
     // ⚠️ TUDO que é "no período" tem que sair de `meetingsInRange`/`aiChatsInRange`.
     // Antes só `quality` e `providers` filtravam: overview, times, adoção e uso
-    // de IA liam `meetingsAll`, então trocar 7d ↔ 90d não mudava número nenhum
+    // de IA liam a base inteira, então trocar 7d ↔ 90d não mudava número nenhum
     // naqueles blocos. Cumulativo de propósito (e rotulado assim no front):
     // base de usuários, ativação, retenção por cohort e DAU/WAU/MAU.
-    const rangeStartMs = range === 'all' ? 0 : daysAgo(days).getTime()
-    const meetingsInRange = range === 'all'
-      ? meetingsAll
-      : meetingsAll.filter(m => new Date(m.created_at).getTime() >= rangeStartMs)
+    const meetingsInRange = meetingsInRangeRaw
     const aiChatsInRange = range === 'all'
       ? aiChats
       : aiChats.filter(c => new Date(c.created_at).getTime() >= rangeStartMs)
 
-    const overview = buildOverview(meetingsInRange, meetingsAll, users, rangeStartMs)
+    const overview = buildOverview(meetingsInRange, meetingsLite, users, rangeStartMs)
     const timeseries = buildTimeseries(meetingsInRange, users, days)
     const quality = buildQuality(meetingsInRange)
     const providers = buildProviders(meetingsInRange)
-    const teamsBlock = buildTeams(meetingsAll, teams, members, rangeStartMs)
-    const retention = buildRetention(meetingsAll, users)
+    const teamsBlock = buildTeams(meetingsLite, teams, members, rangeStartMs)
+    const retention = buildRetention(meetingsLite, users)
     const adoption = buildAdoption(users, calInts, meetingsInRange, aiChatsInRange)
-    // `meetingsAll` de propósito: reprocessamento é bucketizado por updated_at
+    // `meetingsLite` (histórico inteiro) de propósito: reprocessamento é
+    // bucketizado por updated_at
     // (a janela de dias já recorta), e uma reunião antiga reprocessada ontem
     // some se a lista vier filtrada por created_at.
-    const aiUsage = buildAiUsage(aiChatsInRange, meetingsAll, days)
+    const aiUsage = buildAiUsage(aiChatsInRange, meetingsLite, days)
 
     const payload = {
       range,
@@ -619,7 +634,7 @@ router.get('/', authMiddleware, adminMetricsGate, async (req: AuthRequest, res: 
       rangeStart: range === 'all' ? null : new Date(rangeStartMs).toISOString(),
       counts: {
         users: users.length,
-        meetings: meetingsAll.length,
+        meetings: meetingsLite.length,
         meetingsInRange: meetingsInRange.length,
         teams: teams.length,
         teamMembers: members.length,
