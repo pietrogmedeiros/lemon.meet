@@ -76,6 +76,39 @@ const CREDENTIAL_FAIL_STATES = new Set<string>([
   'authentication_failed',
 ])
 
+/**
+ * O Skribby RETENTA sozinho. Medido em 23/09/2026: quatro bots foram a `failed`
+ * na primeira tentativa e voltaram a `booting` em 0–3 segundos. `failed` cru é o
+ * balde de "não entrei e não sei dizer por quê" — o desfecho real vem na
+ * tentativa seguinte, que pode ser `not_admitted`, `finished` ou `failed` de novo.
+ *
+ * Por isso `skribby_failed` é tratado como PROVISÓRIO: o primeiro estado terminal
+ * grava o status (para nada ficar preso em 'requesting'), mas um motivo mais
+ * específico que chegue depois ainda corrige o RÓTULO.
+ */
+const MOTIVO_GENERICO = 'skribby_failed'
+
+/**
+ * Qual motivo deve ficar no banco. Só substitui quando o atual é o genérico e o
+ * novo diz algo de fato diferente — nunca rebaixa um motivo específico.
+ *
+ * ⚠️ Sem isso, a "VR & Starbem [Proposta Comercial]" de 23/09 ficou marcada como
+ * `skribby_failed` ("o serviço de gravação falhou") quando o desfecho real do bot
+ * foi `not_admitted` com `stop_reason: request_denied` — alguém NEGOU a entrada
+ * na sala. Assumimos a culpa de uma falha que era da outra ponta.
+ */
+export function motivoQueDeveFicar(atual: string | null, novo: string): string | null {
+  if (!atual) return null                       // sem motivo gravado: nada a corrigir aqui
+  if (atual !== MOTIVO_GENERICO) return null    // já é específico: não rebaixa
+  if (novo === MOTIVO_GENERICO) return null     // genérico → genérico: sem escrita
+  return novo
+}
+
+// Janela de graça antes de avisar "reunião sem transcrição" quando o motivo é o
+// genérico. Em 23/09 o dono de uma reunião recebeu o aviso às 14:00:09 — e o bot
+// gravou 23 minutos a partir das 14:00:46. Aviso falso é pior que aviso atrasado.
+const GRACA_AVISO_MS = 2 * 60 * 1000
+
 // Alerta de credencial é throttled: 1 a cada 30min (senão um dia de agenda cheia
 // vira dezenas de notificações idênticas).
 const CREDENTIAL_ALERT_THROTTLE_MS = 30 * 60 * 1000
@@ -247,14 +280,31 @@ export async function applySkribbyStatus(
   // a reunião presa em 'requesting'. Não sobrescreve estados já terminais.
   if (FAIL_STATES.has(newStatus)) {
     botMetrics.status('skribby', 'failed')
+    const motivo = `skribby_${newStatus}`
     const { data: updated } = await supabase.from('meetings')
-      .update({ status: 'failed', failure_reason: `skribby_${newStatus}` })
+      .update({ status: 'failed', failure_reason: motivo })
       .eq('id', meeting.id)
       .not('status', 'in', '("failed","completed")')
       .select('id')
     if (updated && updated.length > 0) {
       logger.warn(`${tag} Meeting ${meeting.id} → failed (${newStatus})`)
-      await notificationService.notifyMeetingNoTranscription(meeting.user_id, meeting.id)
+      await avisarSemTranscricao(meeting, newStatus, tag)
+    } else {
+      // Já era terminal. Se o que estava lá era o genérico e agora sabemos o
+      // desfecho de verdade, corrige só o RÓTULO — o status continua 'failed'
+      // e uma reunião já 'completed' nunca é tocada.
+      const { data: atual } = await supabase.from('meetings')
+        .select('status, failure_reason').eq('id', meeting.id).maybeSingle()
+      const corrigido = atual?.status === 'failed'
+        ? motivoQueDeveFicar(atual.failure_reason ?? null, motivo)
+        : null
+      if (corrigido) {
+        await supabase.from('meetings')
+          .update({ failure_reason: corrigido })
+          .eq('id', meeting.id)
+          .eq('status', 'failed')
+        logger.warn(`${tag} Meeting ${meeting.id}: motivo corrigido ${MOTIVO_GENERICO} → ${corrigido}`)
+      }
     }
     if (CREDENTIAL_FAIL_STATES.has(newStatus)) {
       logger.error(`${tag} CREDENCIAL INVÁLIDA na conta autenticada do Skribby (bot=${botId}) — todos os bots vão falhar até reconectar a conta`)
@@ -278,6 +328,42 @@ export async function applySkribbyStatus(
     .update({ status: mapped })
     .eq('id', meeting.id)
     .not('status', 'in', '("failed","completed")')
+}
+
+/**
+ * Avisa o dono que a reunião ficou sem transcrição.
+ *
+ * Para o motivo genérico (`failed`) o aviso espera GRACA_AVISO_MS e só sai se a
+ * reunião AINDA estiver falhada — porque o Skribby retenta em segundos e a
+ * segunda tentativa costuma gravar. Se o processo cair nesse meio-tempo o aviso
+ * se perde, e tudo bem: o card na tela continua mostrando o estado verdadeiro,
+ * enquanto um e-mail dizendo "sem transcrição" sobre uma reunião gravada não tem
+ * como ser desdito.
+ */
+async function avisarSemTranscricao(
+  meeting: MeetingRow,
+  newStatus: string,
+  tag: string,
+): Promise<void> {
+  if (newStatus !== 'failed') {
+    await notificationService.notifyMeetingNoTranscription(meeting.user_id, meeting.id)
+    return
+  }
+  setTimeout(() => {
+    void (async () => {
+      try {
+        const { data } = await supabase.from('meetings')
+          .select('status').eq('id', meeting.id).maybeSingle()
+        if (data?.status !== 'failed') {
+          logger.info(`${tag} Meeting ${meeting.id} se recuperou dentro da graça — aviso cancelado`)
+          return
+        }
+        await notificationService.notifyMeetingNoTranscription(meeting.user_id, meeting.id)
+      } catch (err) {
+        logger.warn(`${tag} Falha ao avisar (pós-graça) meeting ${meeting.id}:`, err)
+      }
+    })()
+  }, GRACA_AVISO_MS).unref?.()
 }
 
 /** True se o Skribby está ligado e com credenciais — gate do reconciliador. */

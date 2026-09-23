@@ -71,10 +71,19 @@ export async function runTranscriptPipeline(
   }
 
   // Salva transcrição completa
+  //
+  // ⚠️ `failure_reason: null` é obrigatório aqui. O Skribby RETENTA sozinho: em
+  // 23/09/2026 um bot falhou ao entrar às 14:00:08, reentrou 13s depois e gravou
+  // 23 minutos. A reunião virou 'completed' com transcrição íntegra, mas o
+  // `failure_reason: 'skribby_failed'` da primeira tentativa continuou no banco —
+  // e a tela mostrou "Concluída" em verde ao lado de "O serviço de gravação
+  // falhou" em vermelho, no mesmo card. Se chegou transcrição, a falha anterior
+  // deixou de ser verdade; quem falhar DEPOIS daqui grava o próprio motivo.
   await supabase.from('meetings').update({
     transcript: fullTranscript,
     ended_at: meeting.ended_at ?? new Date().toISOString(),
     status: 'processing',
+    failure_reason: null,
   }).eq('id', meetingId)
 
   logger.info(`[TranscriptPipeline] ${segments.length} segmentos salvos para meeting ${meetingId}`)
