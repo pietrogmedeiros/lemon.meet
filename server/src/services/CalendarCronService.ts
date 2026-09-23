@@ -59,6 +59,7 @@ import { botIdColumn, type BotProviderName } from './bots/IBotProvider.js'
 import { resolveMeetingTeamId } from '../utils/teamAccess.js'
 import { fanOutFromOwner } from '../routes/meetingbaas.routes.js'
 import { isSkribbyEnabled, reconcileSkribbyMeeting } from '../routes/skribby.routes.js'
+import { checarFalhasDoSkribby } from './skribbyFailureWatch.js'
 import { notificationService } from './NotificationService.js'
 import { cronMetrics, meetingMetrics } from '../metrics.js'
 import {
@@ -186,6 +187,15 @@ export class CalendarCronService {
         await this.alertStuckRequesting()
       } catch (err) {
         logger.error('[CalendarCron] Erro ao checar reuniões presas:', err)
+      }
+
+      // Avisa por e-mail quando o Skribby entra em surto de falhas (23/09/2026:
+      // duas reuniões de cliente perdidas e ninguém soube até a noite).
+      // Isolado em try/catch — nunca pode derrubar o ciclo do cron.
+      try {
+        await checarFalhasDoSkribby()
+      } catch (err) {
+        logger.error('[CalendarCron] Erro ao checar falhas do Skribby:', err)
       }
     } finally {
       cronMetrics.tick(result, (Date.now() - t0) / 1000)

@@ -144,7 +144,7 @@ app.use('/api', limiter)
  * o build falha e o contêiner ANTIGO continua no ar — sem isso, "está no ar" é
  * palpite por uptime. Trocar a cada mudança que precise ser confirmada.
  */
-const BUILD_TAG = 'retry-skribby-21'
+const BUILD_TAG = 'watch-skribby-22'
 
 let ffmpegReady: boolean | null = null
 let audioCodec: string | null = null
@@ -173,6 +173,11 @@ app.get('/health', (req, res) => {
     // expor a chave. Sem isso, "coloquei a variável" é indistinguível de
     // "coloquei e não pegou" até alguém reclamar que o e-mail não chegou.
     resend: Boolean(process.env.RESEND_API_KEY),
+    // ⚠️ `resend` só diz que a CHAVE existe. Sem ALERT_EMAIL_TO o alerta de
+    // plantão é engolido com um warn no log e ninguém nunca sabe — o mesmo modo
+    // de falha silencioso do `lang` do Skribby e do tier gratuito do Gemini.
+    // Este campo existe para dar pra conferir de fora que o alerta TEM como chegar.
+    alertaPorEmail: Boolean(process.env.RESEND_API_KEY && process.env.ALERT_EMAIL_TO),
     digest: {
       proximo: proximoDisparo(new Date()),
       ultimoEnvio: dailyDigestService.ultimoDiaEnviado,
