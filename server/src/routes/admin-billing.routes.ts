@@ -57,6 +57,43 @@ export function minutosDaReuniao(started: string | null, ended: string | null): 
   return Math.round(ms / 60000)
 }
 
+/**
+ * Quanto do mês esta pessoa é cobrada, pela data em que passou a ter acesso.
+ *
+ * A régua mudou em 10/11/2026: a cobrança é por ASSENTO ATIVO no time, não por
+ * quem gravou reunião — e quem entra no meio do mês paga só a parte dele. O
+ * dia da entrada conta inteiro (entrou dia 10 de um mês de 30 = 21/30).
+ *
+ * `acessoDesde` é o mais TARDE entre a criação da conta e a entrada no time:
+ * é o instante em que a pessoa realmente podia usar o produto pelo cliente.
+ */
+export function fracaoCobrada(
+  acessoDesde: string | null,
+  janela: { inicio: string; fim: string },
+): { dias: number; diasDoMes: number; fracao: number } {
+  const inicio = new Date(janela.inicio).getTime()
+  const fim = new Date(janela.fim).getTime()
+  const diasDoMes = Math.round((fim - inicio) / 86_400_000)
+
+  if (!acessoDesde) return { dias: diasDoMes, diasDoMes, fracao: 1 }
+  const entrada = new Date(acessoDesde).getTime()
+  if (!Number.isFinite(entrada) || entrada <= inicio) return { dias: diasDoMes, diasDoMes, fracao: 1 }
+  // Entrou depois do mês fechar: não é cobrado neste mês.
+  if (entrada >= fim) return { dias: 0, diasDoMes, fracao: 0 }
+
+  // Dia do mês em Brasília (a janela já vem em instantes UTC da meia-noite BRT).
+  const diaBrt = new Date(entrada - OFFSET_BRT_MS).getUTCDate()
+  const dias = diasDoMes - diaBrt + 1
+  return { dias, diasDoMes, fracao: dias / diasDoMes }
+}
+
+/** O mais tarde entre duas datas ISO (qualquer uma pode faltar). */
+export function acessoDesdeMaisTarde(a: string | null, b: string | null): string | null {
+  if (!a) return b
+  if (!b) return a
+  return new Date(a).getTime() >= new Date(b).getTime() ? a : b
+}
+
 type LinhaUsuario = {
   userId: string
   email: string
@@ -71,6 +108,17 @@ type LinhaUsuario = {
    *  o Pietro é admin do time da Starbem e o uso dele apareceria como acesso
    *  faturável — cobrar o cliente pelo nosso próprio uso. */
   interno: boolean
+  /** Membro ATIVO do time — é isto, e não o uso, que gera a cobrança. */
+  noTime: boolean
+  papel: string | null
+  /** Quando passou a ter acesso: conta criada E dentro do time. */
+  acessoDesde: string | null
+  entrouNoTimeEm: string | null
+  diasFaturados: number
+  diasDoMes: number
+  /** Fatia do mês cobrada (1 = mês inteiro). */
+  fracao: number
+  faturavel: boolean
 }
 
 router.get('/billing', authMiddleware, adminMetricsGate, async (req: AuthRequest, res: Response) => {
@@ -99,6 +147,19 @@ router.get('/billing', authMiddleware, adminMetricsGate, async (req: AuthRequest
     const { data: reunioes, error } = await consulta
     if (error) throw new Error(`falha ao ler reuniões: ${error.message}`)
 
+    // ── A BASE DA COBRANÇA: assento ativo no time ──────────────────────────
+    // Até 10/11/2026 a fatura contava quem teve reunião gravada. Virou assento:
+    // quem está no time ocupa acesso, usou ou não. Por isso os membros entram
+    // ANTES das reuniões — quem não gravou nada aparece com zeros, e cobrado.
+    let consultaMembros = supabase
+      .from('team_members')
+      .select('user_id, team_id, role, created_at')
+      .eq('status', 'active')
+      .not('user_id', 'is', null)
+    if (teamId !== 'all') consultaMembros = consultaMembros.eq('team_id', teamId)
+    const { data: membros, error: errMembros } = await consultaMembros
+    if (errMembros) throw new Error(`falha ao ler membros: ${errMembros.message}`)
+
     // ⚠️ Reunião de time vira UMA LINHA POR MEMBRO com o mesmo skribby_bot_id
     // (fan-out). Para COBRANÇA isso é o certo — cada pessoa usou o produto —,
     // mas o total de reuniões distintas precisa ser contado à parte, senão a
@@ -106,17 +167,34 @@ router.get('/billing', authMiddleware, adminMetricsGate, async (req: AuthRequest
     const botsDistintos = new Set<string>()
 
     const porUsuario = new Map<string, LinhaUsuario>()
+
+    const linhaVazia = (uid: string): LinhaUsuario => ({
+      userId: uid, email: '', nome: '',
+      reunioes: 0, gravadas: 0, minutos: 0, minutosIncompletos: false,
+      primeira: null, ultima: null, interno: false,
+      noTime: false, papel: null, acessoDesde: null, entrouNoTimeEm: null,
+      diasFaturados: 0, diasDoMes: 0, fracao: 0, faturavel: false,
+    })
+
+    for (const m of membros ?? []) {
+      const uid = m.user_id as string
+      const linha = porUsuario.get(uid) ?? linhaVazia(uid)
+      linha.noTime = true
+      linha.papel = m.role ?? null
+      // Entrou duas vezes (dois times no filtro 'all'): vale a mais antiga.
+      if (!linha.entrouNoTimeEm || (m.created_at && m.created_at < linha.entrouNoTimeEm)) {
+        linha.entrouNoTimeEm = m.created_at ?? null
+      }
+      porUsuario.set(uid, linha)
+    }
+
     for (const r of reunioes ?? []) {
       if (r.skribby_bot_id) botsDistintos.add(r.skribby_bot_id)
       const uid = r.user_id
       if (!uid) continue
       let linha = porUsuario.get(uid)
       if (!linha) {
-        linha = {
-          userId: uid, email: '', nome: '',
-          reunioes: 0, gravadas: 0, minutos: 0, minutosIncompletos: false,
-          primeira: null, ultima: null, interno: false,
-        }
+        linha = linhaVazia(uid)
         porUsuario.set(uid, linha)
       }
       linha.reunioes++
@@ -139,6 +217,7 @@ router.get('/billing', authMiddleware, adminMetricsGate, async (req: AuthRequest
         {
           email: u.email ?? '(sem e-mail)',
           nome: (u.user_metadata?.full_name as string) || (u.user_metadata?.name as string) || '',
+          criadaEm: u.created_at ?? null,
         },
       ]),
     )
@@ -147,9 +226,23 @@ router.get('/billing', authMiddleware, adminMetricsGate, async (req: AuthRequest
       linha.email = c?.email ?? '(conta removida)'
       linha.nome = c?.nome || linha.email.split('@')[0]
       linha.interno = isDevEmail(linha.email)
+
+      linha.acessoDesde = acessoDesdeMaisTarde(c?.criadaEm ?? null, linha.entrouNoTimeEm)
+      const prop = fracaoCobrada(linha.acessoDesde, janela)
+      linha.diasFaturados = prop.dias
+      linha.diasDoMes = prop.diasDoMes
+      linha.fracao = prop.fracao
+      // Assento ativo, não é conta nossa, e o acesso começou dentro do mês.
+      linha.faturavel = linha.noTime && !linha.interno && prop.dias > 0
     }
 
-    const usuarios = [...porUsuario.values()].sort((a, b) => b.gravadas - a.gravadas || b.reunioes - a.reunioes)
+    const usuarios = [...porUsuario.values()].sort(
+      (a, b) =>
+        Number(b.faturavel) - Number(a.faturavel) ||
+        b.gravadas - a.gravadas ||
+        b.reunioes - a.reunioes ||
+        a.email.localeCompare(b.email),
+    )
 
     // ⚠️ ALERTA DE SUBFATURAMENTO — descoberto em 14/09/2026 ao conferir setembro.
     // O Kledson tinha 31 reuniões no mês, e-mail @starbem.app, `team_id` NULO e
@@ -203,9 +296,14 @@ router.get('/billing', authMiddleware, adminMetricsGate, async (req: AuthRequest
       usuarios,
       alertas,
       totais: {
-        // A base de cobrança: quem de fato teve reunião GRAVADA no mês.
-        acessosFaturaveis: usuarios.filter((u) => u.gravadas > 0 && !u.interno).length,
-        usuariosComAtividade: usuarios.length,
+        // A base de cobrança: assento ATIVO no time (usou ou não).
+        acessosFaturaveis: usuarios.filter((u) => u.faturavel).length,
+        // Soma das frações: 2 acessos de meio mês = 1 assento equivalente. É
+        // isto que multiplica o preço, não a contagem de cabeças.
+        assentosEquivalentes:
+          Math.round(usuarios.filter((u) => u.faturavel).reduce((n, u) => n + u.fracao, 0) * 100) / 100,
+        comAcessoParcial: usuarios.filter((u) => u.faturavel && u.fracao < 1).length,
+        usuariosComAtividade: usuarios.filter((u) => u.reunioes > 0).length,
         reunioes: (reunioes ?? []).length,
         reunioesDistintas: botsDistintos.size || (reunioes ?? []).length,
         gravadas: usuarios.reduce((n, u) => n + u.gravadas, 0),

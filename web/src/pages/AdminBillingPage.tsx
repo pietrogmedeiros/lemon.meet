@@ -33,6 +33,14 @@ type Usuario = {
   primeira: string | null
   ultima: string | null
   interno: boolean
+  noTime: boolean
+  papel: string | null
+  acessoDesde: string | null
+  entrouNoTimeEm: string | null
+  diasFaturados: number
+  diasDoMes: number
+  fracao: number
+  faturavel: boolean
 }
 
 type Resposta = {
@@ -43,6 +51,8 @@ type Resposta = {
   alertas: { email: string; reunioes: number; gravadas: number; motivo: string }[]
   totais: {
     acessosFaturaveis: number
+    assentosEquivalentes: number
+    comAcessoParcial: number
     usuariosComAtividade: number
     reunioes: number
     reunioesDistintas: number
@@ -133,11 +143,19 @@ export function AdminBillingPage() {
 
   useEffect(() => { void buscar() }, [buscar])
 
+  // A régua da cobrança (mudou em 10/11/2026): ASSENTO ATIVO no time, usou ou
+  // não — e proporcional para quem entrou no meio do mês. O backend já decide
+  // em `faturavel` e `fracao`; aqui não se recalcula a regra.
   const faturaveis = useMemo(
-    () => (dados?.usuarios ?? []).filter((u) => u.gravadas > 0 && !u.interno),
+    () => (dados?.usuarios ?? []).filter((u) => u.faturavel),
     [dados],
   )
-  const total = faturaveis.length * preco
+  const assentos = useMemo(
+    () => faturaveis.reduce((n, u) => n + u.fracao, 0),
+    [faturaveis],
+  )
+  const parciais = faturaveis.filter((u) => u.fracao < 1).length
+  const total = assentos * preco
   const nomeTime = dados?.teams.find((t) => t.id === teamId)?.name ?? 'Todos os times'
 
   async function gerarPdf() {
@@ -232,7 +250,7 @@ export function AdminBillingPage() {
         </div>
       )}
 
-      {dados && (dados.usuarios ?? []).some((u) => u.interno && u.gravadas > 0) && (
+      {dados && (dados.usuarios ?? []).some((u) => u.interno && u.noTime) && (
         <div className="mb-6 p-3 rounded-lg border border-neutral-light bg-neutral-lighter text-xs text-neutral-mid">
           Contas internas com uso no período foram <strong>excluídas da fatura</strong> — não se cobra o cliente
           pelo nosso próprio acesso.
@@ -241,7 +259,14 @@ export function AdminBillingPage() {
 
       {dados && faturaveis.length === 0 && !carregando && (
         <div className="p-6 text-neutral-mid">
-          Ninguém teve reunião gravada em {nomeDoMes(mes)} neste filtro. Sem uso, não há o que faturar.
+          Nenhum assento ativo em {nomeDoMes(mes)} neste filtro — sem membro no time, não há o que faturar.
+        </div>
+      )}
+
+      {parciais > 0 && (
+        <div className="mb-6 p-3 rounded-lg border border-neutral-light bg-neutral-lighter text-xs text-neutral-mid">
+          {parciais === 1 ? 'Um acesso é' : `${parciais} acessos são`} <strong>proporcional{parciais === 1 ? '' : 'is'}</strong>:
+          entrou no meio de {nomeDoMes(mes)} e é cobrado só pelos dias de acesso.
         </div>
       )}
 
@@ -272,8 +297,8 @@ export function AdminBillingPage() {
           <div style={{ display: 'flex', gap: 12, margin: '20px 0' }}>
             {[
               { r: 'Acessos faturáveis', v: String(faturaveis.length), destaque: true },
+              { r: 'Assentos equivalentes', v: assentos.toLocaleString('pt-BR', { maximumFractionDigits: 2 }) },
               { r: 'Reuniões gravadas', v: String(dados.totais.gravadas) },
-              { r: 'Minutos registrados', v: dados.totais.minutos.toLocaleString('pt-BR') },
             ].map((c) => (
               <div key={c.r} style={{
                 flex: 1, border: `1px solid ${c.destaque ? VERDE : '#e5e5e5'}`,
@@ -290,9 +315,10 @@ export function AdminBillingPage() {
             <thead>
               <tr style={{ background: VERDE, color: '#fff' }}>
                 <th style={{ textAlign: 'left', padding: '9px 10px' }}>Usuário</th>
+                <th style={{ textAlign: 'center', padding: '9px 10px' }}>Acesso desde</th>
+                <th style={{ textAlign: 'center', padding: '9px 10px' }}>Dias cobrados</th>
                 <th style={{ textAlign: 'right', padding: '9px 10px' }}>Gravadas</th>
-                <th style={{ textAlign: 'right', padding: '9px 10px' }}>Minutos</th>
-                <th style={{ textAlign: 'center', padding: '9px 10px' }}>Período</th>
+                <th style={{ textAlign: 'right', padding: '9px 10px' }}>Valor</th>
               </tr>
             </thead>
             <tbody>
@@ -302,12 +328,15 @@ export function AdminBillingPage() {
                     <div style={{ fontWeight: 600 }}>{u.nome}</div>
                     <div style={{ color: '#777', fontSize: 11 }}>{u.email}</div>
                   </td>
-                  <td style={{ textAlign: 'right', padding: '8px 10px', fontWeight: 700, color: VERDE }}>{u.gravadas}</td>
-                  <td style={{ textAlign: 'right', padding: '8px 10px' }}>
-                    {u.minutos}{u.minutosIncompletos ? '*' : ''}
-                  </td>
                   <td style={{ textAlign: 'center', padding: '8px 10px', color: '#555' }}>
-                    {dia(u.primeira)} – {dia(u.ultima)}
+                    {u.fracao < 1 ? dia(u.acessoDesde) : '—'}
+                  </td>
+                  <td style={{ textAlign: 'center', padding: '8px 10px', color: u.fracao < 1 ? '#222' : '#555' }}>
+                    {u.diasFaturados}/{u.diasDoMes}
+                  </td>
+                  <td style={{ textAlign: 'right', padding: '8px 10px' }}>{u.gravadas}</td>
+                  <td style={{ textAlign: 'right', padding: '8px 10px', fontWeight: 700, color: VERDE }}>
+                    {brl(u.fracao * preco)}
                   </td>
                 </tr>
               ))}
@@ -320,6 +349,12 @@ export function AdminBillingPage() {
                 <tr>
                   <td style={{ padding: '6px 12px', color: '#555' }}>Acessos faturáveis</td>
                   <td style={{ padding: '6px 12px', textAlign: 'right' }}>{faturaveis.length}</td>
+                </tr>
+                <tr>
+                  <td style={{ padding: '6px 12px', color: '#555' }}>Assentos equivalentes</td>
+                  <td style={{ padding: '6px 12px', textAlign: 'right' }}>
+                    {assentos.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}
+                  </td>
                 </tr>
                 <tr>
                   <td style={{ padding: '6px 12px', color: '#555' }}>Preço por acesso</td>
@@ -337,8 +372,9 @@ export function AdminBillingPage() {
               que foi contado, senão a conversa de cobrança vira discussão. */}
           <div style={{ marginTop: 24, paddingTop: 12, borderTop: '1px solid #e5e5e5', fontSize: 10, color: '#777', lineHeight: 1.6 }}>
             <div><strong>Como este relatório é apurado</strong></div>
-            <div>• <strong>Acesso faturável</strong>: pessoa com ao menos uma reunião <strong>gravada com sucesso</strong> no mês. Quem teve só tentativas frustradas não é cobrado.</div>
-            <div>• <strong>Minutos</strong>: calculados por início e fim da gravação. Valores com <strong>*</strong> são parciais — parte das reuniões não registrou o horário de término.</div>
+            <div>• <strong>Acesso faturável</strong>: pessoa com acesso ativo ao time no mês, tenha gravado reunião ou não. Contas da Lemon.meet não são cobradas.</div>
+            <div>• <strong>Proporcional</strong>: quem passou a ter acesso no meio do mês é cobrado só pelos dias de acesso — o dia de entrada conta inteiro. "Dias cobrados" mostra a fração aplicada.</div>
+            <div>• <strong>Gravadas</strong>: reuniões registradas com sucesso no mês, como comprovação de uso. Não alteram o valor.</div>
             <div>• Período apurado em horário de Brasília, de {nomeDoMes(mes)}.</div>
             <div style={{ marginTop: 8, color: '#999' }}>Emitido em {new Date().toLocaleDateString('pt-BR')} · Lemon.meet</div>
           </div>
