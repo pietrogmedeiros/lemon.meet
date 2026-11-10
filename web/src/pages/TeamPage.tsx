@@ -16,7 +16,7 @@ interface Member {
   user_id: string | null
   invited_email: string
   name: string | null
-  role: 'admin' | 'member'
+  role: 'admin' | 'member' | 'owner'
   status: 'active' | 'invited'
   created_at: string
 }
@@ -1039,6 +1039,11 @@ export function TeamPage() {
                         <span className="text-sm font-semibold text-primary truncate">
                           {m.name ?? m.invited_email.split('@')[0]}
                         </span>
+                        {m.role === 'owner' && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-[#2D5A27]/10 text-brand border border-[#2D5A27]/30 px-1.5 py-0.5 rounded-full">
+                            <Crown size={9} /> Owner
+                          </span>
+                        )}
                         {m.role === 'admin' && (
                           <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-amber-50 dark:bg-amber-950/40 text-amber-600 border border-amber-200 dark:border-amber-900/50 px-1.5 py-0.5 rounded-full">
                             <Crown size={9} /> Admin
@@ -1057,7 +1062,7 @@ export function TeamPage() {
                           <Clock size={11} /> Pendente
                         </span>
                       )}
-                      {isOwner && m.user_id !== team.owner_id && (
+                      {isOwner && m.user_id !== team.owner_id && m.role !== 'owner' && (
                         <button
                           onClick={() => handleRoleChange(m.id, m.role === 'admin' ? 'member' : 'admin')}
                           disabled={promotingMember === m.id}
@@ -1075,7 +1080,7 @@ export function TeamPage() {
                           )}
                         </button>
                       )}
-                      {isOwner && m.user_id !== team.owner_id && m.role !== 'admin' && (
+                      {isOwner && m.user_id !== team.owner_id && m.role !== 'admin' && m.role !== 'owner' && (
                         <button
                           onClick={() => handleRemove(m.invited_email)}
                           disabled={removingEmail === m.invited_email}

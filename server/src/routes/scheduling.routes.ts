@@ -21,6 +21,7 @@ import { Router, type Response } from 'express'
 import { authMiddleware, type AuthRequest } from '../middleware/auth.middleware.js'
 import { supabase } from '../config/supabase.js'
 import { logger } from '../utils/logger.js'
+import { PAPEIS_ELEVADOS } from '../utils/teamAccess.js'
 import { getValidAccessToken, GCAL_EVENTS_URL } from '../utils/calendarTokens.js'
 import {
   DEFAULT_TIME_ZONE,
@@ -58,7 +59,7 @@ const upload = multer({
 // HELPERS
 // ============================================================
 
-// Verifica se é admin do time (owner ou role=admin)
+// Verifica se é admin do time (owner da linha, co-owner ou role=admin)
 async function isTeamAdmin(userId: string, teamId: string): Promise<boolean> {
   const { data: team } = await supabase
     .from('teams')
@@ -73,7 +74,7 @@ async function isTeamAdmin(userId: string, teamId: string): Promise<boolean> {
     .select('role')
     .eq('team_id', teamId)
     .eq('user_id', userId)
-    .eq('role', 'admin')
+    .in('role', [...PAPEIS_ELEVADOS])
     .eq('status', 'active')
     .maybeSingle()
 

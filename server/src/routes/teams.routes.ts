@@ -18,7 +18,16 @@ import { supabase } from '../config/supabase.js'
 import { authMiddleware, type AuthRequest } from '../middleware/auth.middleware.js'
 import { logger } from '../utils/logger.js'
 import { nanoid } from 'nanoid'
-import { canCreateOwnedTeam, canJoinTeamAsMember, getPreferredOwnerTeamId, isDevUser } from '../utils/teamAccess.js'
+import {
+  canCreateOwnedTeam,
+  canJoinTeamAsMember,
+  ehDonoDoTime,
+  filtrarContasPrivadas,
+  getPreferredOwnerTeamId,
+  isDevUser,
+  PAPEIS_ELEVADOS,
+  timesCoDono,
+} from '../utils/teamAccess.js'
 
 const router: express.Router = Router()
 
@@ -148,6 +157,21 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
     const activeOwnerTeamId = await getPreferredOwnerTeamId(userId)
     logger.info(`📋 GET /api/teams - Usuario ${userId} solicitando lista de times`)
 
+    // Times onde ele é CO-DONO (papel 'owner' em team_members): a tela usa
+    // `isOwner` para liberar os controles, então o co-dono precisa vir marcado.
+    const { data: papeis } = await supabase
+      .from('team_members')
+      .select('team_id, role')
+      .eq('user_id', userId)
+      .eq('status', 'active')
+      .not('team_id', 'is', null)
+    const idsAtivos = new Set((papeis ?? []).map(m => m.team_id as string))
+    const coDonoDe = new Set([
+      ...(papeis ?? []).filter(m => m.role === 'owner').map(m => m.team_id as string),
+      // Co-dono pelo metadata, mas só nos times em que ele é membro ativo.
+      ...(await timesCoDono(userId)).filter(id => idsAtivos.has(id)),
+    ])
+
     // 🔧 DEV USER: retorna TODOS os times (regra centralizada em teamAccess.isDevUser)
     const isDev = await isDevUser(userId, req.user!.email)
 
@@ -166,7 +190,7 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
           .eq('team_id', t.id)
           .eq('status', 'active')
         
-        return { ...t, isOwner: t.owner_id === userId, member_count: count ?? 0 }
+        return { ...t, isOwner: t.owner_id === userId || coDonoDe.has(t.id), member_count: count ?? 0 }
       }))
 
       logger.info(`🔧 DEV USER: Total de times retornados: ${teamsWithCount.length}`)
@@ -210,7 +234,7 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
     const allTeamsMap = new Map()
     ;[...(ownedTeams ?? []), ...memberTeams].forEach(t => {
       if (!allTeamsMap.has(t.id)) {
-        allTeamsMap.set(t.id, { ...t, isOwner: t.owner_id === userId })
+        allTeamsMap.set(t.id, { ...t, isOwner: t.owner_id === userId || coDonoDe.has(t.id) })
       }
     })
 
@@ -247,14 +271,7 @@ router.post('/active', authMiddleware, async (req: AuthRequest, res: Response) =
       return res.status(400).json({ success: false, message: 'teamId is required' })
     }
 
-    const { data: team } = await supabase
-      .from('teams')
-      .select('id')
-      .eq('id', teamId)
-      .eq('owner_id', userId)
-      .maybeSingle()
-
-    if (!team) {
+    if (!(await ehDonoDoTime(userId, teamId))) {
       return res.status(403).json({ success: false, message: 'Apenas owners podem definir o time ativo.' })
     }
 
@@ -330,7 +347,7 @@ router.get('/my', authMiddleware, async (req: AuthRequest, res: Response) => {
       })
     )
 
-    return res.json({ success: true, team, members: enriched, isOwner: team.owner_id === userId })
+    return res.json({ success: true, team, members: enriched, isOwner: await ehDonoDoTime(userId, team.id) })
   } catch (err) {
     logger.error('Error fetching team:', err)
     return res.status(500).json({ success: false, message: 'Internal server error' })
@@ -353,8 +370,8 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ success: false, message: 'Time não encontrado' })
     }
 
-    // Verifica se o usuário tem acesso (owner ou membro ativo)
-    const isOwner = team.owner_id === userId
+    // Verifica se o usuário tem acesso (owner, co-owner ou membro ativo)
+    const isOwner = await ehDonoDoTime(userId, teamId)
     const { data: membership } = await supabase
       .from('team_members')
       .select('id')
@@ -447,7 +464,7 @@ router.patch('/:id/evaluation-config', authMiddleware, async (req: AuthRequest, 
     if (!team) {
       return res.status(404).json({ success: false, message: 'Time não encontrado' })
     }
-    if (team.owner_id !== userId) {
+    if (!(await ehDonoDoTime(userId, teamId))) {
       return res.status(403).json({
         success: false,
         message: 'Apenas o owner pode alterar a configuração de avaliação',
@@ -496,15 +513,14 @@ router.post('/:id/invite', authMiddleware, async (req: AuthRequest, res: Respons
       return res.status(400).json({ success: false, message: 'email is required' })
     }
 
-    // Verifica ownership
+    // Verifica ownership (dono da linha OU co-dono com papel 'owner')
     const { data: team } = await supabase
       .from('teams')
       .select('id, name')
       .eq('id', teamId)
-      .eq('owner_id', userId)
       .single()
 
-    if (!team) {
+    if (!team || !(await ehDonoDoTime(userId, teamId))) {
       return res.status(403).json({ success: false, message: 'Sem permissão' })
     }
 
@@ -596,17 +612,20 @@ router.delete('/:id/members/:email', authMiddleware, async (req: AuthRequest, re
       .from('teams')
       .select('id, owner_id')
       .eq('id', teamId)
-      .eq('owner_id', userId)
       .single()
 
-    if (!team) {
+    if (!team || !(await ehDonoDoTime(userId, teamId))) {
       return res.status(403).json({ success: false, message: 'Sem permissão' })
     }
 
-    // Não pode remover a si mesmo (owner)
+    // Ninguém remove a si mesmo, e o co-dono não remove o dono da linha.
     const { data: ownerProfile } = await supabase.auth.admin.getUserById(userId)
     if (ownerProfile.user?.email?.toLowerCase() === email.toLowerCase()) {
       return res.status(400).json({ success: false, message: 'Owner não pode ser removido.' })
+    }
+    const { data: donoProfile } = await supabase.auth.admin.getUserById(team.owner_id)
+    if (donoProfile.user?.email?.toLowerCase() === email.toLowerCase()) {
+      return res.status(400).json({ success: false, message: 'O owner do time não pode ser removido.' })
     }
 
     const { error } = await supabase
@@ -633,8 +652,6 @@ router.get('/:id/meetings', authMiddleware, async (req: AuthRequest, res: Respon
     const { data: team } = await supabase.from('teams').select('owner_id').eq('id', teamId).single()
     if (!team) return res.status(404).json({ success: false, message: 'Time não encontrado' })
 
-    const isOwner = team.owner_id === userId
-
     // Verifica se é membro e seu papel
     const { data: membership } = await supabase
       .from('team_members')
@@ -644,8 +661,9 @@ router.get('/:id/meetings', authMiddleware, async (req: AuthRequest, res: Respon
       .eq('status', 'active')
       .maybeSingle()
 
+    const isOwner = await ehDonoDoTime(userId, teamId)
     const isMember = !!membership
-    const isAdmin = membership?.role === 'admin'
+    const isAdmin = (PAPEIS_ELEVADOS as readonly string[]).includes(membership?.role ?? '')
 
     // Dev user bypass: pode ver qualquer time mesmo sem ownership/membership
     const isDev = await isDevUser(userId, req.user!.email)
@@ -669,7 +687,11 @@ router.get('/:id/meetings', authMiddleware, async (req: AuthRequest, res: Respon
         .eq('status', 'active')
         .not('user_id', 'is', null)
       
-      memberIds = (members ?? []).map(m => m.user_id as string)
+      // Contas privadas ficam fora até para o dono do time.
+      memberIds = await filtrarContasPrivadas(
+        (members ?? []).map(m => m.user_id as string),
+        userId,
+      )
     } else {
       // Membro comum: apenas suas reuniões
       memberIds = [userId]
@@ -743,15 +765,14 @@ router.patch('/:id/members/:memberId/role', authMiddleware, async (req: AuthRequ
       return res.status(400).json({ success: false, message: 'role deve ser admin ou member' })
     }
 
-    // Só o owner pode alterar papéis
+    // Só quem manda no time pode alterar papéis (dono da linha ou co-dono)
     const { data: team } = await supabase
       .from('teams')
       .select('id, owner_id')
       .eq('id', teamId)
-      .eq('owner_id', userId)
       .single()
 
-    if (!team) {
+    if (!team || !(await ehDonoDoTime(userId, teamId))) {
       return res.status(403).json({ success: false, message: 'Sem permissão' })
     }
 
@@ -770,6 +791,16 @@ router.patch('/:id/members/:memberId/role', authMiddleware, async (req: AuthRequ
     // Owner não pode alterar o próprio papel
     if (targetMember.user_id === userId) {
       return res.status(400).json({ success: false, message: 'Não é possível alterar o próprio papel.' })
+    }
+
+    // Nem o co-dono rebaixa o dono da linha — senão quem promovi pode me tirar.
+    if (targetMember.user_id === team.owner_id) {
+      return res.status(400).json({ success: false, message: 'O papel do owner do time não pode ser alterado.' })
+    }
+
+    // Co-dono ('owner') só é concedido direto no banco, nunca pela tela.
+    if (targetMember.role === 'owner') {
+      return res.status(400).json({ success: false, message: 'O papel de co-owner não é alterado por aqui.' })
     }
 
     const { error } = await supabase
@@ -917,7 +948,7 @@ router.post('/:id/invite-link', authMiddleware, async (req: AuthRequest, res: Re
       return res.status(404).json({ success: false, message: 'Time não encontrado' })
     }
 
-    if (team.owner_id !== userId) {
+    if (!(await ehDonoDoTime(userId, teamId))) {
       return res.status(403).json({ success: false, message: 'Apenas o owner pode gerar links de convite' })
     }
 

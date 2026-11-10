@@ -28,6 +28,29 @@ export function DashboardPage() {
     console.log('[Dashboard] 🔍 useEffect de convite executado')
     console.log('[Dashboard] 📦 localStorage keys:', Object.keys(localStorage))
     
+    const ativarConvitePorEmail = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+        const res = await fetch(`${API}/api/teams/accept-invite`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        });
+        const data = await res.json();
+        if (data?.activated > 0) {
+          console.log('[Dashboard] 🎉 Convite por e-mail ativado:', data.activated);
+          invalidateMeetingsCache();
+          window.location.href = '/team?joined=true';
+        }
+      } catch (err) {
+        // Convite pendente é exceção: falhar aqui não pode atrapalhar o login.
+        console.warn('[Dashboard] ⚠️ Falha ao checar convite por e-mail:', err);
+      }
+    };
+
     const processPendingTeamJoin = async () => {
       const pendingToken = localStorage.getItem('pending_team_join');
       
@@ -35,6 +58,12 @@ export function DashboardPage() {
       
       if (!pendingToken) {
         console.log('[Dashboard] ℹ️ Nenhum convite pendente encontrado');
+        // ⚠️ Sem token no localStorage ainda pode haver convite POR E-MAIL
+        // esperando: o backend insere a linha como `invited` e só o
+        // accept-invite a ativa. Ninguém chamava essa rota — o convite mágico
+        // ficava pendente para sempre (zero linhas fora de 'active' no banco em
+        // 10/11/2026). É idempotente: sem convite, devolve activated=0.
+        void ativarConvitePorEmail();
         return;
       }
 
